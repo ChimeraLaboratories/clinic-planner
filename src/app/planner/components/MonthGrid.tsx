@@ -31,7 +31,7 @@ export default function MonthGrid({ anchorMonth, data }: { anchorMonth: Date; da
             </div>
 
             <div className="grid grid-cols-7 border border-slate-200 rounded-xl overflow-hidden bg-white">
-                {days.map((d) => {
+                {days.filter((d) => isSameMonth(d, anchorMonth)).map((d) => {
                     const iso = toISODate(d);
                     const inMonth = isSameMonth(d, anchorMonth);
                     const sessions = sessionsByDate.get(iso) ?? [];
