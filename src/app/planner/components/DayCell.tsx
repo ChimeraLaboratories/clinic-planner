@@ -1,24 +1,44 @@
 "use client";
 
 import type { Session } from "../types/planner";
-import SessionChip from "./SessionChip";
 
 function sumValue(sessions: Session[], code: string): number {
     let total = 0;
+    const target = code.toUpperCase();
 
     for (const s of sessions as any[]) {
-        const c = String(s.session_type ?? s.type ?? s.clinic_code ?? "").toUpperCase();
+        const c = String(s.session_type ?? s.type ?? s.clinic_code ?? "")
+            .trim()
+            .toUpperCase();
 
-        const raw: unknown = s.value ?? 0;
+        const raw: unknown = s.value ?? s.session_value ?? s.clinic_value ?? 0;
         const v: number = typeof raw === "number" ? raw : parseFloat(String(raw));
 
-        if (c === code && Number.isFinite(v)) total += v;
+        // ✅ allow ST, ST1, ST-..., "ST ..." etc.
+        const matches =
+            c === target ||
+            c.startsWith(target) ||
+            c.includes(` ${target}`) ||
+            c.includes(`${target} `);
+
+        if (matches && Number.isFinite(v)) total += v;
     }
+
     return total;
 }
 
-function ymdFromApiDate(input: string) {
-    return (input ?? "").slice(0, 10);
+function ymdFromApiDate(input: any) {
+    if (!input) return "";
+    const s = String(input);
+    // ISO
+    if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10);
+    // Attempt Date parse fallback
+    const d = new Date(s);
+    if (!Number.isFinite(d.getTime())) return "";
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, "0");
+    const dd = String(d.getDate()).padStart(2, "0");
+    return `${yyyy}-${mm}-${dd}`;
 }
 
 function usedRoomsCount(sessions: Session[]) {
@@ -47,7 +67,7 @@ export default function DayCell({
     cliniciansById: Map<number, string>;
     onSelect: (date: Date) => void;
 }) {
-    // ✅ normalize [date] key to local YYYY-MM-DD (matches how you pick dates elsewhere)
+    // normalize [date] key to local YYYY-MM-DD (matches how you pick dates elsewhere)
     const dayKey = (() => {
         const yyyy = date.getFullYear();
         const mm = String(date.getMonth() + 1).padStart(2, "0");
@@ -55,13 +75,22 @@ export default function DayCell({
         return `${yyyy}-${mm}-${dd}`;
     })();
 
-    // ✅ FIX: only count sessions that belong to this [date]
+    // only count sessions that belong to this [date]
     const daySessions = (sessions as any[]).filter((s) => {
-        const apiDate = s.session_date ?? s.date ?? "";
+        const apiDate =
+            s.session_date ??
+            s.date ??
+            s.sessionDate ??
+            s.clinic_date ??
+            s.clinicDate;
+
         return ymdFromApiDate(String(apiDate)) === dayKey;
     });
 
-    const clinics = daySessions.length;
+    if (inMonth && daySessions.length > 0) {
+        console.log("Day:", dayKey, "keys:", Object.keys(daySessions[0] as any));
+        console.log("Day sample obj:", daySessions[0]);
+    }
 
     const usedRooms = usedRoomsCount(daySessions);
     const emptyRooms = Math.max(0, (totalRooms ?? 0) - usedRooms);
@@ -70,53 +99,58 @@ export default function DayCell({
 
     const valueCL = sumValue(daySessions as any, "CL")
 
-    console.log("ST raw values", (daySessions as any[]).filter(s => s.session_type==="ST").map(s => s.value));
-
     return (
         <button
             type="button"
-            onClick={() => onSelect(date)}
+            onClick={() => inMonth && onSelect(date)}
+            disabled={!inMonth}
             className={`h-[140px] border border-slate-200 p-2 relative text-left w-full ${
-                inMonth ? "bg-white hover:bg-slate-50" : "bg-slate-50"
+                inMonth ? "bg-white hover:bg-slate-50" : "bg-slate-50 opacity-50 cursor-default"
             }`}
         >
             <div className="absolute top-2 left-2 text-xs text-slate-700 font-medium">
                 {inMonth ? date.getDate() : ""}
             </div>
 
-            <div className="mt-6 space-y-1 text-[11px] text-slate-600">
-                <div className={`flex justify-between rounded px-1 py-0.5 ${
-                    emptyRooms >=3 ? "bg-red-600 text-white font-medium" : "text-slate-800"}`}>
-                    <span>Empty Rooms</span>
-                    <span>{emptyRooms}</span>
-                </div>
-                <div className={`flex justify-between rounded px-1 py-0.5 ${
-                    valueST > 6
-                    ? "text-slate-800"
-                        : valueST > 5
-                    ? "bg-orange-100 text-white font-medium"
-                        : "bg-red-100 text-red font-medium"
-                }`}>
-                    <span>Total ST Clinics</span>
-                    <span className="text-slate-800">{valueST.toFixed(2)}</span>
-                </div>
-                <div className={`flex justify-between rounded px-1 py-0.5 ${
-                    valueCL > 2
-                        ? "text-slate-800"
-                        : valueCL > 1
-                            ? "bg-orange-100 text-white font-medium"
-                            : "bg-red-100 text-red font-medium"
-                }`}>
-                    <span>Total CL Clinics</span>
-                    <span className="text-slate-800">{valueCL.toFixed(2)}</span>
-                </div>
-            </div>
+            {/* ✅ Only show stats if the day is in the current month */}
+            {inMonth && (
+                <div className="mt-5 space-y-1 text-[11px] text-slate-600">
+                    <div
+                        className={`flex justify-between rounded px-1 py-0.5 ${
+                            emptyRooms >= 3 ? "bg-red-600 text-white font-medium" : "text-slate-800"
+                        }`}
+                    >
+                        <span>Empty Rooms</span>
+                        <span>{emptyRooms}</span>
+                    </div>
 
-            <div className="space-y-1">
-                {daySessions.length > 3 && (
-                    <div className="text-xs text-slate-500">+{daySessions.length - 3} more</div>
-                )}
-            </div>
+                    <div
+                        className={`flex justify-between rounded px-1 py-0.5 ${
+                            valueST > 6
+                                ? "text-slate-800"
+                                : valueST > 5
+                                    ? "bg-orange-100 text-slate-900 font-medium"
+                                    : "bg-red-100 text-red-700 font-medium"
+                        }`}
+                    >
+                        <span>Total ST Clinics</span>
+                        <span>{valueST.toFixed(2)}</span>
+                    </div>
+
+                    <div
+                        className={`flex justify-between rounded px-1 py-0.5 ${
+                            valueCL > 2
+                                ? "text-slate-800"
+                                : valueCL >= 1
+                                    ? "bg-orange-100 text-slate-900 font-medium"
+                                    : "bg-red-100 text-red-700 font-medium"
+                        }`}
+                    >
+                        <span>Total CL Clinics</span>
+                        <span>{valueCL.toFixed(2)}</span>
+                    </div>
+                </div>
+            )}
         </button>
     );
 }

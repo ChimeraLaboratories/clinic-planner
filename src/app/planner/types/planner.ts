@@ -18,6 +18,8 @@ export type Session = {
     time?: string; // Full Day / AM / PM etc
     notes?: string;
     status?: string;
+    session_type?: "ST" | "CL" | string;
+    value?: number | string;
 };
 
 export type PlannerResponse = {

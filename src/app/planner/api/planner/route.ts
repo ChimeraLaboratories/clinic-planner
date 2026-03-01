@@ -20,10 +20,33 @@ export async function GET(req: Request) {
         const [rooms] = await db.query(`SELECT id, name FROM rooms WHERE is_active=1`);
         const [clinicians] = await db.query(`SELECT id, display_name, role_code, grade_code FROM clinicians WHERE is_active=1`);
         const [sessions] = await db.query(
-            `SELECT id, session_date, room_id, clinician_id, status
-       FROM sessions
-       WHERE session_date BETWEEN ? AND ?
-       ORDER BY session_date`,
+            `
+                SELECT
+                    s.id,
+                    s.session_date,
+                    s.room_id,
+                    s.clinician_id,
+                    s.status,
+                    s.session_type,
+
+                    CASE
+                        WHEN UPPER(s.session_type) = 'ST'
+                            THEN COALESCE(cc.st_value, 0)
+                        WHEN UPPER(s.session_type) = 'CL'
+                            THEN COALESCE(cc.cl_value, 0)
+                        ELSE 0
+                        END AS value
+
+                FROM sessions s
+
+                    LEFT JOIN clinician_capacity cc
+                ON cc.clinician_id = s.clinician_id
+                    AND DATE(s.session_date) BETWEEN cc.effective_from
+                    AND COALESCE(cc.effective_to, '9999-12-31')
+
+                WHERE s.session_date BETWEEN ? AND ?
+                ORDER BY s.session_date, s.room_id, s.id
+            `,
             [from, to]
         );
 

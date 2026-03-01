@@ -26,10 +26,39 @@ type PlannerTotalsLikeResponse = {
 function normalizeTotals(raw: any) {
     const root = raw?.data ?? raw ?? {};
     const stats = root?.stats ?? {};
-    return {
-        totalStValue: Number(stats.totalStValue ?? root.totalStValue ?? 0),
-        totalClValue: Number(stats.totalClValue ?? root.totalClValue ?? 0),
-    };
+
+    // 1) Prefer explicit totals if your API provides them
+    const explicitSt = stats.totalStValue ?? root.totalStValue;
+    const explicitCl = stats.totalClValue ?? root.totalClValue;
+
+    if (explicitSt != null || explicitCl != null) {
+        return {
+            totalStValue: Number(explicitSt ?? 0),
+            totalClValue: Number(explicitCl ?? 0),
+        };
+    }
+
+    // 2) Fallback: compute totals from sessions array
+    const sessions: any[] = Array.isArray(root.sessions) ? root.sessions : [];
+
+    let totalStValue = 0;
+    let totalClValue = 0;
+
+    for (const s of sessions) {
+        const t = String(s.session_type ?? s.type ?? s.clinic_code ?? "")
+            .trim()
+            .toUpperCase();
+
+        const rawVal = s.value ?? 0;
+        const v = typeof rawVal === "number" ? rawVal : parseFloat(String(rawVal));
+
+        if (!Number.isFinite(v)) continue;
+
+        if (t.startsWith("ST")) totalStValue += v;
+        else if (t.startsWith("CL")) totalClValue += v;
+    }
+
+    return { totalStValue, totalClValue };
 }
 
 export default async function PlannerDayPage({
@@ -113,14 +142,14 @@ export default async function PlannerDayPage({
                             <div className="p-6">
                                 <div className="text-base font-medium text-gray-700 tracking-tight">Total ST</div>
                                 <div className="text-3xl font-bold text-gray-900">
-                                    {Math.round(totals.totalStValue)}
+                                    {totals.totalStValue.toFixed(2)}
                                 </div>
                             </div>
 
                             <div className="p-6 border-l">
                                 <div className="text-base font-medium text-gray-700 tracking-tight">Total CL</div>
                                 <div className="text-3xl font-bold text-gray-900">
-                                    {Math.round(totals.totalClValue)}
+                                    {totals.totalStValue.toFixed(2)}
                                 </div>
                             </div>
 
