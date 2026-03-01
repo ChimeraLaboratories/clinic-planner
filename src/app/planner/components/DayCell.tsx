@@ -85,10 +85,6 @@ export default function DayCell({
             </div>
 
             <div className="mt-6 space-y-1 text-[11px] text-slate-600">
-                <div className="flex justify-between">
-                    <span>Clinics</span>
-                    <span className="text-slate-800">{clinics}</span>
-                </div>
                 <div className={`flex justify-between rounded px-1 py-0.5 ${
                     emptyRooms >=3 ? "bg-red-600 text-white font-medium" : "text-slate-800"}`}>
                     <span>Empty Rooms</span>
