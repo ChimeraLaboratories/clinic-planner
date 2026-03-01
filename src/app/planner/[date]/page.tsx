@@ -81,6 +81,9 @@ export default async function PlannerDayPage({params,}: {
                             {displayDate.toLocaleDateString("en-GB")}
                         </p>
                     </div>
+                    <a href="/planner" className="inline-flex items-center px-3 py-2 text-sm rounded border hover:bg-gray-50">
+                        ← Back to Planner
+                    </a>
                 </div>
 
                 {/* Stats */}
