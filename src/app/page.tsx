@@ -2,77 +2,73 @@
 // This tells Next.js this file runs in the browser.
 // We need this because we're using React state (useState)
 
-import { useState } from "react";
+import { useMemo } from "react";
+import { MonthCalendar } from "@/components/clinic-planner/MonthCalendar"
 // useState lets us store and manage dynamic values inside the component.
 
+// Pad numbers to 2 digits (1 > 01)
+function pad2(n: number) {
+  return String(n).padStart(2, "0");
+}
+
+// Convert date -> YYYY-MM-DD
+function toDateKey(d: Date) {
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+}
+
+function sundayStartIndex(jsDay: number) {
+    return jsDay;
+}
+
+
 export default function Home() {
-  // new Date(2026, 0) means Year = 2026, Month = 0 (JS is 0 based so 0 = January)
-  const [selectedMonth] = useState(new Date(2026, 0));
+  const year = 2026;
+  const month = 0; // January
 
-  // Extract year and month from selected date
-  const year = selectedMonth.getFullYear();
-  const month = selectedMonth.getMonth();
+  // Calculate month layout
+  const { leadingEmptyCells, days } = useMemo(() => {
+    const first = new Date(year, month, 1);
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const leading = sundayStartIndex(first.getDay());
 
-  // getDay returns what day the 1st of the month falls on
-  const jsDay = new Date(year, month, 1).getDay();
+    const daysArr = Array.from({ length: daysInMonth }, (_, i) => {
+      const day = i + 1;
+      const dateKey = toDateKey(new Date(year, month, day));
+      return { day, dateKey };
+    });
 
-  const firstDay = new Date(year, month, 1).getDay()
-
-  // Get how many days are in month
-  const daysInMonth = new Date(year, month +1, 0).getDate();
-
-  // Creates an array holding all days
-  const daysArray = Array.from({ length: daysInMonth }, (_, i) => i + 1);
+    return { leadingEmptyCells: leading, days: daysArr };
+  }, [year, month]);
 
   return (
       <main className="min-h-screen bg-slate-100 p-10">
-        {/* Page container with background and padding */}
-
         <div className="max-w-7xl mx-auto">
-          {/* Limits width and centers content */}
+          <MonthCalendar
+              title="Clinic Planner – January 2026"
+              weekdayLabels={["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]}
+              leadingEmptyCells={leadingEmptyCells}
+              days={days}
+              renderDay={({ day }) => (
+                  <div className="bg-white rounded-2xl shadow p-4 h-44 hover:shadow-lg transition cursor-pointer">
+                    <div className="flex justify-between items-center">
+                      <span className="font-semibold text-lg">{day}</span>
+                      <span className="text-xs bg-blue-100 text-blue-600 px-2 py-1 rounded-full">
+                  3 free
+                </span>
+                    </div>
 
-          <h1 className="text-4xl font-bold mb-8">
-            Clinic Planner - January 2026
-          </h1>
+                    <div className="mt-3 space-y-1 text-sm">
+                      <div className="text-gray-700">Room 1 – Zara</div>
+                      <div className="text-gray-700">Room 2 – Cane</div>
+                      <div className="text-gray-400">Room 3 – Free</div>
+                    </div>
 
-          {/* Calendar grid:
-              grid-cols-7 = 7 columns (Mon-Sun style layout)
-              gap-6 = spacing between cells
-           */}
-          <div className="grid grid-cols-7 gap-6 mb-4 text-sm font-medium text-gray-600">
-            {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((day) => (
-                <div key={day}>{day}</div>
-            ))}
-
-            {/* Loop through each day in the month */}
-            {daysArray.map((day) => (
-                <div key={day} className="bg-white rounded -2xl shadow p-4 h-44 hover:shadow-lg transition cursor-pointer">
-                  {/* Top section of day card */}
-                  <div className="flex justify-between items-center">
-                    <span className="font-semibold text-lg">
-                      {day}
-                    </span>
-
-                    {/* Fake "rooms free" badge for now */}
-                    <span className="text-xs bg-blue-100 text-blue-600 px-2 py-1 rounded-full">
-                      3 free
-                    </span>
+                    <div className="mt-4 text-sm font-medium text-blue-600">
+                      Value: 42
+                    </div>
                   </div>
-
-                  {/* Room preview list (currently hardcoded) */}
-                  <div className="mt-3 space-y-1 text-sm">
-                    <div className="text-grey-700">Room 1 - Zara</div>
-                    <div className="text-grey-700">Room 2 - Cane</div>
-                    <div className="text-grey-700">Room 3 - Free</div>
-                  </div>
-
-                  {/* Fake clinical value total */}
-                  <div className="mt-4 text-sm font-medium text-blue-600">
-                    Value: 42
-                  </div>
-                </div>
-            ))}
-          </div>
+              )}
+          />
         </div>
       </main>
   );
