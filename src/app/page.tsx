@@ -8,6 +8,7 @@ export default function Page() {
     async function load() {
         const today = new Date();
         const from = today.toISOString().split("T")[0];
+
         const toDate = new Date(today);
         toDate.setDate(today.getDate() + 6);
         const to = toDate.toISOString().split("T")[0];
@@ -17,6 +18,7 @@ export default function Page() {
         });
 
         const json = await res.json();
+        console.log("API Response:", json);
         setData(json);
     }
 
