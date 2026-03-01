@@ -59,12 +59,43 @@ export default function DayRoomsClient({
         router.refresh();
     }
 
+    async function deleteRoomSessions(sessionIds: number[]) {
+        if (sessionIds.length === 0) return;
+
+        setDeleting(sessionIds[0]);
+
+        const results = await Promise.all(
+            sessionIds.map((id) =>
+                fetch(`/planner/api/sessions/${id}`, { method: "DELETE" }).then((r) => ({
+                    id,
+                    ok: r.ok,
+                }))
+            )
+        );
+
+        setDeleting(null);
+
+        const failed = results.filter((x) => !x.ok);
+        if (failed.length) {
+            alert(`Failed to delete ${failed.length} session(s).`);
+            return;
+        }
+
+        router.refresh();
+    }
+
     return (
         <>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 items-start">
                 {rooms.map((room) => {
+                    const hasSessions = room.sessions.length > 0;
+
                     const clinicianNames = Array.from(
-                        new Set(room.sessions.map((s) => s.clinicianName).filter(Boolean))
+                        new Set(
+                            room.sessions
+                                .map((s: any) => s.clinicianFullName ?? s.clinicianName)
+                                .filter(Boolean)
+                        )
                     );
 
                     const needsSupervisorWarning = room.sessions.some((s) =>
@@ -74,7 +105,9 @@ export default function DayRoomsClient({
                     return (
                         <div
                             key={room.id}
-                            className={`rounded-lg border bg-white p-5 shadow-sm ${
+                            className={`rounded-lg border bg-white shadow-sm ${
+                                hasSessions ? "p-5" : "p-4"
+                            } ${
                                 needsSupervisorWarning
                                     ? "border-red-600 bg-red-50"
                                     : room.used
@@ -86,15 +119,28 @@ export default function DayRoomsClient({
                                 <h3 className="font-semibold text-gray-900">{room.name}</h3>
 
                                 <div className="flex items-center gap-2">
-                                    <button
-                                        onClick={() => openCreateForRoom(room.id)}
-                                        className="text-xs px-2 py-1 rounded border hover:bg-blue-50 text-blue-600 border-blue-200"
-                                    >
-                                        + Add
-                                    </button>
+                                    {!hasSessions ? (
+                                        <button
+                                            onClick={() => openCreateForRoom(room.id)}
+                                            className="text-xs px-2 py-1 rounded border hover:bg-blue-50 text-blue-600 border-blue-200"
+                                        >
+                                            + Add
+                                        </button>
+                                    ) : (
+                                        <button
+                                            onClick={() =>
+                                                deleteRoomSessions(room.sessions.map((s) => s.id))
+                                            }
+                                            disabled={deleting !== null}
+                                            className="text-xs px-2 py-1 rounded border hover:bg-gray-50 disabled:opacity-50"
+                                            title="Delete session(s) in this room"
+                                        >
+                                            {deleting !== null ? "Deleting…" : "Delete"}
+                                        </button>
+                                    )}
 
                                     <span
-                                        className={`text-xs px-2 py-1 rounded-full ${
+                                        className={`inline-flex items-center justify-center text-center leading-tight text-xs font-medium px-3 py-1 rounded-full ${
                                             needsSupervisorWarning
                                                 ? "bg-red-200 text-red-800"
                                                 : room.used
@@ -111,43 +157,20 @@ export default function DayRoomsClient({
                                 </div>
                             </div>
 
-                            <div className="mt-3 text-sm text-gray-600 space-y-1">
-                                {clinicianNames.length > 0 ? (
-                                    clinicianNames.map((name) => <div key={name}>• {name}</div>)
+                            {/* Only show a simple summary line under the header */}
+                            <div className="mt-3 text-sm text-gray-600">
+                                {hasSessions ? (
+                                    <div className="space-y-1">
+                                        {clinicianNames.length > 0 ? (
+                                            clinicianNames.map((name) => (
+                                                <div key={name}>• {name}</div>
+                                            ))
+                                        ) : (
+                                            <div className="text-gray-400">• Unassigned</div>
+                                        )}
+                                    </div>
                                 ) : (
-                                    <div className="text-gray-400">No clinician assigned</div>
-                                )}
-                            </div>
-
-                            <div className="mt-4 border-t pt-3 space-y-2">
-                                {room.sessions.length === 0 ? (
-                                    <div className="text-sm text-gray-400">No sessions</div>
-                                ) : (
-                                    room.sessions.map((s) => (
-                                        <div
-                                            key={s.id}
-                                            className={`flex items-start justify-between gap-3 rounded p-2 ${
-                                                (s as any).requiresSupervisorWarning ? "bg-red-100" : ""
-                                            }`}
-                                        >
-                                            <div className="text-sm">
-                                                <div className="font-medium text-gray-900">
-                                                    {s.clinicianName ?? "Unassigned"}
-                                                </div>
-                                                <div className="text-gray-500">
-                                                    {(s.startTime ?? "--:--")} – {(s.endTime ?? "--:--")}
-                                                </div>
-                                            </div>
-
-                                            <button
-                                                onClick={() => deleteSession(s.id)}
-                                                disabled={deleting === s.id}
-                                                className="text-xs px-2 py-1 rounded border hover:bg-gray-50 disabled:opacity-50"
-                                            >
-                                                {deleting === s.id ? "Deleting…" : "Delete"}
-                                            </button>
-                                        </div>
-                                    ))
+                                    <div className="text-gray-400">No Clinic today</div>
                                 )}
                             </div>
                         </div>
