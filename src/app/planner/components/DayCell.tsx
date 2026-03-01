@@ -47,7 +47,7 @@ export default function DayCell({
     cliniciansById: Map<number, string>;
     onSelect: (date: Date) => void;
 }) {
-    // ✅ normalize day key to local YYYY-MM-DD (matches how you pick dates elsewhere)
+    // ✅ normalize [date] key to local YYYY-MM-DD (matches how you pick dates elsewhere)
     const dayKey = (() => {
         const yyyy = date.getFullYear();
         const mm = String(date.getMonth() + 1).padStart(2, "0");
@@ -55,7 +55,7 @@ export default function DayCell({
         return `${yyyy}-${mm}-${dd}`;
     })();
 
-    // ✅ FIX: only count sessions that belong to this day
+    // ✅ FIX: only count sessions that belong to this [date]
     const daySessions = (sessions as any[]).filter((s) => {
         const apiDate = s.session_date ?? s.date ?? "";
         return ymdFromApiDate(String(apiDate)) === dayKey;

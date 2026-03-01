@@ -5,6 +5,7 @@ import { buildMonthGrid, isSameMonth, toISODate } from "../utils/date";
 import DayCell from "./DayCell";
 import DayDrawer from "@/app/planner/components/DayDrawer";
 import {useMemo, useState} from "react";
+import {useRouter} from "next/navigation";
 
 function groupByDate(sessions: Session[]) {
     const map = new Map<string, Session[]>();
@@ -22,11 +23,12 @@ export default function MonthGrid({ anchorMonth, data, onRefresh, }: { anchorMon
     const sessionsByDate = groupByDate(data.sessions ?? []);
     const dow = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
     const totalRooms = data.rooms?.length ?? 0;
+    const router = useRouter();
 
     const roomsById = useMemo(() => {
         const m = new Map<number, string>();
         for (const r of data.rooms) {
-            m.set(Number(r.id), String(r.name)); // ✅ force number key + string value
+            m.set(Number(r.id), String(r.name));
         }
         return m;
     }, [data.rooms]);
@@ -86,7 +88,7 @@ export default function MonthGrid({ anchorMonth, data, onRefresh, }: { anchorMon
                             totalRooms={data?.rooms?.length ?? 0}
                             roomsById={roomsById}
                             cliniciansById={cliniciansById}
-                            onSelect={(date) => setSelectedDate(date)}
+                            onSelect={(date) => router.push(`/planner/${toISODate(date)}`)}
                         />
                     );
                 })}
