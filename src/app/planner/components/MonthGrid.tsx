@@ -4,7 +4,7 @@ import type { PlannerResponse, Session } from "../types/planner";
 import { buildMonthGrid, isSameMonth, toISODate } from "../utils/date";
 import DayCell from "./DayCell";
 import DayDrawer from "@/app/planner/components/DayDrawer";
-import {useState} from "react";
+import {useMemo, useState} from "react";
 
 function groupByDate(sessions: Session[]) {
     const map = new Map<string, Session[]>();
@@ -22,6 +22,18 @@ export default function MonthGrid({ anchorMonth, data }: { anchorMonth: Date; da
     const sessionsByDate = groupByDate(data.sessions ?? []);
     const dow = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
     const totalRooms = data.rooms?.length ?? 0;
+
+    const roomsById = useMemo(() => {
+        const m = new Map<number, string>();
+        for (const r of data.rooms ?? []) m.set(Number((r as any).id), (r as any).name ?? (r as any).label ?? "");
+        return m;
+    }, [data.rooms]);
+
+    const cliniciansById = useMemo(() => {
+        const m = new Map<number, string>();
+        for (const r of data.clinicians ?? []) m.set(Number((r as any).id), (r as any).name ?? (r as any).label ?? "");
+        return m;
+    }, [data.clinicians]);
 
     const [selectedDate, setSelectedDate] = useState<Date | null>(null);
 
@@ -50,13 +62,22 @@ export default function MonthGrid({ anchorMonth, data }: { anchorMonth: Date; da
                             inMonth={inMonth}
                             sessions={sessions}
                             totalRooms={totalRooms}
+                            roomsById={roomsById}
+                            cliniciansById={cliniciansById}
                             onSelect={(date) => setSelectedDate(date)}
                         />
                     );
                 })}
             </div>
 
-            <DayDrawer open={!!selectedDate} date={selectedDate} sessions={selectedSessions} onClose={() => setSelectedDate(null)}/>
+            <DayDrawer
+                open={!!selectedDate}
+                date={selectedDate}
+                sessions={selectedSessions}
+                roomsById={roomsById}
+                cliniciansById={cliniciansById}
+                onClose={() => setSelectedDate(null)}
+            />
         </div>
     );
 }

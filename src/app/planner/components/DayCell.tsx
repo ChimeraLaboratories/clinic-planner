@@ -2,7 +2,6 @@
 
 import type { Session } from "../types/planner";
 import SessionChip from "./SessionChip";
-import {string} from "postcss-selector-parser";
 
 function sumValue(sessions: Session[], code: string) {
     let total = 0;
@@ -23,11 +22,13 @@ function usedRoomsCount(sessions: Session[]) {
     return set.size;
 }
 
-export default function DayCell({date, inMonth, sessions, totalRooms, onSelect,}: {
+export default function DayCell({date, inMonth, sessions, totalRooms, roomsById, cliniciansById, onSelect,}: {
     date: Date;
     inMonth: boolean;
     sessions: Session[];
     totalRooms: number;
+    roomsById: Map<number, string>;
+    cliniciansById: Map<number, string>;
     onSelect: (date: Date) => void;
 }) {
 
@@ -68,7 +69,12 @@ export default function DayCell({date, inMonth, sessions, totalRooms, onSelect,}
 
             <div className="space-y-1">
                 {sessions.slice(0, 3).map((s) => (
-                    <SessionChip key={String(s.id)} session={s} />
+                    <SessionChip
+                        key={String(s.id)}
+                        session={s}
+                        roomsById={roomsById}
+                        cliniciansById={cliniciansById}
+                    />
                 ))}
                 {sessions.length > 3 && (
                     <div className="text-xs text-slate-500">+{sessions.length - 3} more</div>
