@@ -24,8 +24,8 @@ export default function PlannerShell({
         <div className="min-h-screen bg-slate-100">
             <TopBar anchorMonth={anchorMonth} onPrevMonth={onPrevMonth} onNextMonth={onNextMonth} />
 
-            <main className="mx-auto max-w-7xl px-6 py-6">
-                <div className="rounded-2xl bg-white shadow">
+            <main className="max-w-7xl mx-auto px-6 py-8">
+                <div className="bg-white rounded-2xl shadow-sm border border-slate-200">
                     <div className="px-6 pt-5">
                         <ViewTabs />
                     </div>

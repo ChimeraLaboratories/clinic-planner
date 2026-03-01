@@ -12,7 +12,7 @@ export default function TopBar({
     onNextMonth: () => void;
 }) {
     return (
-        <header className="sticky top-0 z-10 bg-white/90 backdrop-blur border-b">
+        <header className="bg-white border-b border-slate-200 shadow-sm">
             <div className="mx-auto max-w-7xl px-6 py-4 flex items-center justify-between">
                 <div className="flex items-center gap-3">
                     <div className="h-9 w-9 rounded-lg bg-blue-600" />

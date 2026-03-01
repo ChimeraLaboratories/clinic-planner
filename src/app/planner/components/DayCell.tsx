@@ -13,7 +13,8 @@ export default function DayCell({
     sessions: Session[];
 }) {
     return (
-        <div className={`min-h-[110px] border-t border-l p-2 ${inMonth ? "bg-white" : "bg-slate-50"}`}>
+        <div className={`h-[140px] border border-slate-200 p-2 relative ${inMonth ? "bg-white" : "bg-slate-50"}`}
+        >
     <div className="text-xs text-slate-600 mb-2">{date.getDate()}</div>
 
         <div className="space-y-1">
