@@ -32,10 +32,21 @@ export default function TopBar({
                     </button>
                 </div>
 
-                <div className="flex items-center gap-2">
-                    <Link href="/planner/clinicians"  className="h-9 px-4 rounded-lg border bg-white">Clinicians</Link>
-                    <button className="h-9 px-4 rounded-lg border bg-white">Export</button>
-                    <button className="h-9 px-4 rounded-lg border bg-white">Publish</button>
+                <div className="flex items-center gap-3">
+                    <Link
+                        href="/planner/clinicians"
+                        className="inline-flex items-center px-3 py-2 rounded border text-sm"
+                    >
+                        Clinicians
+                    </Link>
+
+                    <button className="inline-flex items-center px-3 py-2 rounded border text-sm">
+                        Export
+                    </button>
+
+                    <button className="inline-flex items-center px-3 py-2 rounded border text-sm">
+                        Publish
+                    </button>
                 </div>
             </div>
         </header>
