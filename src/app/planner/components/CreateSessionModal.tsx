@@ -117,11 +117,17 @@ export default function CreateSessionModal({
                             onChange={(e) => setClinicianId(e.target.value ? Number(e.target.value) : "")}
                         >
                             <option value="">Unassigned</option>
-                            {clinicians.map((c: any) => (
-                                <option key={c.id} value={c.id}>
-                                    {c.display_name ?? c.full_name ?? c.name ?? `Clinician ${c.id}`}
-                                </option>
-                            ))}
+                            {clinicians.map((c: any) => {
+                                const label =
+                                    String(c.display_name ?? c.full_name ?? c.name ?? "").trim() ||
+                                    `Clinician ${c.id}`;
+
+                                return (
+                                    <option key={c.id} value={c.id}>
+                                        {label}
+                                    </option>
+                                );
+                            })}
                         </select>
                     </label>
 

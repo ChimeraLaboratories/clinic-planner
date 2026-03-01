@@ -1,6 +1,7 @@
 "use client";
 
 import { formatMonthTitle } from "../utils/date";
+import Link from "next/link";
 
 export default function TopBar({
                                    anchorMonth,
@@ -32,7 +33,7 @@ export default function TopBar({
                 </div>
 
                 <div className="flex items-center gap-2">
-                    <button className="h-9 px-4 rounded-lg border bg-white">Import</button>
+                    <Link href="/planner/clinicians"  className="h-9 px-4 rounded-lg border bg-white">Clinicians</Link>
                     <button className="h-9 px-4 rounded-lg border bg-white">Export</button>
                     <button className="h-9 px-4 rounded-lg border bg-white">Publish</button>
                 </div>
