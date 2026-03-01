@@ -3,12 +3,16 @@
 import type { Session } from "../types/planner";
 import SessionChip from "./SessionChip";
 
-function sumValue(sessions: Session[], code: string) {
+function sumValue(sessions: Session[], code: string): number {
     let total = 0;
+
     for (const s of sessions as any[]) {
-        const c = (s.clinic_code ?? s.clinicType ?? s.type ?? "").toString().toUpperCase();
-        const v = Number(s.value ?? s.clinical_value ?? 0);
-        if (c === code) total += Number.isFinite(v) ? v : 0;
+        const c = String(s.session_type ?? s.type ?? s.clinic_code ?? "").toUpperCase();
+
+        const raw: unknown = s.value ?? 0;
+        const v: number = typeof raw === "number" ? raw : parseFloat(String(raw));
+
+        if (c === code && Number.isFinite(v)) total += v;
     }
     return total;
 }
@@ -62,8 +66,11 @@ export default function DayCell({
     const usedRooms = usedRoomsCount(daySessions);
     const emptyRooms = Math.max(0, (totalRooms ?? 0) - usedRooms);
 
-    const valueST = sumValue(daySessions, "ST");
-    const valueCL = sumValue(daySessions, "CL");
+    const valueST = sumValue(daySessions as any, "ST")
+
+    const valueCL = sumValue(daySessions as any, "CL")
+
+    console.log("ST raw values", (daySessions as any[]).filter(s => s.session_type==="ST").map(s => s.value));
 
     return (
         <button
@@ -82,17 +89,30 @@ export default function DayCell({
                     <span>Clinics</span>
                     <span className="text-slate-800">{clinics}</span>
                 </div>
-                <div className="flex justify-between">
+                <div className={`flex justify-between rounded px-1 py-0.5 ${
+                    emptyRooms >=3 ? "bg-red-600 text-white font-medium" : "text-slate-800"}`}>
                     <span>Empty Rooms</span>
-                    <span className="text-slate-800">{emptyRooms}</span>
+                    <span>{emptyRooms}</span>
                 </div>
-                <div className="flex justify-between">
+                <div className={`flex justify-between rounded px-1 py-0.5 ${
+                    valueST > 6
+                    ? "text-slate-800"
+                        : valueST > 5
+                    ? "bg-orange-100 text-white font-medium"
+                        : "bg-red-100 text-red font-medium"
+                }`}>
                     <span>Total ST Clinics</span>
-                    <span className="text-slate-800">{valueST}</span>
+                    <span className="text-slate-800">{valueST.toFixed(2)}</span>
                 </div>
-                <div className="flex justify-between">
+                <div className={`flex justify-between rounded px-1 py-0.5 ${
+                    valueCL > 2
+                        ? "text-slate-800"
+                        : valueCL > 1
+                            ? "bg-orange-100 text-white font-medium"
+                            : "bg-red-100 text-red font-medium"
+                }`}>
                     <span>Total CL Clinics</span>
-                    <span className="text-slate-800">{valueCL}</span>
+                    <span className="text-slate-800">{valueCL.toFixed(2)}</span>
                 </div>
             </div>
 

@@ -81,20 +81,25 @@ export async function getPlannerData(from: string, to: string) {
         `
             SELECT
                 s.id,
-                s.session_date AS date,
-    s.clinician_id AS clinicianId,
-    COALESCE(NULLIF(c.display_name, ''), c.full_name) AS clinicianName,
-    s.room_id AS roomId,
-    r.name AS roomName,
-    s.session_type AS type,
-    s.slot AS time,
-    s.notes,
-    s.status
+                s.session_date,
+                s.room_id,
+                s.clinician_id,
+                s.session_type,
+                s.slot,
+                s.status,
+                s.notes,
+                CASE
+                    WHEN s.session_type = 'ST' THEN COALESCE(cc.st_value, 0)
+                    WHEN s.session_type = 'CL' THEN COALESCE(cc.cl_value, 0)
+                    ELSE 0
+                    END AS value
             FROM sessions s
-                LEFT JOIN clinicians c ON c.id = s.clinician_id
-                LEFT JOIN rooms r ON r.id = s.room_id
+                LEFT JOIN clinician_capacity cc
+            ON cc.clinician_id = s.clinician_id
+                AND s.session_date >= cc.effective_from
+                AND (cc.effective_to IS NULL OR s.session_date <= cc.effective_to)
             WHERE s.session_date BETWEEN ? AND ?
-            ORDER BY s.session_date ASC
+            ORDER BY s.session_date, s.slot;
         `,
         [from, to]
     );
