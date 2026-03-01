@@ -21,6 +21,7 @@ export default function MonthGrid({ anchorMonth, data }: { anchorMonth: Date; da
     const days = buildMonthGrid(anchorMonth);
     const sessionsByDate = groupByDate(data.sessions ?? []);
     const dow = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+    const totalRooms = data.rooms?.length ?? 0;
 
     const [selectedDate, setSelectedDate] = useState<Date | null>(null);
 
@@ -48,6 +49,7 @@ export default function MonthGrid({ anchorMonth, data }: { anchorMonth: Date; da
                             date={d}
                             inMonth={inMonth}
                             sessions={sessions}
+                            totalRooms={totalRooms}
                             onSelect={(date) => setSelectedDate(date)}
                         />
                     );
