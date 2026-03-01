@@ -9,13 +9,14 @@ export type Clinician = {
 export type Session = {
     id: number | string;
     date: string; // YYYY-MM-DD
-    clinicianId?: number | string;
+    clinician_id?: number | string;
     clinicianName?: string;
-    roomId?: number | string;
+    room_id?: number | string;
     roomName?: string;
     type?: "ST" | "CL";
     time?: string; // Full Day / AM / PM etc
     notes?: string;
+    status?: string;
 };
 
 export type PlannerResponse = {

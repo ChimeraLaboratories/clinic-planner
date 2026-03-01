@@ -3,6 +3,8 @@
 import type { PlannerResponse, Session } from "../types/planner";
 import { buildMonthGrid, isSameMonth, toISODate } from "../utils/date";
 import DayCell from "./DayCell";
+import DayDrawer from "@/app/planner/components/DayDrawer";
+import {useState} from "react";
 
 function groupByDate(sessions: Session[]) {
     const map = new Map<string, Session[]>();
@@ -20,6 +22,11 @@ export default function MonthGrid({ anchorMonth, data }: { anchorMonth: Date; da
     const sessionsByDate = groupByDate(data.sessions ?? []);
     const dow = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
+    const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+
+    const selectedIso = selectedDate ? toISODate(selectedDate) : null;
+    const selectedSessions = selectedIso ? sessionsByDate.get(selectedIso) ?? [] : [];
+
     return (
         <div>
             <div className="grid grid-cols-7 bg-slate-50 border border-slate-200 border-b-0 rounded-t-xl text-sm font-medium text-slate-600">
@@ -31,13 +38,23 @@ export default function MonthGrid({ anchorMonth, data }: { anchorMonth: Date; da
             </div>
 
             <div className="grid grid-cols-7 border border-slate-200 rounded-xl overflow-hidden bg-white">
-                {days.filter((d) => isSameMonth(d, anchorMonth)).map((d) => {
+                {days.map((d) => {
                     const iso = toISODate(d);
                     const inMonth = isSameMonth(d, anchorMonth);
                     const sessions = sessionsByDate.get(iso) ?? [];
-                    return <DayCell key={d.getFullYear() + "-" + d.getMonth() + "-" + d.getDate()} date={d} inMonth={inMonth} sessions={sessions} />;
+                    return (
+                        <DayCell
+                            key={d.getFullYear() + "-" + d.getMonth() + "-" + d.getDate()}
+                            date={d}
+                            inMonth={inMonth}
+                            sessions={sessions}
+                            onSelect={(date) => setSelectedDate(date)}
+                        />
+                    );
                 })}
             </div>
+
+            <DayDrawer open={!!selectedDate} date={selectedDate} sessions={selectedSessions} onClose={() => setSelectedDate(null)}/>
         </div>
     );
 }
