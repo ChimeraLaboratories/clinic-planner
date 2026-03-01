@@ -4,6 +4,8 @@
 
 import { useMemo } from "react";
 import { MonthCalendar } from "@/components/clinic-planner/MonthCalendar"
+import { DayCard } from "@/components/clinic-planner/DayCard"
+
 // useState lets us store and manage dynamic values inside the component.
 
 // Pad numbers to 2 digits (1 > 01)
@@ -49,24 +51,17 @@ export default function Home() {
               leadingEmptyCells={leadingEmptyCells}
               days={days}
               renderDay={({ day }) => (
-                  <div className="bg-white rounded-2xl shadow p-4 h-44 hover:shadow-lg transition cursor-pointer">
-                    <div className="flex justify-between items-center">
-                      <span className="font-semibold text-lg">{day}</span>
-                      <span className="text-xs bg-blue-100 text-blue-600 px-2 py-1 rounded-full">
-                  3 free
-                </span>
-                    </div>
-
-                    <div className="mt-3 space-y-1 text-sm">
-                      <div className="text-gray-700">Room 1 – Zara</div>
-                      <div className="text-gray-700">Room 2 – Cane</div>
-                      <div className="text-gray-400">Room 3 – Free</div>
-                    </div>
-
-                    <div className="mt-4 text-sm font-medium text-blue-600">
-                      Value: 42
-                    </div>
-                  </div>
+                  <DayCard
+                      day={day}
+                      roomsFreeText="3 free"
+                      previewLines={[
+                          "Room 1 – Zara",
+                          "Room 2 – Cane",
+                          "Room 3 – Free",
+                      ]}
+                      valueText="Value: 42"
+                      onClick={() => console.log("Clicked day:", day)}
+                  />
               )}
           />
         </div>
