@@ -77,32 +77,45 @@ export async function getPlannerData(from: string, to: string) {
     const [rooms] = await db.query(`SELECT id, name FROM rooms ORDER BY name`);
     const [clinicians] = await db.query(`SELECT id, full_name, display_name, role_code AS role, grade_code, goc_number, is_active FROM clinicians ORDER BY full_name`);
 
+// sessions query
     const [sessions] = await db.query(
         `
             SELECT
-                s.id,
-                s.session_date,
-                s.room_id,
-                s.clinician_id,
-                s.session_type,
-                s.slot,
-                s.status,
-                s.notes,
-                CASE
-                    WHEN s.session_type = 'ST' THEN COALESCE(cc.st_value, 0)
-                    WHEN s.session_type = 'CL' THEN COALESCE(cc.cl_value, 0)
-                    ELSE 0
-                    END AS value
-            FROM sessions s
-                LEFT JOIN clinician_capacity cc
-            ON cc.clinician_id = s.clinician_id
-                AND s.session_date >= cc.effective_from
-                AND (cc.effective_to IS NULL OR s.session_date <= cc.effective_to)
-            WHERE s.session_date BETWEEN ? AND ?
-            ORDER BY s.session_date, s.slot;
+                cs.id,
+                cs.session_date,
+                cs.room_id,
+                cs.clinician_id,
+
+                c.full_name,
+                c.display_name,
+                c.grade_code,
+                c.is_supervisor,
+
+                EXISTS (
+                    SELECT 1
+                    FROM sessions cs2
+                             JOIN clinicians c2 ON cs2.clinician_id = c2.id
+                    WHERE cs2.session_date = cs.session_date
+                      AND c2.is_supervisor = 1
+                ) AS supervisor_present
+
+            FROM sessions cs
+                     JOIN clinicians c ON cs.clinician_id = c.id
+            WHERE cs.session_date BETWEEN ? AND ?
+            ORDER BY cs.session_date, cs.id
         `,
         [from, to]
     );
 
-    return { rooms, clinicians, sessions };
+    const sessionsWithWarnings = (sessions as any[]).map((s) => ({
+        ...s,
+        requiresSupervisorWarning:
+            Number(s.grade_code) === 2 && Number(s.supervisor_present) === 0,
+    }));
+
+    return Response.json({
+        rooms,
+        clinicians,
+        sessions: sessionsWithWarnings,
+    });
 }

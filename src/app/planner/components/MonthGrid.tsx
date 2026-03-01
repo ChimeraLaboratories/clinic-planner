@@ -27,22 +27,21 @@ export default function MonthGrid({ anchorMonth, data, onRefresh, }: { anchorMon
 
     const roomsById = useMemo(() => {
         const m = new Map<number, string>();
-        for (const r of data.rooms) {
+        const rooms = data?.rooms ?? [];
+        for (const r of rooms) {
             m.set(Number(r.id), String(r.name));
         }
         return m;
-    }, [data.rooms]);
+    }, [data]);
 
     const cliniciansById = useMemo(() => {
         const m = new Map<number, string>();
-        for (const c of data.clinicians) {
-            // ✅ ensure it's never undefined
-            const label = c.display_name ?? c.full_name ?? `Clinician ${c.id}`;
-            m.set(Number(c.id), String(label));
+        const clinicians = data?.clinicians ?? [];
+        for (const c of clinicians) {
+            m.set(Number(c.id), String(c.full_name));
         }
         return m;
-    }, [data.clinicians]);
-
+    }, [data]);
     const sessionsByDay = useMemo(() => {
         const map: Record<string, any[]> = {};
         for (const s of (data?.sessions ?? []) as any[]) {

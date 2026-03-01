@@ -1,5 +1,6 @@
 import { headers } from "next/headers";
 import { notFound } from "next/navigation";
+import DayRoomsClient from "@/app/planner/[date]/DayRoomsClient";
 
 type PageProps = {
     params: Promise<{ date: string }>;
@@ -87,46 +88,14 @@ export default async function DayOverview({ params }: PageProps) {
                     </div>
                 </div>
 
-                {/* Rooms Grid */}
-                <div>
+                {/* Rooms Section */}
+                <section>
                     <h2 className="text-xl font-semibold mb-4">
                         Room Overview
                     </h2>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-                        {data.rooms.map((room) => (
-                            <div
-                                key={room.id}
-                                className={`rounded-lg border bg-white p-5 shadow-sm ${
-                                    room.used ? "border-red-300" : "border-green-300"
-                                }`}
-                            >
-                                <div className="flex items-center justify-between">
-                                    <h3 className="font-semibold">{room.name}</h3>
-                                    <span
-                                        className={`text-xs px-2 py-1 rounded-full ${
-                                            room.used
-                                                ? "bg-red-100 text-red-600"
-                                                : "bg-green-100 text-green-600"
-                                        }`}
-                                    >
-                    {room.used ? "In Use" : "Free"}
-                  </span>
-                                </div>
-
-                                <div className="mt-3 text-sm text-gray-600 space-y-1">
-                                    {room.clinicians.length > 0 ? (
-                                        room.clinicians.map((name, index) => (
-                                            <div key={index}>• {name}</div>
-                                        ))
-                                    ) : (
-                                        <div className="text-gray-400">No clinician assigned</div>
-                                    )}
-                                    </div>
-                            </div>
-                        ))}
-                    </div>
-                </div>
+                    <DayRoomsClient initialRooms={data.rooms} />
+                </section>
 
             </div>
         </div>
