@@ -150,7 +150,7 @@ export default function DayDrawer({open, date, sessions, roomsById, cliniciansBy
                 onClose={() => setCreateOpen(false)}
                 onCreated={async () => {
                 setCreateOpen(false);
-                await onRefresh()
+                await onRefresh();
                 }}
                 />
             )}

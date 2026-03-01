@@ -16,7 +16,7 @@ export async function POST(req: Request) {
         } = body;
 
         if (!session_date || !room_id) {
-            return NextResponse.json({error: "session_date and room_id are requred"}, {status:400});
+            return NextResponse.json({error: "session_date and room_id are required"}, {status:400});
         }
 
         await createSession({

@@ -41,6 +41,22 @@ export default function MonthGrid({ anchorMonth, data, onRefresh, }: { anchorMon
         return m;
     }, [data.clinicians]);
 
+    const sessionsByDay = useMemo(() => {
+        const map: Record<string, any[]> = {};
+        for (const s of (data?.sessions ?? []) as any[]) {
+            const key = String(s.date ?? s.session_date ?? "").slice(0, 10); // ✅ critical
+            (map[key] ??= []).push(s);
+        }
+        return map;
+    }, [data?.sessions]);
+
+    function dayKeyLocal(d: Date) {
+        const yyyy = d.getFullYear();
+        const mm = String(d.getMonth() + 1).padStart(2, "0");
+        const dd = String(d.getDate()).padStart(2, "0");
+        return `${yyyy}-${mm}-${dd}`;
+    }
+
     const [selectedDate, setSelectedDate] = useState<Date | null>(null);
 
     const selectedIso = selectedDate ? toISODate(selectedDate) : null;
@@ -66,8 +82,8 @@ export default function MonthGrid({ anchorMonth, data, onRefresh, }: { anchorMon
                             key={d.getFullYear() + "-" + d.getMonth() + "-" + d.getDate()}
                             date={d}
                             inMonth={inMonth}
-                            sessions={sessions}
-                            totalRooms={totalRooms}
+                            sessions={(sessionsByDay[dayKeyLocal(d)] ?? []) as any}
+                            totalRooms={data?.rooms?.length ?? 0}
                             roomsById={roomsById}
                             cliniciansById={cliniciansById}
                             onSelect={(date) => setSelectedDate(date)}

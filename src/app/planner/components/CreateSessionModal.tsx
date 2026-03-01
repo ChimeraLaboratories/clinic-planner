@@ -32,7 +32,7 @@ export default function CreateSessionModal({
     async function save() {
         setSaving(true);
         try {
-            const res = await fetch("/api/sessions", {
+            const res = await fetch("/planner/api/sessions", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
@@ -45,6 +45,8 @@ export default function CreateSessionModal({
                     notes: notes.trim() ? notes.trim() : null,
                 }),
             });
+
+
 
             const data = await res.json().catch(() => ({}));
             if (!res.ok) {
