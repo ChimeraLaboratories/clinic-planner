@@ -1,0 +1,43 @@
+"use client";
+
+import type { PlannerResponse, Session } from "../types/planner";
+import { buildMonthGrid, isSameMonth, toISODate } from "../utils/date";
+import DayCell from "./DayCell";
+
+function groupByDate(sessions: Session[]) {
+    const map = new Map<string, Session[]>();
+    for (const s of sessions) {
+        const k = s.date;
+        const arr = map.get(k) ?? [];
+        arr.push(s);
+        map.set(k, arr);
+    }
+    return map;
+}
+
+export default function MonthGrid({ anchorMonth, data }: { anchorMonth: Date; data: PlannerResponse }) {
+    const days = buildMonthGrid(anchorMonth);
+    const sessionsByDate = groupByDate(data.sessions ?? []);
+    const dow = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+    return (
+        <div>
+            <div className="grid grid-cols-7 text-xs font-medium text-slate-500 mb-2">
+                {dow.map((d) => (
+                    <div key={d} className="px-2 py-2">
+                        {d}
+                    </div>
+                ))}
+            </div>
+
+            <div className="grid grid-cols-7 border rounded-xl overflow-hidden">
+                {days.map((d) => {
+                    const iso = toISODate(d);
+                    const inMonth = isSameMonth(d, anchorMonth);
+                    const sessions = sessionsByDate.get(iso) ?? [];
+                    return <DayCell key={iso} date={d} inMonth={inMonth} sessions={sessions} />;
+                })}
+            </div>
+        </div>
+    );
+}
