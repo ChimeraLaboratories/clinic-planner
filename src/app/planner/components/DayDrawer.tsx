@@ -1,6 +1,8 @@
 "use client";
 
 import type { Session } from "../types/planner";
+import {useMemo, useState} from "react";
+import CreateSessionModal from "@/app/planner/components/CreateSessionModal";
 
 function formatDate(d: Date) {
     return d.toLocaleDateString(undefined, {
@@ -11,21 +13,35 @@ function formatDate(d: Date) {
     });
 }
 
-export default function DayDrawer({
-                                      open,
-                                      date,
-                                      sessions,
-                                      roomsById,
-                                      cliniciansById,
-                                      onClose,
-                                  }: {
+function toYMD(d: Date) {
+    // local YYYY-MM-DD
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, "0");
+    const dd = String(d.getDate()).padStart(2, "0");
+    return `${yyyy}-${mm}-${dd}`;
+}
+
+export default function DayDrawer({open, date, sessions, roomsById, cliniciansById, onClose, onRefresh,}: {
     open: boolean;
     date: Date | null;
     sessions: Session[];
     roomsById: Map<number, string>;
     cliniciansById: Map<number, string>;
     onClose: () => void;
+    onRefresh: () => Promise<void> | void;
 }) {
+    const [createOpen, setCreateOpen] = useState(false);
+    const [createDefaults, setCreateDefaults] = useState<{
+        session_date: string;
+        room_id: number;
+        slot: "AM" | "PM" | "FULL";
+    } | null>(null);
+
+    const firstRoomId = useMemo(() => {
+        const first = roomsById.keys().next();
+        return first.done ? null : first.value;
+    }, [roomsById]);
+
     if (!open || !date) return null;
 
     return (
@@ -57,8 +73,18 @@ export default function DayDrawer({
                 <div className="p-4 border-b border-slate-200 flex gap-2">
                     <button
                         type="button"
-                        className="px-3 py-2 rounded-lg bg-slate-900 text-white hover:bg-slate-800"
-                        onClick={() => alert("Next: Add session form")}
+                        className="px-3 py-2 rounded-lg bg-slate-900 text-white hover:bg-slate-800 disabled:opacity-50"
+                        disabled={!firstRoomId}
+                        onClick={() => {
+                            if (!firstRoomId) return;
+
+                            setCreateDefaults({
+                                session_date: toYMD(date),
+                                room_id: firstRoomId,
+                                slot: "FULL",
+                            });
+                            setCreateOpen(true);
+                        }}
                     >
                         Add session
                     </button>
@@ -71,12 +97,11 @@ export default function DayDrawer({
                     ) : (
                         <div className="space-y-2">
                             {sessions.map((s) => {
-                                const roomName =
-                                    roomsById.get(Number((s as any).room_id)) ??
-                                    `Room ${String((s as any).room_id ?? "")}`;
+                                const roomId = Number((s as any).room_id);
+                                const clinicianId = Number((s as any).clinician_id);
 
-                                const clinicianName =
-                                    cliniciansById.get(Number((s as any).clinician_id)) ?? "";
+                                const roomName = roomsById.get(roomId) ?? `Room ${roomId}`;
+                                const clinicianName = cliniciansById.get(clinicianId) ?? "";
 
                                 return (
                                     <div
@@ -113,6 +138,22 @@ export default function DayDrawer({
                     )}
                 </div>
             </div>
+
+            {createOpen && createDefaults && (
+                <CreateSessionModal
+                rooms={Array.from(roomsById.entries()).map(([id, name]) => ({id,name}))}
+                clinicians={Array.from(cliniciansById.entries()).map(([id,display_name]) => ({
+                id,
+                display_name,
+                }))}
+                defaults={createDefaults}
+                onClose={() => setCreateOpen(false)}
+                onCreated={async () => {
+                setCreateOpen(false);
+                await onRefresh()
+                }}
+                />
+            )}
         </div>
     );
 }

@@ -8,10 +8,11 @@ export function usePlannerData(from: string, to: string, pollMs = 10000) {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
+
     async function load() {
         try {
             setError(null);
-            const res = await fetch(`/planner/api?from=${from}&to=${to}`, { cache: "no-store" });
+            const res = await fetch(`/planner/api/planner?from=${from}&to=${to}`, { cache: "no-store" });
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
             const json = (await res.json()) as PlannerResponse;
             setData(json);

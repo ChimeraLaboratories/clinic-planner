@@ -2,8 +2,9 @@ export type Room = { id: number | string; name: string };
 
 export type Clinician = {
     id: number | string;
-    name: string;
+    full_name: string;
     role?: string;
+    display_name?: string;
 };
 
 export type Session = {

@@ -17,7 +17,7 @@ function groupByDate(sessions: Session[]) {
     return map;
 }
 
-export default function MonthGrid({ anchorMonth, data }: { anchorMonth: Date; data: PlannerResponse }) {
+export default function MonthGrid({ anchorMonth, data, onRefresh, }: { anchorMonth: Date; data: PlannerResponse; onRefresh: () => void | Promise<void>; }) {
     const days = buildMonthGrid(anchorMonth);
     const sessionsByDate = groupByDate(data.sessions ?? []);
     const dow = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -25,13 +25,19 @@ export default function MonthGrid({ anchorMonth, data }: { anchorMonth: Date; da
 
     const roomsById = useMemo(() => {
         const m = new Map<number, string>();
-        for (const r of data.rooms ?? []) m.set(Number((r as any).id), (r as any).name ?? (r as any).label ?? "");
+        for (const r of data.rooms) {
+            m.set(Number(r.id), String(r.name)); // ✅ force number key + string value
+        }
         return m;
     }, [data.rooms]);
 
     const cliniciansById = useMemo(() => {
         const m = new Map<number, string>();
-        for (const r of data.clinicians ?? []) m.set(Number((r as any).id), (r as any).name ?? (r as any).label ?? "");
+        for (const c of data.clinicians) {
+            // ✅ ensure it's never undefined
+            const label = c.display_name ?? c.full_name ?? `Clinician ${c.id}`;
+            m.set(Number(c.id), String(label));
+        }
         return m;
     }, [data.clinicians]);
 
@@ -77,6 +83,7 @@ export default function MonthGrid({ anchorMonth, data }: { anchorMonth: Date; da
                 roomsById={roomsById}
                 cliniciansById={cliniciansById}
                 onClose={() => setSelectedDate(null)}
+                onRefresh={onRefresh}
             />
         </div>
     );

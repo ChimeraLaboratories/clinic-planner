@@ -1,6 +1,7 @@
 import {NextResponse} from "next/server";
 import {getPlannerData} from "@/app/planner/services/plannerService";
 
+
 export async function GET(req: Request) {
     const {searchParams} = new URL(req.url);
 

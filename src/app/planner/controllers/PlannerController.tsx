@@ -15,7 +15,7 @@ export default function PlannerController() {
         };
     }, [anchorMonth]);
 
-    const { data, loading, error } = usePlannerData(from, to, 10000);
+    const { data, loading, error, reload } = usePlannerData(from, to, 10000);
 
     return (
         <PlannerShell
@@ -25,6 +25,7 @@ export default function PlannerController() {
     data={data}
     loading={loading}
     error={error}
-    />
+    onRefresh={reload}
+        />
 );
 }
