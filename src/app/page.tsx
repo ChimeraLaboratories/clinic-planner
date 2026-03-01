@@ -1,70 +1,45 @@
 "use client";
-// This tells Next.js this file runs in the browser.
-// We need this because we're using React state (useState)
 
-import { useMemo } from "react";
-import { MonthCalendar } from "@/components/clinic-planner/MonthCalendar"
-import { DayCard } from "@/components/clinic-planner/DayCard"
+import { useEffect, useState } from "react";
 
-// useState lets us store and manage dynamic values inside the component.
+export default function Page() {
+    const [data, setData] = useState<any>(null);
 
-// Pad numbers to 2 digits (1 > 01)
-function pad2(n: number) {
-  return String(n).padStart(2, "0");
-}
+    async function load() {
+        const today = new Date();
+        const from = today.toISOString().split("T")[0];
+        const toDate = new Date(today);
+        toDate.setDate(today.getDate() + 6);
+        const to = toDate.toISOString().split("T")[0];
 
-// Convert date -> YYYY-MM-DD
-function toDateKey(d: Date) {
-  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
-}
+        const res = await fetch(`/api/planner?from=${from}&to=${to}`, {
+            cache: "no-store",
+        });
 
-function sundayStartIndex(jsDay: number) {
-    return jsDay;
-}
+        const json = await res.json();
+        setData(json);
+    }
 
+    useEffect(() => {
+        load();
+        const interval = setInterval(load, 10000);
+        return () => clearInterval(interval);
+    }, []);
 
-export default function Home() {
-  const year = 2026;
-  const month = 0; // January
+    if (!data) return <div>Loading…</div>;
 
-  // Calculate month layout
-  const { leadingEmptyCells, days } = useMemo(() => {
-    const first = new Date(year, month, 1);
-    const daysInMonth = new Date(year, month + 1, 0).getDate();
-    const leading = sundayStartIndex(first.getDay());
+    return (
+        <div style={{ padding: 20 }}>
+            <h1>Clinic Planner</h1>
 
-    const daysArr = Array.from({ length: daysInMonth }, (_, i) => {
-      const day = i + 1;
-      const dateKey = toDateKey(new Date(year, month, day));
-      return { day, dateKey };
-    });
+            <h2>Rooms</h2>
+            <pre>{JSON.stringify(data.rooms, null, 2)}</pre>
 
-    return { leadingEmptyCells: leading, days: daysArr };
-  }, [year, month]);
+            <h2>Clinicians</h2>
+            <pre>{JSON.stringify(data.clinicians, null, 2)}</pre>
 
-  return (
-      <main className="min-h-screen bg-slate-100 p-10">
-        <div className="max-w-7xl mx-auto">
-          <MonthCalendar
-              title="Clinic Planner – January 2026"
-              weekdayLabels={["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]}
-              leadingEmptyCells={leadingEmptyCells}
-              days={days}
-              renderDay={({ day }) => (
-                  <DayCard
-                      day={day}
-                      roomsFreeText="3 free"
-                      previewLines={[
-                          "Room 1 – Zara",
-                          "Room 2 – Cane",
-                          "Room 3 – Free",
-                      ]}
-                      valueText="Value: 42"
-                      onClick={() => console.log("Clicked day:", day)}
-                  />
-              )}
-          />
+            <h2>Sessions</h2>
+            <pre>{JSON.stringify(data.sessions, null, 2)}</pre>
         </div>
-      </main>
-  );
+    );
 }
