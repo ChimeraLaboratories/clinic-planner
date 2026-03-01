@@ -19,7 +19,7 @@ export async function GET(req: Request) {
             `
       SELECT c.id, c.display_name, c.role_code, r.role_name
       FROM clinicians c
-      JOIN clinical_roles r ON r.role_code = c.role_code
+      JOIN clinician_roles r ON r.role_code = c.role_code
       WHERE c.is_active=1
       ORDER BY c.display_name
       `
