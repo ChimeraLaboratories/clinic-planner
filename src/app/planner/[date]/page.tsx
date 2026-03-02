@@ -1,5 +1,6 @@
 import { headers } from "next/headers";
 import { notFound } from "next/navigation";
+import Link from "next/link";
 
 import DayRoomsClient from "@/app/planner/[date]/DayRoomsClient";
 import type { DayRoom } from "@/app/planner/[date]/types";
@@ -63,10 +64,14 @@ function normalizeTotals(raw: any) {
 
 export default async function PlannerDayPage({
                                                  params,
+                                                 searchParams,
                                              }: {
     params: Promise<{ date: string }>;
+    searchParams?: Promise<{ m?: string }>;
 }) {
     const { date } = await params;
+    const sp = (await searchParams) ?? {};
+    const monthParam = sp?.m; // expected "YYYY-MM"
 
     // 1) validate date param early
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return notFound();
@@ -86,7 +91,6 @@ export default async function PlannerDayPage({
     const dayData: DayApiResponse = await dayRes.json();
 
     // ✅ B) Month-view endpoint for totals (single-day range)
-    // If this endpoint returns a different shape, totals will just be 0.00 instead of crashing.
     let totals = { totalStValue: 0, totalClValue: 0 };
     try {
         const totalsRes = await fetch(
@@ -111,6 +115,8 @@ export default async function PlannerDayPage({
     const displayDate = new Date(`${date}T00:00:00`);
     const dayName = displayDate.toLocaleDateString("en-GB", { weekday: "long" });
 
+    const backHref = monthParam ? `/planner?m=${monthParam}` : "/planner";
+
     return (
         <div className="min-h-screen bg-gray-50 p-8">
             <div className="max-w-6xl mx-auto space-y-8">
@@ -120,12 +126,13 @@ export default async function PlannerDayPage({
                         <h1 className="text-3xl font-bold text-gray-900">{dayName}</h1>
                         <p className="text-gray-500">{displayDate.toLocaleDateString("en-GB")}</p>
                     </div>
-                    <a
-                        href="/planner"
+
+                    <Link
+                        href={backHref}
                         className="inline-flex items-center px-3 py-2 text-sm rounded border hover:bg-gray-50"
                     >
                         ← Back to Planner
-                    </a>
+                    </Link>
                 </div>
 
                 {/* Stats */}
@@ -135,10 +142,9 @@ export default async function PlannerDayPage({
                         <div className="text-3xl font-bold">{dayData.stats.roomsUsed}</div>
                     </div>
 
-                    {/* Split cell: Total ST / Total CL Value (same logic as Month View) */}
+                    {/* Split cell: Total ST / Total CL Value */}
                     <div className="bg-white rounded-lg border shadow-sm overflow-hidden">
                         <div className="grid grid-cols-2">
-
                             <div className="p-6">
                                 <div className="text-base font-medium text-gray-700 tracking-tight">Total ST</div>
                                 <div className="text-3xl font-bold text-gray-900">
@@ -149,10 +155,9 @@ export default async function PlannerDayPage({
                             <div className="p-6 border-l">
                                 <div className="text-base font-medium text-gray-700 tracking-tight">Total CL</div>
                                 <div className="text-3xl font-bold text-gray-900">
-                                    {totals.totalStValue.toFixed(2)}
+                                    {totals.totalClValue.toFixed(2)}
                                 </div>
                             </div>
-
                         </div>
                     </div>
 
@@ -166,7 +171,6 @@ export default async function PlannerDayPage({
 
                 <section>
                     <h2 className="text-xl font-semibold mb-4">Room Overview</h2>
-
                     <DayRoomsClient initialRooms={dayData.rooms} date={date} clinicians={clinicianList} />
                 </section>
             </div>
