@@ -67,16 +67,8 @@ export default function TopBar({
                         href="/planner/clinicians"
                         className="inline-flex items-center px-3 py-2 rounded border text-sm"
                     >
-                        Clinicians
+                        Clinician Management
                     </Link>
-
-                    <button className="inline-flex items-center px-3 py-2 rounded border text-sm">
-                        Export
-                    </button>
-
-                    <button className="inline-flex items-center px-3 py-2 rounded border text-sm">
-                        Publish
-                    </button>
                 </div>
             </div>
         </header>
