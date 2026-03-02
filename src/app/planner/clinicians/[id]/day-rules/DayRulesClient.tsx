@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import {useRouter} from "next/navigation";
 
 type DayRuleRow = {
     id: number | null;
@@ -112,6 +113,7 @@ export default function DayRulesClient({ clinicianId }: { clinicianId: number })
     const [viewAsOfDate, setViewAsOfDate] = useState<string>(() => toLocalISODate(new Date()));
     const [effectiveFrom, setEffectiveFrom] = useState<string>(() => toLocalISODate(new Date()));
     const [layout, setLayout] = useState<"table" | "cards">("table");
+    const router = useRouter();
 
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
@@ -232,6 +234,7 @@ export default function DayRulesClient({ clinicianId }: { clinicianId: number })
                         <div className="text-sm text-gray-500">Weekly Day Rules</div>
                         <div className="text-lg font-semibold">Sun → Sat</div>
                     </div>
+
 
                     <div className="flex flex-wrap items-end gap-3">
                         <div>
