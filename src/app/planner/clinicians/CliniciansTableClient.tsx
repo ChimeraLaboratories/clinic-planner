@@ -60,7 +60,12 @@ export default function CliniciansTableClient({ clinicians }: { clinicians: Clin
 
                 <tbody>
                 {clinicians.map((c) => (
-                    <tr key={c.id} className="border-t">
+                    <tr
+                        key={c.id}
+                        className="border-t cursor-pointer hover:bg-gray-50 transition"
+                        onClick={() => router.push(`/planner/clinicians/${c.id}/day-rules`)}
+                        title="Open day rules"
+                    >
                         <td className="p-3 font-medium">{c.display_name}</td>
                         <td className="p-3 text-gray-700">{c.full_name}</td>
                         <td className="p-3">{roleLabel(c.role_code)}</td>
@@ -68,32 +73,52 @@ export default function CliniciansTableClient({ clinicians }: { clinicians: Clin
                         <td className="p-3">{c.is_supervisor ? "Yes" : "No"}</td>
 
                         <td className="p-3">
-                <span
-                    className={`px-2 py-1 rounded-full text-xs ${
-                        c.is_active ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-600"
-                    }`}
-                >
-                  {c.is_active ? "Active" : "Inactive"}
-                </span>
+                                <span
+                                    className={`px-2 py-1 rounded-full text-xs ${
+                                        c.is_active
+                                            ? "bg-green-100 text-green-700"
+                                            : "bg-gray-100 text-gray-600"
+                                    }`}
+                                >
+                                    {c.is_active ? "Active" : "Inactive"}
+                                </span>
                         </td>
 
                         <td className="p-3 text-right">
                             <div className="inline-flex items-center gap-3">
                                 <button
-                                    onClick={() => toggleActive(c)}
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        toggleActive(c);
+                                    }}
                                     disabled={togglingId === c.id}
                                     className={`text-xs px-2 py-1 rounded border disabled:opacity-50 ${
                                         c.is_active
                                             ? "border-gray-300 hover:bg-gray-50"
                                             : "border-green-300 text-green-700 hover:bg-green-50"
                                     }`}
-                                    title={c.is_active ? "Set inactive" : "Set active"}
                                 >
-                                    {togglingId === c.id ? "Saving…" : c.is_active ? "Deactivate" : "Activate"}
+                                    {togglingId === c.id
+                                        ? "Saving…"
+                                        : c.is_active
+                                            ? "Deactivate"
+                                            : "Activate"}
                                 </button>
 
-                                <Link href={`/planner/clinicians/${c.id}`} className="text-blue-600 hover:underline">
+                                <Link
+                                    href={`/planner/clinicians/${c.id}`}
+                                    className="text-blue-600 hover:underline"
+                                    onClick={(e) => e.stopPropagation()}
+                                >
                                     Edit
+                                </Link>
+
+                                <Link
+                                    href={`/planner/clinicians/${c.id}/day-rules`}
+                                    className="text-blue-600 hover:underline"
+                                    onClick={(e) => e.stopPropagation()}
+                                >
+                                    Day rules
                                 </Link>
                             </div>
                         </td>
