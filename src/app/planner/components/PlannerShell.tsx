@@ -220,7 +220,7 @@ export default function PlannerShell({
 
     return (
         <div className="min-h-screen bg-slate-100">
-            <TopBar anchorMonth={anchorMonth} onPrevMonth={onPrevMonth} onNextMonth={onNextMonth} onCurrentMonth={handleCurrentMonth} env="DEV"
+            <TopBar anchorMonth={anchorMonth} onPrevMonth={onPrevMonth} onNextMonth={onNextMonth} onCurrentMonth={handleCurrentMonth} env="PROD"
             syncState={syncState} lastSyncedAt={lastSyncedAt}/>
 
             <main className="w-full px-6 py-8">
