@@ -1,16 +1,18 @@
 "use client";
 
 import type { PlannerResponse, Session } from "../types/planner";
-import { buildMonthGrid, isSameMonth, toISODate } from "../utils/date";
+import {buildMonthGrid, getFirstFullWeekend, isSameMonth, toISODate} from "../utils/date";
 import DayCell from "./DayCell";
 import DayDrawer from "@/app/planner/components/DayDrawer";
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import {keys} from "eslint-config-next";
 
 function groupByDate(sessions: Session[]) {
     const map = new Map<string, Session[]>();
     for (const s of sessions) {
-        const k = s.date;
+        const k = dateKeyFromAny((s as any).date ?? (s as any).session_date ?? (s as any).sessionDate);
+        if (!k) continue;
         const arr = map.get(k) ?? [];
         arr.push(s);
         map.set(k, arr);
@@ -22,6 +24,35 @@ function ym(d: Date) {
     const yyyy = d.getFullYear();
     const mm = String(d.getMonth() + 1).padStart(2, "0");
     return `${yyyy}-${mm}`;
+}
+
+function buildTrainingKeys(anchorMonth: Date) {
+    const year = anchorMonth.getFullYear();
+    const month = anchorMonth.getMonth();
+
+
+    const wk = getFirstFullWeekend(year, month);
+    if (!wk) return new Set<string>();
+
+    const sat = new Date(year, month, wk.saturday);
+    const sun = new Date(year, month, wk.sunday);
+
+    return new Set([toISODate(sat), toISODate(sun)]);
+}
+
+function dateKeyFromAny(input: any): string {
+    if (!input) return "";
+
+    // mysql2 may return a Date object
+    if (input instanceof Date) return toISODate(input);
+
+    const s = String(input).trim();
+
+    // "YYYY-MM-DD" or "YYYY-MM-DDTHH:mm:ss..."
+    const m = s.match(/^(\d{4}-\d{2}-\d{2})/);
+    if (m) return m[1];
+
+    return "";
 }
 
 export default function MonthGrid({
@@ -40,6 +71,7 @@ export default function MonthGrid({
     const sessionsByDate = groupByDate(data.sessions ?? []);
     const dow = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
     const totalRooms = data.rooms?.length ?? 0;
+    const trainingKeys = useMemo(() => buildTrainingKeys(anchorMonth), [anchorMonth]);
 
     const roomsById = useMemo(() => {
         const m = new Map<number, string>();
@@ -62,7 +94,7 @@ export default function MonthGrid({
     const sessionsByDay = useMemo(() => {
         const map: Record<string, any[]> = {};
         for (const s of (data?.sessions ?? []) as any[]) {
-            const key = String(s.date ?? s.session_date ?? "").slice(0, 10); // ✅ critical
+            const key = dateKeyFromAny(s.date ?? s.session_date ?? s.sessionDate);
             (map[key] ??= []).push(s);
         }
         return map;
@@ -98,19 +130,21 @@ export default function MonthGrid({
 
             <div className="grid grid-cols-7 border border-slate-200 rounded-xl overflow-hidden bg-white">
                 {days.map((d) => {
-                    const iso = toISODate(d);
+                    const dateKey = dayKeyLocal(d); // ✅ already safe local YYYY-MM-DD
                     const inMonth = isSameMonth(d, anchorMonth);
 
                     return (
                         <DayCell
-                            key={d.getFullYear() + "-" + d.getMonth() + "-" + d.getDate()}
+                            key={dateKey}
                             date={d}
+                            dateKey={dateKey}
                             inMonth={inMonth}
-                            sessions={(sessionsByDay[dayKeyLocal(d)] ?? []) as any}
+                            sessions={(sessionsByDay[dateKey] ?? []) as any}
                             totalRooms={totalRooms}
                             roomsById={roomsById}
                             cliniciansById={cliniciansById}
-                            onSelect={(date) => goToDay(date)}
+                            onSelect={(key) => router.push(`/planner/${key}?m=${monthParam}`)} // ✅ STRING ROUTE
+                            isTrainingWeekend={inMonth && trainingKeys.has(toISODate(d))}
                         />
                     );
                 })}

@@ -29,16 +29,14 @@ function sumValue(sessions: Session[], code: string): number {
 
 function ymdFromApiDate(input: any) {
     if (!input) return "";
-    const s = String(input);
-    // ISO
-    if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10);
-    // Attempt Date parse fallback
-    const d = new Date(s);
-    if (!Number.isFinite(d.getTime())) return "";
-    const yyyy = d.getFullYear();
-    const mm = String(d.getMonth() + 1).padStart(2, "0");
-    const dd = String(d.getDate()).padStart(2, "0");
-    return `${yyyy}-${mm}-${dd}`;
+    const s = String(input).trim();
+
+    // ✅ If it already contains YYYY-MM-DD, take it (covers "YYYY-MM-DD" and "YYYY-MM-DDTHH:mm:ss")
+    const m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (m) return `${m[1]}-${m[2]}-${m[3]}`;
+
+    // ❌ Do NOT fall back to new Date(s) — it causes BST/UTC day shifts
+    return "";
 }
 
 function usedRoomsCount(sessions: Session[]) {
@@ -54,10 +52,12 @@ export default function DayCell({
                                     date,
                                     inMonth,
                                     sessions,
+                                    dateKey,
                                     totalRooms,
                                     roomsById,
                                     cliniciansById,
                                     onSelect,
+                                    isTrainingWeekend,
                                 }: {
     date: Date;
     inMonth: boolean;
@@ -65,7 +65,9 @@ export default function DayCell({
     totalRooms: number;
     roomsById: Map<number, string>;
     cliniciansById: Map<number, string>;
-    onSelect: (date: Date) => void;
+    dateKey: string;
+    onSelect: (dateKey: string) => void;
+    isTrainingWeekend?: boolean;
 }) {
     // normalize [date] key to local YYYY-MM-DD (matches how you pick dates elsewhere)
     const dayKey = (() => {
@@ -102,15 +104,31 @@ export default function DayCell({
     return (
         <button
             type="button"
-            onClick={() => inMonth && onSelect(date)}
+            onClick={() => inMonth && onSelect(dateKey)}
             disabled={!inMonth}
-            className={`h-[140px] border border-slate-200 p-2 relative text-left w-full ${
-                inMonth ? "bg-white hover:bg-slate-50" : "bg-slate-50 opacity-50 cursor-default"
+            className={`h-[140px] border p-2 relative text-left w-full transition ${
+                inMonth
+                    ? "bg-white hover:bg-slate-50"
+                    : "bg-slate-50 opacity-50 cursor-default"
+            } ${
+                isTrainingWeekend && inMonth
+                    ? "border-purple-300 bg-gradient-to-br from-purple-50 to-white ring-2 ring-purple-400"
+                    : "border-slate-200"
             }`}
         >
             <div className="absolute top-2 left-2 text-xs text-slate-700 font-medium">
                 {inMonth ? date.getDate() : ""}
             </div>
+
+            {inMonth && isTrainingWeekend && (
+                <div
+                    className="absolute top-2 right-2 flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-purple-600 text-white font-semibold shadow-sm tracking-wide"
+                    title="Monthly Training Weekend"
+                >
+                    <span className="w-1.5 h-1.5 bg-white rounded-full opacity-80"></span>
+                    TRAINING
+                </div>
+            )}
 
             {/* ✅ Only show stats if the day is in the current month */}
             {inMonth && (

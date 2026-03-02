@@ -4,26 +4,37 @@ import type { PlannerResponse } from "../types/planner";
 import TopBar from "./TopBar";
 import ViewTabs from "./ViewTabs";
 import MonthGrid from "./MonthGrid";
-import { useMemo } from "react";
+import {useEffect, useMemo} from "react";
 import { useRouter } from "next/navigation";
 
 function getSessionDateKey(s: any): string | null {
-    const raw = String(s?.date ?? s?.session_date ?? "").slice(0, 10);
-    return raw && raw.length === 10 ? raw : null;
-}
+    const v = s?.session_date ?? s?.date ?? s?.sessionDate ?? null;
+    if (!v) return null;
 
-function getSessionClinicianId(s: any): number | null {
-    const raw =
-        s?.clinician_id ??
-        s?.clinicianId ??
-        s?.clinician?.id ??        // 👈 if session embeds clinician object
-        s?.clinician_id_fk ??      // 👈 if you used a different column
-        null;
+    // If it's a string, parse to Date so timezone is applied correctly
+    if (typeof v === "string") {
+        const d = new Date(v);
+        if (!isNaN(d.getTime())) {
+            const yyyy = d.getFullYear();
+            const mm = String(d.getMonth() + 1).padStart(2, "0");
+            const dd = String(d.getDate()).padStart(2, "0");
+            return `${yyyy}-${mm}-${dd}`;
+        }
 
-    if (raw === null || raw === undefined || raw === "") return null;
+        // fallback if it's already YYYY-MM-DD but not parseable
+        const m = v.match(/^(\d{4}-\d{2}-\d{2})/);
+        return m ? m[1] : null;
+    }
 
-    const n = Number(raw);
-    return Number.isFinite(n) && n > 0 ? n : null;
+    // If MySQL driver returns a Date object
+    if (v instanceof Date && !isNaN(v.getTime())) {
+        const yyyy = v.getFullYear();
+        const mm = String(v.getMonth() + 1).padStart(2, "0");
+        const dd = String(v.getDate()).padStart(2, "0");
+        return `${yyyy}-${mm}-${dd}`;
+    }
+
+    return null;
 }
 
 function getSessionSTValue(s: any): number {
@@ -33,12 +44,7 @@ function getSessionSTValue(s: any): number {
 
     if (!code.startsWith("ST")) return 0;
 
-    const rawValue =
-        s?.st_value ??
-        s?.value ??
-        s?.clinic_value ??
-        0;
-
+    const rawValue = s?.st_value ?? s?.value ?? s?.clinic_value ?? 0;
     const n = Number(rawValue);
     return Number.isFinite(n) ? n : 0;
 }
@@ -51,11 +57,22 @@ function getSessionClinicCode(s: any): string {
 
 function isSTClinic(s: any): boolean {
     const code = getSessionClinicCode(s);
-    // Accept "ST" or anything that starts with "ST" if your data uses variants like "ST1"
     return code === "ST" || code.startsWith("ST");
 }
 
+type NeedsSupervisorDay = {
+    date: string;
+    preRegCount: number;
+    supervisorCount: number;
+    preRegs: string;
+    supervisorsInClinic: string;
+    supervisorsInStore: string;
+};
 
+type StoreSupervisorDay = {
+    date: string;
+    supervisorsInStore: string;
+};
 
 export default function PlannerShell({
                                          anchorMonth,
@@ -78,69 +95,15 @@ export default function PlannerShell({
 }) {
     const router = useRouter();
 
-    // ✅ Build sidebar list here so it's separate from the Month card
-    const needsSupervisorDays = useMemo(() => {
-        if (!data) return [];
+    useEffect(() => {
+        const sessions = (data?.sessions ?? []) as any[];
 
-        const clinicianById = new Map<number, any>();
-        for (const c of (data.clinicians ?? []) as any[]) clinicianById.set(Number(c.id), c);
+        const uniqueDates = Array.from(
+            new Set(sessions.map((s) => getSessionDateKey(s)).filter(Boolean))
+        ).sort();
 
-        const perDay = new Map<string, { preRegs: string[]; supervisors: string[] }>();
-
-        for (const s of (data.sessions ?? []) as any[]) {
-            const dateKey = String(s?.session_date ?? s?.date ?? "").slice(0, 10);
-            if (!dateKey) continue;
-
-            const cid = Number(s?.clinician_id ?? s?.clinicianId);
-            if (!Number.isFinite(cid)) continue;
-
-            const c = clinicianById.get(cid);
-            if (!c) continue;
-
-            const role = Number(c.role_code);   // OO=1
-            const grade = Number(c.grade_code); // Registered=1, PreReg=2
-            const name = String(c.display_name ?? c.full_name ?? `#${cid}`);
-
-            const isPreRegOO = role === 1 && grade === 2;
-
-            // ✅ Supervisor anywhere in the day (OO registered only)
-            const isSupervisor = role === 1 && grade === 1 && Number(c.is_supervisor) === 1;
-
-            const entry = perDay.get(dateKey) ?? { preRegs: [], supervisors: [] };
-            if (isPreRegOO) entry.preRegs.push(name);
-            if (isSupervisor) entry.supervisors.push(name);
-            perDay.set(dateKey, entry);
-        }
-
-        //DEBUG DATA
-        //SHOW KEYS AND SUPERVISORS
-/*        if (data) {
-            console.log("[DEBUG] clinician sample keys", Object.keys(data.clinicians?.[0] ?? {}));
-            console.log("[DEBUG] supervisors in payload", (data.clinicians ?? []).filter((c: any) => Number(c.is_supervisor) === 1).length);
-        }*/
-        //DEBUG TABLE SHOWING PRE-REG AND SUPERVISORS
-/*       const debug = Array.from(perDay.entries())
-            .map(([date, v]) => ({
-                date,
-                preRegCount: v.preRegs.length,
-                supervisorCount: v.supervisors.length,
-                preRegs: v.preRegs.join(", "),
-                supervisors: v.supervisors.join(", "),
-            }))
-            .sort((a, b) => a.date.localeCompare(b.date));
-
-        console.table(debug.filter(r => r.date === "2026-03-01" || r.date === "2026-03-02"));*/
-
-        return Array.from(perDay.entries())
-            .map(([date, v]) => ({
-                date,
-                preRegCount: v.preRegs.length,
-                supervisorCount: v.supervisors.length,
-                preRegs: v.preRegs.join(", "),
-            }))
-            .filter((r) => r.preRegCount > 0 && r.supervisorCount === 0)
-            .sort((a, b) => a.date.localeCompare(b.date));
-    }, [data?.sessions, data?.clinicians]);
+        console.log("[debug] unique session date keys (April fetch)", uniqueDates);
+    }, [data?.sessions]);
 
     function ymd(d: Date) {
         const yyyy = d.getFullYear();
@@ -154,29 +117,59 @@ export default function PlannerShell({
     }
 
     function monthEnd(d: Date) {
-        // last day of month
         return new Date(d.getFullYear(), d.getMonth() + 1, 0);
     }
 
-// ✅ Days where Total ST Value is low (includes days with 0)
+    // ✅ SOURCE OF TRUTH: use backend supervisionByDate (includes supervisor_in_store)
+    const needsSupervisorDays = useMemo<NeedsSupervisorDay[]>(() => {
+        const rows: any[] = (data as any)?.supervisionByDate ?? [];
+
+        return rows
+            .filter((r) => !!r.needsSupervisor)
+            .map((r) => ({
+                date: String(r.date ?? ""),
+                preRegCount: Number(r.preRegCount ?? 0),
+                supervisorCount: Number(r.supervisorCount ?? 0),
+                preRegs: String(r.preRegs ?? ""),
+                supervisorsInClinic: String(r.supervisorsInClinic ?? ""),
+                supervisorsInStore: String(r.supervisorsInStore ?? ""),
+            }))
+            .sort((a, b) => a.date.localeCompare(b.date));
+    }, [data]);
+
+    // ✅ Show who is "Supervisor in store" even if not in clinic
+    const supervisorInStoreOnlyDays = useMemo<StoreSupervisorDay[]>(() => {
+        const rows: any[] = (data as any)?.supervisionByDate ?? [];
+
+        return rows
+            .filter((r) => {
+                const store = String(r.supervisorsInStore ?? "").trim();
+                const clinic = String(r.supervisorsInClinic ?? "").trim();
+                return store.length > 0 && clinic.length === 0;
+            })
+            .map((r) => ({
+                date: String(r.date ?? ""),
+                supervisorsInStore: String(r.supervisorsInStore ?? ""),
+            }))
+            .sort((a, b) => a.date.localeCompare(b.date));
+    }, [data]);
+
+    // ✅ Days where Total ST Value is low (includes days with 0)
     const lowSTValueDays = useMemo(() => {
         if (!data) return [];
 
-        // 1) Sum ST per day from sessions
         const perDay = new Map<string, number>();
 
         for (const s of (data.sessions ?? []) as any[]) {
             const dateKey = getSessionDateKey(s);
             if (!dateKey) continue;
 
-            // Only add ST sessions; BUT do NOT skip when value is 0
             if (!isSTClinic(s)) continue;
 
-            const stVal = getSessionSTValue(s); // can be 0, that's fine
+            const stVal = getSessionSTValue(s);
             perDay.set(dateKey, (perDay.get(dateKey) ?? 0) + stVal);
         }
 
-        // 2) Walk every day in the calendar month and classify it
         const start = monthStart(anchorMonth);
         const end = monthEnd(anchorMonth);
 
@@ -196,14 +189,11 @@ export default function PlannerShell({
             cur.setDate(cur.getDate() + 1);
         }
 
-        return out
-            .filter((d) => d.status !== "ok")
-            .sort((a, b) => a.date.localeCompare(b.date));
-    }, [data?.sessions, anchorMonth]);
+        return out.filter((d) => d.status !== "ok").sort((a, b) => a.date.localeCompare(b.date));
+    }, [data, anchorMonth]);
 
-// Card-level status
     const stCardStatus =
-        lowSTValueDays.some(d => d.status === "critical")
+        lowSTValueDays.some((d) => d.status === "critical")
             ? "critical"
             : lowSTValueDays.length > 0
                 ? "warning"
@@ -216,10 +206,14 @@ export default function PlannerShell({
 
     return (
         <div className="min-h-screen bg-slate-100">
-            <TopBar anchorMonth={anchorMonth} onPrevMonth={onPrevMonth} onNextMonth={onNextMonth} onCurrentMonth={handleCurrentMonth} />
+            <TopBar
+                anchorMonth={anchorMonth}
+                onPrevMonth={onPrevMonth}
+                onNextMonth={onNextMonth}
+                onCurrentMonth={handleCurrentMonth}
+            />
 
             <main className="w-full px-6 py-8">
-                {/* ✅ two separate boxes with a visible gap */}
                 <div className="flex gap-6 items-start">
                     {/* LEFT SIDEBAR CARDS */}
                     <aside className="hidden lg:block w-80 shrink-0">
@@ -247,27 +241,27 @@ export default function PlannerShell({
 
                                     {needsSupervisorDays.length > 0 ? (
                                         <span className="relative flex h-3 w-3">
-                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-                            <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
-                        </span>
+                                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                                            <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
+                                        </span>
                                     ) : (
                                         <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-emerald-600">
-                            <svg viewBox="0 0 20 20" fill="none" className="h-4 w-4">
-                                <path
-                                    d="M16.25 5.75L8.5 13.5L3.75 8.75"
-                                    stroke="white"
-                                    strokeWidth="2.5"
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                />
-                            </svg>
-                        </span>
+                                            <svg viewBox="0 0 20 20" fill="none" className="h-4 w-4">
+                                                <path
+                                                    d="M16.25 5.75L8.5 13.5L3.75 8.75"
+                                                    stroke="white"
+                                                    strokeWidth="2.5"
+                                                    strokeLinecap="round"
+                                                    strokeLinejoin="round"
+                                                />
+                                            </svg>
+                                        </span>
                                     )}
                                 </div>
 
                                 <div className="mt-3 text-sm text-slate-700">
                                     {needsSupervisorDays.length > 0
-                                        ? "Pre-Reg OO scheduled without a supervising Registered OO."
+                                        ? "Pre-Reg OO scheduled without a supervising Registered OO (clinic OR in-store)."
                                         : "All clinics properly supervised."}
                                 </div>
 
@@ -280,15 +274,52 @@ export default function PlannerShell({
                                                 className="w-full text-left rounded-xl border border-red-200 bg-white px-4 py-3 hover:bg-red-50 transition"
                                             >
                                                 <div className="flex items-center justify-between">
-                                                    <div>
+                                                    <div className="min-w-0">
                                                         <div className="text-sm font-semibold text-slate-900">{d.date}</div>
                                                         <div className="mt-1 text-xs text-slate-500">{d.preRegs}</div>
+
+                                                        {(d.supervisorsInClinic.trim() || d.supervisorsInStore.trim()) && (
+                                                            <div className="mt-1 text-xs text-emerald-700">
+                                                                Supervisor:{" "}
+                                                                <span className="font-semibold">
+                                                                    {(d.supervisorsInClinic || d.supervisorsInStore).trim()}
+                                                                </span>
+                                                            </div>
+                                                        )}
                                                     </div>
 
                                                     <div className="text-xs font-semibold text-red-700 bg-red-100 rounded-full px-2 py-0.5">
                                                         Attention
                                                     </div>
                                                 </div>
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* ✅ PLACED HERE: SUPERVISOR IN STORE (NOT IN CLINIC) */}
+                            <div className="rounded-2xl border shadow-sm p-6 bg-white border-slate-200">
+                                <div className="text-xs font-semibold tracking-wide uppercase text-slate-600">
+                                    Supervisor in Store (not in clinic)
+                                </div>
+
+                                <div className="mt-3 text-sm text-slate-700">
+                                    {supervisorInStoreOnlyDays.length > 0
+                                        ? "These days have store supervision recorded even if no supervisor is booked into clinic."
+                                        : "No store-only supervision entries in this range."}
+                                </div>
+
+                                {supervisorInStoreOnlyDays.length > 0 && (
+                                    <div className="mt-4 space-y-2">
+                                        {supervisorInStoreOnlyDays.map((d) => (
+                                            <button
+                                                key={d.date}
+                                                onClick={() => router.push(`/planner/${d.date}`)}
+                                                className="w-full text-left rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 hover:bg-emerald-100 transition"
+                                            >
+                                                <div className="text-sm font-semibold text-slate-900">{d.date}</div>
+                                                <div className="mt-1 text-xs text-emerald-800">{d.supervisorsInStore}</div>
                                             </button>
                                         ))}
                                     </div>
@@ -324,26 +355,26 @@ export default function PlannerShell({
 
                                     {stCardStatus === "critical" ? (
                                         <span className="relative flex h-3 w-3">
-                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-                            <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
-                        </span>
+                                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                                            <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
+                                        </span>
                                     ) : stCardStatus === "warning" ? (
                                         <span className="relative flex h-3 w-3">
-                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-orange-400 opacity-60"></span>
-                            <span className="relative inline-flex rounded-full h-3 w-3 bg-orange-600"></span>
-                        </span>
+                                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-orange-400 opacity-60"></span>
+                                            <span className="relative inline-flex rounded-full h-3 w-3 bg-orange-600"></span>
+                                        </span>
                                     ) : (
                                         <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-emerald-600">
-                            <svg viewBox="0 0 20 20" fill="none" className="h-4 w-4">
-                                <path
-                                    d="M16.25 5.75L8.5 13.5L3.75 8.75"
-                                    stroke="white"
-                                    strokeWidth="2.5"
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                />
-                            </svg>
-                        </span>
+                                            <svg viewBox="0 0 20 20" fill="none" className="h-4 w-4">
+                                                <path
+                                                    d="M16.25 5.75L8.5 13.5L3.75 8.75"
+                                                    stroke="white"
+                                                    strokeWidth="2.5"
+                                                    strokeLinecap="round"
+                                                    strokeLinejoin="round"
+                                                />
+                                            </svg>
+                                        </span>
                                     )}
                                 </div>
 
@@ -393,7 +424,7 @@ export default function PlannerShell({
                         </div>
                     </aside>
 
-                    {/* MAIN MONTH CARD (this must be OUTSIDE the aside) */}
+                    {/* MAIN MONTH CARD */}
                     <div className="flex-1 min-w-0 bg-white rounded-2xl shadow-sm border border-slate-200">
                         <div className="px-6 pt-5">
                             <ViewTabs />

@@ -19,19 +19,11 @@ export async function GET(req: Request) {
 
     const [rows] = await db.query<ClinicianRow[]>(
         `
-    SELECT
-      id,
-      full_name,
-      display_name,
-      role_code,
-      grade_code,
-      GOC_number,
-      is_supervisor,
-      is_active
-    FROM clinicians
-    WHERE (? = 1) OR is_active = 1
-    ORDER BY is_active DESC, display_name, full_name
-    `,
+            SELECT id, full_name, display_name, role_code, grade_code, is_supervisor, is_active
+            FROM clinicians
+            WHERE (? = 1 OR is_active = 1)
+            ORDER BY display_name
+        `,
         [includeInactive ? 1 : 0]
     );
 

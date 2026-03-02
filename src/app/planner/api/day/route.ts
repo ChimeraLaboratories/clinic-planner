@@ -25,6 +25,23 @@ export async function GET(req: Request) {
         return NextResponse.json({ error: "No date" }, { status: 400 });
     }
 
+// ✅ Is a registered OO supervisor in store today (even if not testing)?
+    const [inStoreSupRows] = await db.query<RowDataPacket[]>(
+        `
+            SELECT COUNT(*) AS cnt
+            FROM supervisor_in_store sis
+                     JOIN clinicians c ON c.id = sis.clinician_id
+            WHERE sis.in_store_date = ?
+              AND c.is_active = 1
+              AND c.role_code = 1
+              AND c.grade_code = 1
+              AND c.is_supervisor = 1
+        `,
+        [date]
+    );
+
+    const inStoreSupervisorPresent = Number((inStoreSupRows as any[])[0]?.cnt ?? 0) > 0;
+
     const [rooms] = await db.query<RoomRow[]>(
         `SELECT id, name FROM rooms ORDER BY name`
     );
@@ -46,6 +63,8 @@ export async function GET(req: Request) {
                     FROM sessions cs2
                              JOIN clinicians c2 ON cs2.clinician_id = c2.id
                     WHERE cs2.session_date = cs.session_date
+                      AND c2.role_code = 1
+                      AND c2.grade_code = 1
                       AND c2.is_supervisor = 1
                 ) AS supervisor_present
 
@@ -58,10 +77,13 @@ export async function GET(req: Request) {
     );
 
     // ✅ compute warning flag ONCE
+// ✅ compute warning flag ONCE
     const sessionsWithWarnings = sessions.map((s) => ({
         ...s,
         requiresSupervisorWarning:
-            Number(s.grade_code) === 2 && Number(s.supervisor_present) === 0,
+            Number(s.grade_code) === 2 &&
+            Number(s.supervisor_present) === 0 &&
+            !inStoreSupervisorPresent,
     }));
 
     // ✅ build room map

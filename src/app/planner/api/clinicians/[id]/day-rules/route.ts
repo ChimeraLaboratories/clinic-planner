@@ -13,6 +13,19 @@ function isValidTimeOrNull(t: any): t is string | null {
     return /^\d{2}:\d{2}:\d{2}$/.test(t);
 }
 
+function computeIsAvailableShift(activity_code: string | null | undefined): number {
+    const code = String(activity_code ?? "").trim().toUpperCase();
+
+    // treat these as NOT available
+    const NOT_AVAILABLE = new Set(["D/O", "SG"]);
+
+    if (!code) return 0;                 // no code -> not available (or choose 1 if you prefer)
+    if (NOT_AVAILABLE.has(code)) return 0;
+
+    // ST / CL / OTHER / etc -> available
+    return 1;
+}
+
 export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }) {
     try {
         const { id } = await ctx.params;
@@ -156,22 +169,26 @@ export async function PUT(req: Request, ctx: { params: Promise<{ id: string }> }
         const rowsSql: string[] = [];
 
         for (const r of rules) {
-            rowsSql.push("(?, ?, 'EVERY', ?, ?, ?, ?, NULL, ?, 1)");
+            const activity = String(r.activity_code).trim();
+            const is_available_shift = computeIsAvailableShift(activity);
+
+            rowsSql.push("(?, ?, 'EVERY', ?, ?, ?, ?, NULL, ?, ?, 1)");
             values.push(
                 clinicianId,
                 Number(r.weekday),
-                String(r.activity_code).trim(),
+                activity,
                 r.start_time ?? null,
                 r.end_time ?? null,
                 effectiveFrom,
-                r.note ?? null
+                r.note ?? null,
+                is_available_shift
             );
         }
 
         await conn.query(
             `
-      INSERT INTO clinician_day_rule
-        (clinician_id, weekday, pattern_code, activity_code, start_time, end_time, effective_from, effective_to, note, is_active)
+                INSERT INTO clinician_day_rule
+                (clinician_id, weekday, pattern_code, activity_code, start_time, end_time, effective_from, effective_to, note, is_available_shift, is_active)
       VALUES ${rowsSql.join(",")}
       `,
             values

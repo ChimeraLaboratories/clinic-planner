@@ -15,7 +15,15 @@ export default function DayRoomsClient({
                                        }: {
     initialRooms: DayRoom[];
     date: string; // YYYY-MM-DD (from route param)
-    clinicians: { id: number; display_name: string; role_code: number }[];
+    clinicians: {
+        id: number;
+        full_name?: string | null;
+        display_name: string;
+        role_code: number;
+        grade_code: number;
+        is_supervisor: number;
+        is_active?: number;
+    }[];
 }) {
     const [rooms, setRooms] = useState<DayRoom[]>(initialRooms);
     const [deleting, setDeleting] = useState<number | null>(null);
@@ -39,6 +47,47 @@ export default function DayRoomsClient({
             slot,
         });
         setCreateOpen(true);
+    }
+
+    const [addingSupervisor, setAddingSupervisor] = useState(false);
+    const [supervisorId, setSupervisorId] = useState<number | "">("");
+
+    const supervisorOptions = clinicians.filter(
+        (c) =>
+            Number(c.role_code) === 1 &&
+            Number(c.grade_code) === 1 &&
+            Number(c.is_supervisor) === 1
+    );
+
+    async function addSupervisorInStore() {
+        if (supervisorId === "") {
+            alert("Select a supervisor first.");
+            return;
+        }
+
+        try {
+            setAddingSupervisor(true);
+
+            const res = await fetch("/planner/api/supervisor-in-store", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    in_store_date: date,
+                    clinician_id: supervisorId,
+                }),
+            });
+
+            if (!res.ok) {
+                const msg = await res.json().catch(() => null);
+                alert(msg?.error ?? "Failed to add supervisor in store.");
+                return;
+            }
+
+            setSupervisorId("");
+            router.refresh();
+        } finally {
+            setAddingSupervisor(false);
+        }
     }
 
     async function deleteSession(sessionId: number) {
@@ -86,6 +135,37 @@ export default function DayRoomsClient({
 
     return (
         <>
+
+            <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                    <div className="text-sm text-gray-500">Date</div>
+                    <div className="text-lg font-semibold text-gray-900">{date}</div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                    <select
+                        className="rounded-lg border px-3 py-2 text-sm bg-white shadow-sm"
+                        value={supervisorId}
+                        onChange={(e) => setSupervisorId(e.target.value ? Number(e.target.value) : "")}
+                    >
+                        <option value="">Supervisor in store (not testing)…</option>
+                        {supervisorOptions.map((c) => (
+                            <option key={c.id} value={c.id}>
+                                {c.full_name}
+                            </option>
+                        ))}
+                    </select>
+
+                    <button
+                        onClick={addSupervisorInStore}
+                        disabled={addingSupervisor || supervisorId === "" || supervisorOptions.length === 0}
+                        className="rounded-lg border px-4 py-2 text-sm font-medium shadow-sm hover:bg-gray-50 disabled:opacity-50"
+                        title="Marks the selected supervisor as present in store for this date"
+                    >
+                        {addingSupervisor ? "Adding…" : "Add"}
+                    </button>
+                </div>
+            </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 items-start">
                 {rooms.map((room) => {
                     const hasSessions = room.sessions.length > 0;
