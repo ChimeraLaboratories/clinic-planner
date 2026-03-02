@@ -50,7 +50,13 @@ function normalizeTotals(raw: any) {
             .trim()
             .toUpperCase();
 
-        const rawVal = s.value ?? 0;
+        const rawVal =
+            s.st_value ??
+            s.cl_value ??
+            s.value ??
+            s.session_value ??
+            s.clinic_value ??
+            0;
         const v = typeof rawVal === "number" ? rawVal : parseFloat(String(rawVal));
 
         if (!Number.isFinite(v)) continue;

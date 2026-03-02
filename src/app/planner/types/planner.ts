@@ -22,8 +22,23 @@ export type Session = {
     value?: number | string;
 };
 
+export type SupervisionByDateRow = {
+    date: string;
+    preRegCount: number;
+    supervisorCount: number;
+    supervisorInClinicCount: number;
+    supervisorInStoreCount: number;
+    needsSupervisor: boolean;
+    preRegs: string;
+    supervisors: string;
+    supervisorsInClinic: string;
+    supervisorsInStore: string;
+};
+
 export type PlannerResponse = {
     rooms: Room[];
     clinicians: Clinician[];
     sessions: Session[];
+    supervisionByDate: SupervisionByDateRow[]; // ✅ add this
+    // stats?: { totalStValue: number; totalClValue: number }; // optional if you add it later
 };
