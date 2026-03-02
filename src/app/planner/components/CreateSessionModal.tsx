@@ -30,33 +30,39 @@ export default function CreateSessionModal({
     const [saving, setSaving] = useState(false);
 
     async function save() {
-        setSaving(true);
         try {
+            const body = {
+                session_date,
+                room_id,
+                clinician_id: clinician_id === "" ? null : clinician_id,
+                session_type,
+                slot,
+                status,
+                notes,
+            };
+
             const res = await fetch("/planner/api/sessions", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    session_date,
-                    room_id,
-                    slot,
-                    clinician_id: clinician_id === "" ? null : clinician_id,
-                    session_type,
-                    status,
-                    notes: notes.trim() ? notes.trim() : null,
-                }),
+                body: JSON.stringify(body),
             });
 
+            let json: any = null;
+            try {
+                json = await res.json();
+            } catch {}
 
-
-            const data = await res.json().catch(() => ({}));
             if (!res.ok) {
-                alert(data.error ?? "Failed to create session");
-                return;
+                throw new Error(json?.error ?? `HTTP ${res.status}`);
             }
 
-            onCreated();
-        } finally {
-            setSaving(false);
+            // ✅ success: close + refresh however you already do it
+            // onClose?.();
+            // router.refresh?.();
+
+        } catch (e: any) {
+            console.error(e);
+            alert(e?.message ?? "Failed to create session");
         }
     }
 

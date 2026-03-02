@@ -35,6 +35,10 @@ export async function POST(req: Request) {
             return NextResponse.json({error: error.message}, {status:400});
         }
 
+        if (error?.code === "CLINICIAN_NOT_AVAILABLE_SHIFT") {
+            return NextResponse.json({ error: error.message }, { status: 409 });
+        }
+
         if (error?.code === "ER_DUP_ENTRY") {
             return NextResponse.json({error: "Session already exists for this room/date/slot"}, {status: 409});
         }

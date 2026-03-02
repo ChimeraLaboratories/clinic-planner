@@ -1,4 +1,4 @@
-import { db } from "@/lib/db";
+import {db} from "@/lib/db";
 
 type Slot = "FULL" | "AM" | "PM";
 type SessionType = "ST" | "CL";
@@ -21,13 +21,15 @@ export async function createSession(input: {
 
     const slotsToCheck = conflictSlots(slot);
 
+    // 1) Room conflicts
     const [roomConflicts] = await db.query(
         `
-        SELECT id, slot FROM sessions WHERE session_date = ?
-        AND room_id = ?
-        AND slot IN (${slotsToCheck.map(() => "?").join(",")})
-        AND status <> 'CANCELLED'
-        LIMIT 1`, [session_date, room_id, ... slotsToCheck]
+            SELECT id, slot FROM sessions WHERE session_date = ?
+                                            AND room_id = ?
+                                            AND slot IN (${slotsToCheck.map(() => "?").join(",")})
+                                            AND status <> 'CANCELLED'
+                LIMIT 1`,
+        [session_date, room_id, ...slotsToCheck]
     );
 
     if ((roomConflicts as any[]).length > 0) {
@@ -37,17 +39,41 @@ export async function createSession(input: {
         throw err;
     }
 
-    if (clinician_id) {
+    if (clinician_id !== null) {
+        // 2) ✅ Availability check against clinician_day_rules
+        const [ruleRows] = await db.query(
+            `
+            SELECT is_available_shift
+            FROM clinician_day_rule
+            WHERE clinician_id = ?
+              AND weekday = DAYOFWEEK(?)
+            LIMIT 1
+            `,
+            [clinician_id, session_date]
+        );
+
+        const rule = (ruleRows as any[])[0];
+
+        // Default behaviour:
+        // - If no rule row exists -> ALLOW
+        // If you want "no rule row -> BLOCK", change to: if (!rule || Number(rule.is_available_shift) !== 1) { ... }
+        if (rule && Number(rule.is_available_shift) !== 1) {
+            const err: any = new Error("Clinician is not available for a shift on this day.");
+            err.code = "CLINICIAN_NOT_AVAILABLE_SHIFT";
+            throw err;
+        }
+
+        // 3) Clinician conflicts (already booked)
         const [clinicianConflicts] = await db.query(
             `
-      SELECT id, slot, room_id
-      FROM sessions
-      WHERE session_date = ?
-        AND clinician_id = ?
-        AND slot IN (${slotsToCheck.map(() => "?").join(",")})
-        AND status <> 'CANCELLED'
-      LIMIT 1
-      `,
+            SELECT id, slot, room_id
+            FROM sessions
+            WHERE session_date = ?
+              AND clinician_id = ?
+              AND slot IN (${slotsToCheck.map(() => "?").join(",")})
+              AND status <> 'CANCELLED'
+            LIMIT 1
+            `,
             [session_date, clinician_id, ...slotsToCheck]
         );
 
@@ -61,61 +87,14 @@ export async function createSession(input: {
         }
     }
 
+    // 4) Insert
     await db.query(
         `
-    INSERT INTO sessions
-      (session_date, room_id, clinician_id, session_type, slot, status, notes)
-    VALUES
-      (?, ?, ?, ?, ?, ?, ?)
-    `,
+        INSERT INTO sessions
+          (session_date, room_id, clinician_id, session_type, slot, status, notes)
+        VALUES
+          (?, ?, ?, ?, ?, ?, ?)
+        `,
         [session_date, room_id, clinician_id, session_type, slot, status, notes]
     );
-}
-
-export async function getPlannerData(from: string, to: string) {
-
-    const [rooms] = await db.query(`SELECT id, name FROM rooms ORDER BY name`);
-    const [clinicians] = await db.query(`SELECT id, full_name, display_name, role_code AS role, grade_code, goc_number, is_active FROM clinicians ORDER BY full_name`);
-
-// sessions query
-    const [sessions] = await db.query(
-        `
-            SELECT
-                cs.id,
-                cs.session_date,
-                cs.room_id,
-                cs.clinician_id,
-
-                c.full_name,
-                c.display_name,
-                c.grade_code,
-                c.is_supervisor,
-
-                EXISTS (
-                    SELECT 1
-                    FROM sessions cs2
-                             JOIN clinicians c2 ON cs2.clinician_id = c2.id
-                    WHERE cs2.session_date = cs.session_date
-                      AND c2.is_supervisor = 1
-                ) AS supervisor_present
-
-            FROM sessions cs
-                     JOIN clinicians c ON cs.clinician_id = c.id
-            WHERE cs.session_date BETWEEN ? AND ?
-            ORDER BY cs.session_date, cs.id
-        `,
-        [from, to]
-    );
-
-    const sessionsWithWarnings = (sessions as any[]).map((s) => ({
-        ...s,
-        requiresSupervisorWarning:
-            Number(s.grade_code) === 2 && Number(s.supervisor_present) === 0,
-    }));
-
-    return Response.json({
-        rooms,
-        clinicians,
-        sessions: sessionsWithWarnings,
-    });
 }
