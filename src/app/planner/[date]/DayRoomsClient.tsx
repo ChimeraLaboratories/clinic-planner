@@ -15,7 +15,7 @@ export default function DayRoomsClient({
                                        }: {
     initialRooms: DayRoom[];
     date: string; // YYYY-MM-DD (from route param)
-    clinicians: { id: number; display_name: string }[];
+    clinicians: { id: number; display_name: string; role_code: number }[];
 }) {
     const [rooms, setRooms] = useState<DayRoom[]>(initialRooms);
     const [deleting, setDeleting] = useState<number | null>(null);

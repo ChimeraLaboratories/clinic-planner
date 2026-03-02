@@ -1,11 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import ErrorModal from "@/app/planner/components/ErrorModal";
 
 type Slot = "AM" | "PM" | "FULL";
 type SessionType = "ST" | "CL" | "OTHER";
 type Status = "DRAFT" | "PUBLISHED" | "CANCELLED";
+
+// ✅ role_code: 1 = OO, 2 = CLO
+type Clinician = { id: number; display_name: string; role_code?: number };
 
 export default function CreateSessionModal({
                                                rooms,
@@ -15,7 +18,7 @@ export default function CreateSessionModal({
                                                onCreated,
                                            }: {
     rooms: { id: number; name: string }[];
-    clinicians: { id: number; display_name: string }[];
+    clinicians: Clinician[];
     defaults: { session_date: string; room_id: number; slot: Slot };
     onClose: () => void;
     onCreated: () => void;
@@ -33,8 +36,18 @@ export default function CreateSessionModal({
     const [notes, setNotes] = useState("");
     const [saving, setSaving] = useState(false);
 
+    // ✅ find selected clinician (so we can lock type for CLO if you want)
+    const selectedClinician = useMemo(() => {
+        if (clinician_id === "") return null;
+        return clinicians.find((c) => c.id === clinician_id) ?? null;
+    }, [clinician_id, clinicians]);
+
+    const isCLO = (selectedClinician?.role_code ?? 0) === 2;
+
     async function save() {
         try {
+            setSaving(true);
+
             const body = {
                 session_date,
                 room_id,
@@ -60,14 +73,15 @@ export default function CreateSessionModal({
                 throw new Error(json?.error ?? `HTTP ${res.status}`);
             }
 
-            // ✅ success: close + refresh however you already do it
-            // onClose?.();
-            // router.refresh?.();
-
+            // ✅ success
+            onCreated?.();
+            onClose?.();
         } catch (e: any) {
             console.error(e);
             setErrorMessage(e?.message ?? "Failed to create session");
             setErrorOpen(true);
+        } finally {
+            setSaving(false);
         }
     }
 
@@ -84,49 +98,28 @@ export default function CreateSessionModal({
 
                     <div className="grid gap-2">
                         <label className="text-sm">
-                            Date
-                            <input
-                                className="mt-1 w-full border rounded p-2"
-                                type="date"
-                                value={session_date}
-                                onChange={(e) => setSessionDate(e.target.value)}
-                            />
-                        </label>
-
-                        <label className="text-sm">
-                            Room
-                            <select
-                                className="mt-1 w-full border rounded p-2"
-                                value={room_id}
-                                onChange={(e) => setRoomId(Number(e.target.value))}
-                            >
-                                {rooms.map((r) => (
-                                    <option key={r.id} value={r.id}>
-                                        {r.name}
-                                    </option>
-                                ))}
-                            </select>
-                        </label>
-
-                        <label className="text-sm">
-                            Slot
-                            <select
-                                className="mt-1 w-full border rounded p-2"
-                                value={slot}
-                                onChange={(e) => setSlot(e.target.value as Slot)}
-                            >
-                                <option value="FULL">FULL</option>
-                                <option value="AM">AM</option>
-                                <option value="PM">PM</option>
-                            </select>
-                        </label>
-
-                        <label className="text-sm">
                             Clinician (optional)
                             <select
                                 className="mt-1 w-full border rounded p-2"
                                 value={clinician_id}
-                                onChange={(e) => setClinicianId(e.target.value ? Number(e.target.value) : "")}
+                                onChange={(e) => {
+                                    const nextId = e.target.value ? Number(e.target.value) : "";
+                                    setClinicianId(nextId);
+
+                                    if (nextId === "") {
+                                        // optional: when unassigned, default back to ST
+                                        setSessionType("ST");
+                                        return;
+                                    }
+                                    const selected = clinicians.find((c: any) => c.id === nextId);
+
+                                    // 2 = CLO, 1 = OO
+                                    if (selected?.role_code === 2) {
+                                        setSessionType("CL");
+                                    } else if (selected?.role_code === 1) {
+                                        setSessionType("ST");
+                                    }
+                                }}
                             >
                                 <option value="">Unassigned</option>
                                 {clinicians.map((c: any) => {
@@ -147,28 +140,16 @@ export default function CreateSessionModal({
                             <label className="text-sm">
                                 Type
                                 <select
-                                    className="mt-1 w-full border rounded p-2"
+                                    className={`mt-1 w-full border rounded p-2 ${isCLO ? "bg-gray-100 text-gray-600 cursor-not-allowed" : ""}`}
                                     value={session_type}
                                     onChange={(e) => setSessionType(e.target.value as SessionType)}
+                                    disabled={isCLO}
                                 >
                                     <option value="ST">ST</option>
                                     <option value="CL">CL</option>
-                                    <option value="OTHER">OTHER</option>
                                 </select>
                             </label>
 
-                            <label className="text-sm">
-                                Status
-                                <select
-                                    className="mt-1 w-full border rounded p-2"
-                                    value={status}
-                                    onChange={(e) => setStatus(e.target.value as Status)}
-                                >
-                                    <option value="DRAFT">DRAFT</option>
-                                    <option value="PUBLISHED">PUBLISHED</option>
-                                    <option value="CANCELLED">CANCELLED</option>
-                                </select>
-                            </label>
                         </div>
 
                         <label className="text-sm">
@@ -197,7 +178,6 @@ export default function CreateSessionModal({
                 </div>
             </div>
 
-            {/* ✅ Error popup sits outside the modal so it can overlay it */}
             <ErrorModal
                 open={errorOpen}
                 title="Cannot create session"
