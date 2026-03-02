@@ -55,10 +55,13 @@ function isSTClinic(s: any): boolean {
     return code === "ST" || code.startsWith("ST");
 }
 
+
+
 export default function PlannerShell({
                                          anchorMonth,
                                          onPrevMonth,
                                          onNextMonth,
+                                         onSetMonth,
                                          data,
                                          loading,
                                          error,
@@ -67,6 +70,7 @@ export default function PlannerShell({
     anchorMonth: Date;
     onPrevMonth: () => void;
     onNextMonth: () => void;
+    onSetMonth: (d: Date) => void;
     data: PlannerResponse | null;
     loading: boolean;
     error: string | null;
@@ -205,9 +209,14 @@ export default function PlannerShell({
                 ? "warning"
                 : "ok";
 
+    function handleCurrentMonth() {
+        const now = new Date();
+        onSetMonth(new Date(now.getFullYear(), now.getMonth(), 1));
+    }
+
     return (
         <div className="min-h-screen bg-slate-100">
-            <TopBar anchorMonth={anchorMonth} onPrevMonth={onPrevMonth} onNextMonth={onNextMonth} />
+            <TopBar anchorMonth={anchorMonth} onPrevMonth={onPrevMonth} onNextMonth={onNextMonth} onCurrentMonth={handleCurrentMonth} />
 
             <main className="w-full px-6 py-8">
                 {/* ✅ two separate boxes with a visible gap */}

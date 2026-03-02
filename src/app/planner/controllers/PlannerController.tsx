@@ -22,6 +22,7 @@ export default function PlannerController() {
             anchorMonth={anchorMonth}
     onPrevMonth={() => setAnchorMonth((d) => new Date(d.getFullYear(), d.getMonth() - 1, 1))}
     onNextMonth={() => setAnchorMonth((d) => new Date(d.getFullYear(), d.getMonth() + 1, 1))}
+            onSetMonth={setAnchorMonth}
     data={data}
     loading={loading}
     error={error}
