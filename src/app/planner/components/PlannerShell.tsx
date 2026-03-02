@@ -13,10 +13,17 @@ function getSessionDateKey(s: any): string | null {
 }
 
 function getSessionClinicianId(s: any): number | null {
-    const raw = s?.clinician_id ?? s?.clinicianId ?? null;
+    const raw =
+        s?.clinician_id ??
+        s?.clinicianId ??
+        s?.clinician?.id ??        // 👈 if session embeds clinician object
+        s?.clinician_id_fk ??      // 👈 if you used a different column
+        null;
+
     if (raw === null || raw === undefined || raw === "") return null;
+
     const n = Number(raw);
-    return Number.isFinite(n) ? n : null;
+    return Number.isFinite(n) && n > 0 ? n : null;
 }
 
 export default function PlannerShell({
@@ -43,50 +50,64 @@ export default function PlannerShell({
         if (!data) return [];
 
         const clinicianById = new Map<number, any>();
-        for (const c of (data.clinicians ?? []) as any[]) {
-            clinicianById.set(Number(c.id), c);
-        }
+        for (const c of (data.clinicians ?? []) as any[]) clinicianById.set(Number(c.id), c);
 
-        const perDay = new Map<
-            string,
-            { hasPreRegOO: boolean; hasSupervisorOO: boolean; preRegCount: number }
-        >();
+        const perDay = new Map<string, { preRegs: string[]; supervisors: string[] }>();
 
         for (const s of (data.sessions ?? []) as any[]) {
-            const dateKey = getSessionDateKey(s);
+            const dateKey = String(s?.session_date ?? s?.date ?? "").slice(0, 10);
             if (!dateKey) continue;
 
-            const cid = getSessionClinicianId(s);
-            const c = cid ? clinicianById.get(cid) : null;
+            const cid = Number(s?.clinician_id ?? s?.clinicianId);
+            if (!Number.isFinite(cid)) continue;
 
-            const role = Number(c?.role_code); // OO=1
-            const grade = Number(c?.grade_code); // Registered=1, PreReg=2
+            const c = clinicianById.get(cid);
+            if (!c) continue;
 
-            const isOO = role === 1;
-            const isPreReg = grade === 2;
-            const isRegistered = grade === 1;
+            const role = Number(c.role_code);   // OO=1
+            const grade = Number(c.grade_code); // Registered=1, PreReg=2
+            const name = String(c.display_name ?? c.full_name ?? `#${cid}`);
 
-            const entry =
-                perDay.get(dateKey) ?? { hasPreRegOO: false, hasSupervisorOO: false, preRegCount: 0 };
+            const isPreRegOO = role === 1 && grade === 2;
 
-            if (isOO && isPreReg) {
-                entry.hasPreRegOO = true;
-                entry.preRegCount += 1;
-            }
+            // ✅ Supervisor anywhere in the day (OO registered only)
+            const isSupervisor = role === 1 && grade === 1 && Number(c.is_supervisor) === 1;
 
-            // supervisor = Registered OO present that day
-            if (isOO && isRegistered) {
-                entry.hasSupervisorOO = true;
-            }
-
+            const entry = perDay.get(dateKey) ?? { preRegs: [], supervisors: [] };
+            if (isPreRegOO) entry.preRegs.push(name);
+            if (isSupervisor) entry.supervisors.push(name);
             perDay.set(dateKey, entry);
         }
 
-        return Array.from(perDay.entries())
-            .filter(([_, v]) => v.hasPreRegOO && !v.hasSupervisorOO)
-            .map(([date, v]) => ({ date, preRegCount: v.preRegCount }))
+        //DEBUG DATA
+        //SHOW KEYS AND SUPERVISORS
+        if (data) {
+            console.log("[DEBUG] clinician sample keys", Object.keys(data.clinicians?.[0] ?? {}));
+            console.log("[DEBUG] supervisors in payload", (data.clinicians ?? []).filter((c: any) => Number(c.is_supervisor) === 1).length);
+        }
+        //DEBUG TABLE SHOWING PRE-REG AND SUPERVISORS
+       const debug = Array.from(perDay.entries())
+            .map(([date, v]) => ({
+                date,
+                preRegCount: v.preRegs.length,
+                supervisorCount: v.supervisors.length,
+                preRegs: v.preRegs.join(", "),
+                supervisors: v.supervisors.join(", "),
+            }))
             .sort((a, b) => a.date.localeCompare(b.date));
-    }, [data]);
+
+        console.table(debug.filter(r => r.date === "2026-03-01" || r.date === "2026-03-02"));
+
+        return Array.from(perDay.entries())
+            .map(([date, v]) => ({
+                date,
+                preRegCount: v.preRegs.length,
+                supervisorCount: v.supervisors.length,
+                preRegs: v.preRegs.join(", "),
+            }))
+            .filter((r) => r.preRegCount > 0 && r.supervisorCount === 0)
+            .sort((a, b) => a.date.localeCompare(b.date));
+    }, [data?.sessions, data?.clinicians]);
 
     return (
         <div className="min-h-screen bg-slate-100">
@@ -96,46 +117,85 @@ export default function PlannerShell({
                 {/* ✅ two separate boxes with a visible gap */}
                 <div className="flex gap-6 items-start">
                     {/* LEFT SIDEBAR CARD */}
-                    <aside className="hidden lg:block w-72 shrink-0">
-                        <div className="rounded-2xl bg-white shadow-sm border border-slate-200 p-4">
-                            <div className="flex items-center justify-between">
-                                <div className="text-sm font-semibold text-slate-900">Needs Supervisor</div>
-                                <div className="text-xs font-semibold text-slate-600">
-                                    {!loading && !error && data ? needsSupervisorDays.length : "—"}
+                    <aside className="hidden lg:block w-80 shrink-0">
+                        <div
+                            className={`rounded-2xl border shadow-sm p-6 transition-all ${
+                                needsSupervisorDays.length > 0
+                                    ? "bg-red-50 border-red-200"
+                                    : "bg-emerald-50 border-emerald-200"
+                            }`}
+                        >
+                            {/* HEADER */}
+                            <div className="text-xs font-semibold tracking-wide uppercase text-slate-600">
+                                Needs Supervisor
+                            </div>
+
+                            {/* STATUS NUMBER + DOT */}
+                            <div className="mt-3 flex items-center gap-3">
+                                <div
+                                    className={`text-4xl font-bold leading-none ${
+                                        needsSupervisorDays.length > 0
+                                            ? "text-red-600"
+                                            : "text-emerald-600"
+                                    }`}
+                                >
+                                    {needsSupervisorDays.length}
                                 </div>
-                            </div>
 
-                            <div className="mt-1 text-xs text-slate-500">
-                                Pre-Reg OO booked with no supervising Registered OO.
-                            </div>
-
-                            <div className="mt-3 space-y-2">
-                                {loading && <div className="text-sm text-slate-600">Loading…</div>}
-                                {error && <div className="text-sm text-red-600">{error}</div>}
-
-                                {!loading && !error && data && (
-                                    <>
-                                        {needsSupervisorDays.length === 0 ? (
-                                            <div className="text-sm text-slate-600">No flagged days.</div>
-                                        ) : (
-                                            needsSupervisorDays.map((d) => (
-                                                <button
-                                                    key={d.date}
-                                                    onClick={() => router.push(`/planner/${d.date}`)}
-                                                    className="w-full text-left rounded-lg border border-slate-200 px-3 py-2 hover:bg-slate-50"
-                                                >
-                                                    <div className="flex items-center justify-between">
-                                                        <div className="text-sm font-medium text-slate-900">{d.date}</div>
-                                                        <div className="text-xs font-semibold text-red-700 bg-red-50 border border-red-200 rounded-full px-2 py-0.5">
-                                                            {d.preRegCount} pre-reg
-                                                        </div>
-                                                    </div>
-                                                </button>
-                                            ))
-                                        )}
-                                    </>
+                                {needsSupervisorDays.length > 0 ? (
+                                    <span className="relative flex h-3 w-3">
+          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+          <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
+        </span>
+                                ) : (
+                                    <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-emerald-600">
+          <svg viewBox="0 0 20 20" fill="none" className="h-4 w-4">
+            <path
+                d="M16.25 5.75L8.5 13.5L3.75 8.75"
+                stroke="white"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+            />
+          </svg>
+        </span>
                                 )}
                             </div>
+
+                            {/* DESCRIPTION */}
+                            <div className="mt-3 text-sm text-slate-700">
+                                {needsSupervisorDays.length > 0
+                                    ? "Pre-Reg OO scheduled without a supervising Registered OO."
+                                    : "All clinics properly supervised."}
+                            </div>
+
+                            {/* FLAGGED DAYS */}
+                            {needsSupervisorDays.length > 0 && (
+                                <div className="mt-5 space-y-3">
+                                    {needsSupervisorDays.map((d) => (
+                                        <button
+                                            key={d.date}
+                                            onClick={() => router.push(`/planner/${d.date}`)}
+                                            className="w-full text-left rounded-xl border border-red-200 bg-white px-4 py-3 hover:bg-red-50 transition"
+                                        >
+                                            <div className="flex items-center justify-between">
+                                                <div>
+                                                    <div className="text-sm font-semibold text-slate-900">
+                                                        {d.date}
+                                                    </div>
+                                                    <div className="mt-1 text-xs text-slate-500">
+                                                        {d.preRegs}
+                                                    </div>
+                                                </div>
+
+                                                <div className="text-xs font-semibold text-red-700 bg-red-100 rounded-full px-2 py-0.5">
+                                                    Attention
+                                                </div>
+                                            </div>
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
                         </div>
                     </aside>
 

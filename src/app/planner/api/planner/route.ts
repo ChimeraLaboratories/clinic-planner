@@ -18,7 +18,7 @@ export async function GET(req: Request) {
         console.log("[/api/planner] from,to =", from, to);
 
         const [rooms] = await db.query(`SELECT id, name FROM rooms WHERE is_active=1`);
-        const [clinicians] = await db.query(`SELECT id, display_name, role_code, grade_code FROM clinicians WHERE is_active=1`);
+        const [clinicians] = await db.query(`SELECT id, display_name, role_code, grade_code, is_supervisor FROM clinicians WHERE is_active=1`);
         const [sessions] = await db.query(
             `
                 SELECT
