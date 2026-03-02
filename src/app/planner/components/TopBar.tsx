@@ -2,23 +2,41 @@
 
 import { formatMonthTitle } from "../utils/date";
 import Link from "next/link";
+import {useEffect, useRef, useState} from "react";
 
 export default function TopBar({
                                    anchorMonth,
                                    onPrevMonth,
                                    onNextMonth,
                                    onCurrentMonth,
+                                   env,
                                }: {
     anchorMonth: Date;
     onPrevMonth: () => void;
     onNextMonth: () => void;
     onCurrentMonth: () => void;
+    env?: "DEV" | "QA" | "PROD";
 }) {
     const today = new Date();
 
     const isCurrentMonth =
         today.getMonth() === anchorMonth.getMonth() &&
         today.getFullYear() === anchorMonth.getFullYear();
+
+    const [menuOpen, setMenuOpen] = useState(false);
+    const menuRef = useRef<HTMLDivElement | null>(null);
+
+    useEffect(() => {
+        function handleClickOutside(e: MouseEvent) {
+            if (!menuRef.current) return;
+            if (!menuRef.current.contains(e.target as Node)) {
+                setMenuOpen(false);
+            }
+        }
+
+        document.addEventListener("mousedown", handleClickOutside);
+        return () => document.removeEventListener("mousedown", handleClickOutside);
+    }, []);
 
     return (
         <header className="sticky top-0 z-40 w-full border-b border-slate-200 bg-white/80 backdrop-blur-md">
@@ -27,18 +45,31 @@ export default function TopBar({
                 {/* LEFT — Logo + Brand */}
                 <div className="flex items-center gap-3">
                     <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-blue-600 to-indigo-600 shadow-md">
-            <span className="text-sm font-bold text-white tracking-wide">
-              CP
-            </span>
+                        <img
+                            src="/logo.svg"
+                            alt="Clinic Planner"
+                            className="h-10 w-10"
+                        />
                     </div>
 
                     <div className="flex flex-col leading-tight">
-            <span className="text-lg font-semibold text-slate-900">
-              Clinic Planner
-            </span>
-                        <span className="text-xs text-slate-500">
-              Scheduling & Capacity Management
-            </span>
+                        <div className="flex items-center gap-2">
+                            <div className="font-semibold text-slate-900">Clinic Planner</div>
+
+                            {env && (
+                                <span
+                                    className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold tracking-wide border ${
+                                        env === "PROD"
+                                            ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                                            : env === "QA"
+                                                ? "bg-amber-50 text-amber-700 border-amber-200"
+                                                : "bg-slate-100 text-slate-600 border-slate-200"
+                                    }`}
+                                >
+        {env}
+      </span>
+                            )}
+                        </div>
                     </div>
                 </div>
 
@@ -78,13 +109,50 @@ export default function TopBar({
                 </div>
 
                 {/* RIGHT — Actions */}
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-4">
+
+                    {/* Publish badge stays here if you added it */}
+
                     <Link
                         href="/planner/clinicians"
-                        className="inline-flex items-center rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm transition hover:bg-slate-50"
+                        className="inline-flex items-center rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50"
                     >
                         Clinician Management
                     </Link>
+
+                    {/* 👤 User Dropdown */}
+                    <div className="relative" ref={menuRef}>
+                        <button
+                            onClick={() => setMenuOpen((v) => !v)}
+                            className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50"
+                        >
+                            <div className="flex h-7 w-7 items-center justify-center rounded-full bg-blue-600 text-white text-xs font-semibold">
+                                CE
+                            </div>
+                            <span className="hidden sm:block">Cane</span>
+                        </button>
+
+                        {menuOpen && (
+                            <div className="absolute right-0 mt-2 w-52 rounded-xl border border-slate-200 bg-white shadow-lg overflow-hidden">
+                                <Link
+                                    href="/settings"
+                                    className="block px-4 py-2 text-sm text-slate-700 hover:bg-slate-50"
+                                >
+                                    Settings
+                                </Link>
+
+                                <button className="w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-50">
+                                    Account
+                                </button>
+
+                                <div className="border-t border-slate-200" />
+
+                                <button className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-slate-50">
+                                    Sign out
+                                </button>
+                            </div>
+                        )}
+                    </div>
                 </div>
             </div>
         </header>
