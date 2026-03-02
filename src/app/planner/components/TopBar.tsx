@@ -4,18 +4,27 @@ import { formatMonthTitle } from "../utils/date";
 import Link from "next/link";
 import {useEffect, useRef, useState} from "react";
 
+function formatLastSynced(d: Date | null | undefined) {
+    if (!d) return "";
+    return d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+}
+
 export default function TopBar({
                                    anchorMonth,
                                    onPrevMonth,
                                    onNextMonth,
                                    onCurrentMonth,
                                    env,
+                                   syncState,
+                                   lastSyncedAt,
                                }: {
     anchorMonth: Date;
     onPrevMonth: () => void;
     onNextMonth: () => void;
     onCurrentMonth: () => void;
-    env?: "DEV" | "QA" | "PROD";
+    env?: "DEV" | "QA" | "STAGE" | "PROD";
+    syncState?: "idle" | "syncing" | "synced" | "error";
+    lastSyncedAt?: Date | null;
 }) {
     const today = new Date();
 
@@ -55,19 +64,48 @@ export default function TopBar({
                     <div className="flex flex-col leading-tight">
                         <div className="flex items-center gap-2">
                             <div className="font-semibold text-slate-900">Clinic Planner</div>
-
                             {env && (
-                                <span
-                                    className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold tracking-wide border ${
-                                        env === "PROD"
-                                            ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-                                            : env === "QA"
-                                                ? "bg-amber-50 text-amber-700 border-amber-200"
-                                                : "bg-slate-100 text-slate-600 border-slate-200"
-                                    }`}
-                                >
+                                <div className="tooltip">
+    <span
+        className={`inline-flex items-center gap-2 rounded-full px-2.5 py-0.5 text-[11px] font-semibold tracking-wide border ${
+            env === "PROD"
+                ? "bg-red-50 text-red-700 border-red-200 env-glow-prod"
+                : env === "STAGE"
+                    ? "bg-purple-50 text-purple-700 border-purple-200"
+                    : env === "QA"
+                        ? "bg-amber-50 text-amber-700 border-amber-200"
+                        : "bg-blue-50 text-blue-700 border-blue-200"
+        }`}
+        aria-label={`Environment: ${env}`}
+    >
+      {/* ✅ Pulsing dot only for QA */}
+        {env === "QA" && (
+            <span className="relative flex h-2 w-2">
+          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-500/60" />
+          <span className="relative inline-flex h-2 w-2 rounded-full bg-amber-600" />
+        </span>
+        )}
+
+        {/* Optional: small warning dot for PROD (static) */}
+        {env === "PROD" && <span className="inline-flex h-2 w-2 rounded-full bg-red-600" />}
+
         {env}
-      </span>
+    </span>
+
+                                    {/* ✅ Proper tooltip (not title="") */}
+                                    <div className="tooltip-content">
+                                        <div className="font-semibold text-slate-800">Environment: {env}</div>
+                                        <div className="mt-1 text-slate-600">
+                                            {env === "PROD"
+                                                ? "Live system. Changes affect real schedules."
+                                                : env === "QA"
+                                                    ? "Testing environment. Data may reset."
+                                                    : env === "STAGE"
+                                                        ? "Pre-production. Validate before going live."
+                                                        : "Development environment. Safe for experiments."}
+                                        </div>
+                                    </div>
+                                </div>
                             )}
                         </div>
                     </div>
@@ -82,10 +120,10 @@ export default function TopBar({
                         ‹
                     </button>
 
-                    <div className="flex h-9 items-center rounded-lg border border-slate-200 bg-white px-5 shadow-sm">
-            <span className="text-sm font-semibold text-slate-800">
-              {formatMonthTitle(anchorMonth)}
-            </span>
+                    <div className="flex h-9 items-center overflow-hidden rounded-lg border border-slate-200 bg-white px-5 shadow-sm">
+                        <span key={formatMonthTitle(anchorMonth)} className="animate-fadeInUp text-sm font-semibold text-slate-800">
+                            {formatMonthTitle(anchorMonth)}
+                        </span>
                     </div>
 
                     <button
@@ -107,6 +145,39 @@ export default function TopBar({
                         Current Month
                     </button>
                 </div>
+                {/* 🔄 Live Sync Indicator */}
+                {syncState && syncState !== "idle" && (
+                    <div
+                        className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold border ${
+                            syncState === "syncing"
+                                ? "bg-blue-50 text-blue-700 border-blue-200"
+                                : syncState === "synced"
+                                    ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                                    : "bg-red-50 text-red-700 border-red-200"
+                        }`}
+                        title={
+                            lastSyncedAt
+                                ? `Last synced at ${formatLastSynced(lastSyncedAt)}`
+                                : undefined
+                        }
+                    >
+    <span
+        className={`h-2 w-2 rounded-full ${
+            syncState === "syncing"
+                ? "bg-blue-600 animate-pulse"
+                : syncState === "synced"
+                    ? "bg-emerald-600"
+                    : "bg-red-600"
+        }`}
+    />
+                        {syncState === "syncing"
+                            ? "Syncing…"
+                            : syncState === "synced"
+                                ? "Synced just now"
+                                : "Sync failed"}
+                    </div>
+                )}
+
 
                 {/* RIGHT — Actions */}
                 <div className="flex items-center gap-4">

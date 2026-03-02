@@ -66,6 +66,8 @@ export default function PlannerShell({
                                          loading,
                                          error,
                                          onRefresh,
+                                         syncState,
+                                         lastSyncedAt,
                                      }: {
     anchorMonth: Date;
     onPrevMonth: () => void;
@@ -75,6 +77,8 @@ export default function PlannerShell({
     loading: boolean;
     error: string | null;
     onRefresh: () => void | Promise<void>;
+    syncState?: "idle" | "syncing" | "synced" | "error";
+    lastSyncedAt?: Date | null;
 }) {
     const router = useRouter();
 
@@ -216,7 +220,8 @@ export default function PlannerShell({
 
     return (
         <div className="min-h-screen bg-slate-100">
-            <TopBar anchorMonth={anchorMonth} onPrevMonth={onPrevMonth} onNextMonth={onNextMonth} onCurrentMonth={handleCurrentMonth} env="DEV" />
+            <TopBar anchorMonth={anchorMonth} onPrevMonth={onPrevMonth} onNextMonth={onNextMonth} onCurrentMonth={handleCurrentMonth} env="DEV"
+            syncState={syncState} lastSyncedAt={lastSyncedAt}/>
 
             <main className="w-full px-6 py-8">
                 {/* ✅ two separate boxes with a visible gap */}

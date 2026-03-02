@@ -25,6 +25,15 @@ export function usePlannerData(from: string, to: string, pollMs = 10000) {
     const [data, setData] = useState<PlannerResponse | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [syncState, setSyncState] = useState<"idle" | "syncing" | "synced" | "error">("idle");
+    const [lastSyncedAt, setLastSyncedAt] = useState<Date | null>(null);
+
+    useEffect(() => {
+        if (syncState !== "synced") return;
+
+        const t = setTimeout(() => setSyncState("idle"), 2500);
+        return () => clearTimeout(t);
+    }, [syncState]);
 
     // ✅ normalize to full month based on the month you're viewing (derived from `to`)
     const normalized = useMemo(() => {
@@ -35,6 +44,7 @@ export function usePlannerData(from: string, to: string, pollMs = 10000) {
     async function load() {
         try {
             setError(null);
+            setSyncState("syncing");
 
             console.log("[usePlannerData] fetching", normalized);
 
@@ -55,6 +65,8 @@ export function usePlannerData(from: string, to: string, pollMs = 10000) {
             });
 
             setData(json);
+            setLastSyncedAt(new Date());
+            setSyncState("synced");
         } catch (e: any) {
             setError(e?.message ?? "Failed to load");
         } finally {
@@ -70,5 +82,5 @@ export function usePlannerData(from: string, to: string, pollMs = 10000) {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [normalized.from, normalized.to, pollMs]);
 
-    return { data, loading, error, reload: load };
+    return { data, loading, error, syncState, lastSyncedAt, reload: load };
 }
