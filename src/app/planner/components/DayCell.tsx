@@ -2,17 +2,38 @@
 
 import type { Session } from "../types/planner";
 
+function isActiveSession(s: any) {
+    return String(s?.status ?? "").toUpperCase() !== "CANCELLED";
+}
+
+function getSessionTypeCode(s: any): string {
+    return String(s?.session_type ?? s?.type ?? s?.clinic_code ?? s?.clinicCode ?? "")
+        .trim()
+        .toUpperCase();
+}
+
+function getSessionNumericValue(s: any): number {
+    const raw =
+        s?.value ??
+        s?.session_value ??
+        s?.clinic_value ??
+        s?.st_value ??
+        s?.cl_value ??
+        0;
+
+    const n = typeof raw === "number" ? raw : parseFloat(String(raw));
+    return Number.isFinite(n) ? n : 0;
+}
+
 function sumValue(sessions: Session[], code: string): number {
     let total = 0;
     const target = code.toUpperCase();
 
     for (const s of sessions as any[]) {
-        const c = String(s.session_type ?? s.type ?? s.clinic_code ?? "")
-            .trim()
-            .toUpperCase();
+        if (!isActiveSession(s)) continue;
 
-        const raw: unknown = s.value ?? s.session_value ?? s.clinic_value ?? 0;
-        const v: number = typeof raw === "number" ? raw : parseFloat(String(raw));
+        const c = getSessionTypeCode(s);
+        const v = getSessionNumericValue(s);
 
         // ✅ allow ST, ST1, ST-..., "ST ..." etc.
         const matches =
@@ -21,28 +42,18 @@ function sumValue(sessions: Session[], code: string): number {
             c.includes(` ${target}`) ||
             c.includes(`${target} `);
 
-        if (matches && Number.isFinite(v)) total += v;
+        if (matches) total += v;
     }
 
     return total;
 }
 
-function ymdFromApiDate(input: any) {
-    if (!input) return "";
-    const s = String(input).trim();
-
-    // ✅ If it already contains YYYY-MM-DD, take it (covers "YYYY-MM-DD" and "YYYY-MM-DDTHH:mm:ss")
-    const m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
-    if (m) return `${m[1]}-${m[2]}-${m[3]}`;
-
-    // ❌ Do NOT fall back to new Date(s) — it causes BST/UTC day shifts
-    return "";
-}
-
 function usedRoomsCount(sessions: Session[]) {
     const set = new Set<number>();
     for (const s of sessions as any[]) {
-        const rid = Number(s.room_id ?? s.roomId);
+        if (!isActiveSession(s)) continue;
+
+        const rid = Number(s.room_id ?? s.roomId ?? s.room?.id);
         if (Number.isFinite(rid)) set.add(rid);
     }
     return set.size;
@@ -69,37 +80,14 @@ export default function DayCell({
     onSelect: (dateKey: string) => void;
     isTrainingWeekend?: boolean;
 }) {
-    // normalize [date] key to local YYYY-MM-DD (matches how you pick dates elsewhere)
-    const dayKey = (() => {
-        const yyyy = date.getFullYear();
-        const mm = String(date.getMonth() + 1).padStart(2, "0");
-        const dd = String(date.getDate()).padStart(2, "0");
-        return `${yyyy}-${mm}-${dd}`;
-    })();
+    // ✅ IMPORTANT: do NOT re-filter by date here — MonthGrid already passed the correct day's sessions
+    const daySessions = (sessions ?? []).filter(isActiveSession) as any[];
 
-    // only count sessions that belong to this [date]
-    const daySessions = (sessions as any[]).filter((s) => {
-        const apiDate =
-            s.session_date ??
-            s.date ??
-            s.sessionDate ??
-            s.clinic_date ??
-            s.clinicDate;
-
-        return ymdFromApiDate(String(apiDate)) === dayKey;
-    });
-
-    if (inMonth && daySessions.length > 0) {
-        console.log("Day:", dayKey, "keys:", Object.keys(daySessions[0] as any));
-        console.log("Day sample obj:", daySessions[0]);
-    }
-
-    const usedRooms = usedRoomsCount(daySessions);
+    const usedRooms = usedRoomsCount(daySessions as any);
     const emptyRooms = Math.max(0, (totalRooms ?? 0) - usedRooms);
 
-    const valueST = sumValue(daySessions as any, "ST")
-
-    const valueCL = sumValue(daySessions as any, "CL")
+    const valueST = sumValue(daySessions as any, "ST");
+    const valueCL = sumValue(daySessions as any, "CL");
 
     return (
         <button
@@ -107,9 +95,7 @@ export default function DayCell({
             onClick={() => inMonth && onSelect(dateKey)}
             disabled={!inMonth}
             className={`h-[140px] border p-2 relative text-left w-full transition ${
-                inMonth
-                    ? "bg-white hover:bg-slate-50"
-                    : "bg-slate-50 opacity-50 cursor-default"
+                inMonth ? "bg-white hover:bg-slate-50" : "bg-slate-50 opacity-50 cursor-default"
             } ${
                 isTrainingWeekend && inMonth
                     ? "border-purple-300 bg-gradient-to-br from-purple-50 to-white ring-2 ring-purple-400"
@@ -130,7 +116,6 @@ export default function DayCell({
                 </div>
             )}
 
-            {/* ✅ Only show stats if the day is in the current month */}
             {inMonth && (
                 <div className="mt-5 space-y-1 text-[11px] text-slate-600">
                     <div

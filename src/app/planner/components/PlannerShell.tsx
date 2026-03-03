@@ -204,6 +204,16 @@ export default function PlannerShell({
         onSetMonth(new Date(now.getFullYear(), now.getMonth(), 1));
     }
 
+    console.log(
+        "[debug] sample session dates",
+        (data?.sessions ?? []).slice(0, 20).map((s: any) => ({
+            session_date: s.session_date,
+            date: s.date,
+            uk_day: s.uk_day,
+            key: getSessionDateKey(s),
+        }))
+    );
+
     return (
         <div className="min-h-screen bg-slate-100">
             <TopBar
