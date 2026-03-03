@@ -1,4 +1,4 @@
-import {db} from "@/lib/db";
+import { db } from "@/lib/db";
 
 type Slot = "FULL" | "AM" | "PM";
 type SessionType = "ST" | "CL";
@@ -24,11 +24,14 @@ export async function createSession(input: {
     // 1) Room conflicts
     const [roomConflicts] = await db.query(
         `
-            SELECT id, slot FROM sessions WHERE session_date = ?
-                                            AND room_id = ?
-                                            AND slot IN (${slotsToCheck.map(() => "?").join(",")})
-                                            AND status <> 'CANCELLED'
-                LIMIT 1`,
+            SELECT id, slot
+            FROM sessions
+            WHERE session_date = ?
+              AND room_id = ?
+              AND slot IN (${slotsToCheck.map(() => "?").join(",")})
+              AND status <> 'CANCELLED'
+                LIMIT 1
+        `,
         [session_date, room_id, ...slotsToCheck]
     );
 
@@ -40,25 +43,43 @@ export async function createSession(input: {
     }
 
     if (clinician_id !== null) {
-        // 2) ✅ Availability check against clinician_day_rules
+        // 2) Availability check (effective dating + correct weekday mapping)
+        // JS getDay(): 0=Sun..6=Sat (matches your DB convention)
+        const weekday0to6 = new Date(session_date + "T00:00:00").getDay();
+
         const [ruleRows] = await db.query(
             `
-            SELECT is_available_shift
-            FROM clinician_day_rule
-            WHERE clinician_id = ?
-              AND weekday = DAYOFWEEK(?)
-            LIMIT 1
-            `,
-            [clinician_id, session_date]
+        SELECT r.is_available_shift, r.activity_code
+        FROM clinician_day_rule r
+        JOIN (
+          SELECT weekday, MAX(effective_from) AS max_from
+          FROM clinician_day_rule
+          WHERE clinician_id = ?
+            AND is_active = 1
+            AND pattern_code = 'EVERY'
+            AND weekday = ?
+            AND effective_from <= ?
+            AND (effective_to IS NULL OR effective_to >= ?)
+          GROUP BY weekday
+        ) pick
+          ON pick.weekday = r.weekday
+         AND pick.max_from = r.effective_from
+        WHERE r.clinician_id = ?
+          AND r.is_active = 1
+          AND r.pattern_code = 'EVERY'
+          AND r.weekday = ?
+        LIMIT 1
+      `,
+            [clinician_id, weekday0to6, session_date, session_date, clinician_id, weekday0to6]
         );
 
         const rule = (ruleRows as any[])[0];
 
-        // Default behaviour:
-        // - If no rule row exists -> ALLOW
-        // If you want "no rule row -> BLOCK", change to: if (!rule || Number(rule.is_available_shift) !== 1) { ... }
+        // Default behaviour: if no rule exists -> allow
         if (rule && Number(rule.is_available_shift) !== 1) {
-            const err: any = new Error("Clinician is not available for a shift on this day.");
+            const err: any = new Error(
+                `Clinician is not available for a shift on this day (rule: ${rule.activity_code ?? "?"}).`
+            );
             err.code = "CLINICIAN_NOT_AVAILABLE_SHIFT";
             throw err;
         }
@@ -66,22 +87,20 @@ export async function createSession(input: {
         // 3) Clinician conflicts (already booked)
         const [clinicianConflicts] = await db.query(
             `
-            SELECT id, slot, room_id
-            FROM sessions
-            WHERE session_date = ?
-              AND clinician_id = ?
-              AND slot IN (${slotsToCheck.map(() => "?").join(",")})
-              AND status <> 'CANCELLED'
-            LIMIT 1
-            `,
+        SELECT id, slot, room_id
+        FROM sessions
+        WHERE session_date = ?
+          AND clinician_id = ?
+          AND slot IN (${slotsToCheck.map(() => "?").join(",")})
+          AND status <> 'CANCELLED'
+        LIMIT 1
+      `,
             [session_date, clinician_id, ...slotsToCheck]
         );
 
         if ((clinicianConflicts as any[]).length > 0) {
             const c = (clinicianConflicts as any[])[0];
-            const err: any = new Error(
-                `Clinician already booked (${c.slot}) on ${session_date} (room ${c.room_id})`
-            );
+            const err: any = new Error(`Clinician already booked (${c.slot}) on ${session_date} (room ${c.room_id})`);
             err.code = "SESSION_CONFLICT";
             throw err;
         }
@@ -90,10 +109,10 @@ export async function createSession(input: {
     // 4) Insert
     await db.query(
         `
-        INSERT INTO sessions
-          (session_date, room_id, clinician_id, session_type, slot, status, notes)
-        VALUES
-          (?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO sessions
+            (session_date, room_id, clinician_id, session_type, slot, status, notes)
+            VALUES
+                (?, ?, ?, ?, ?, ?, ?)
         `,
         [session_date, room_id, clinician_id, session_type, slot, status, notes]
     );
