@@ -298,34 +298,6 @@ export default function PlannerShell({
                                 )}
                             </div>
 
-                            {/* ✅ PLACED HERE: SUPERVISOR IN STORE (NOT IN CLINIC) */}
-                            <div className="rounded-2xl border shadow-sm p-6 bg-white border-slate-200">
-                                <div className="text-xs font-semibold tracking-wide uppercase text-slate-600">
-                                    Supervisor in Store (not in clinic)
-                                </div>
-
-                                <div className="mt-3 text-sm text-slate-700">
-                                    {supervisorInStoreOnlyDays.length > 0
-                                        ? "These days have store supervision recorded even if no supervisor is booked into clinic."
-                                        : "No store-only supervision entries in this range."}
-                                </div>
-
-                                {supervisorInStoreOnlyDays.length > 0 && (
-                                    <div className="mt-4 space-y-2">
-                                        {supervisorInStoreOnlyDays.map((d) => (
-                                            <button
-                                                key={d.date}
-                                                onClick={() => router.push(`/planner/${d.date}`)}
-                                                className="w-full text-left rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 hover:bg-emerald-100 transition"
-                                            >
-                                                <div className="text-sm font-semibold text-slate-900">{d.date}</div>
-                                                <div className="mt-1 text-xs text-emerald-800">{d.supervisorsInStore}</div>
-                                            </button>
-                                        ))}
-                                    </div>
-                                )}
-                            </div>
-
                             {/* CLINICS (ST VALUE) CARD */}
                             <div
                                 className={`rounded-2xl border shadow-sm p-6 transition-all ${
