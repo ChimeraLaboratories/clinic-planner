@@ -1,16 +1,16 @@
 "use client";
 
-import type { PlannerResponse, Session } from "../types/planner";
-import {
-    buildMonthGrid,
-    getFirstFullWeekend,
-    isSameMonth,
-    toISODate,
-} from "../utils/date";
+import type { PlannerResponse } from "../types/planner";
+import { buildMonthGrid, getFirstFullWeekend, isSameMonth, toISODate } from "../utils/date";
 import DayCell from "./DayCell";
-import DayDrawer from "@/app/planner/components/DayDrawer";
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { useRouter } from "next/navigation";
+
+function ym(d: Date) {
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, "0");
+    return `${yyyy}-${mm}`;
+}
 
 function ymdLocal(d: Date) {
     const yyyy = d.getFullYear();
@@ -21,33 +21,10 @@ function ymdLocal(d: Date) {
 
 function dateKeyFromAny(input: any): string {
     if (!input) return "";
-
-    // ✅ IMPORTANT: mysql2 can return Date objects; use LOCAL YMD to match month grid keys
     if (input instanceof Date) return ymdLocal(input);
-
     const s = String(input).trim();
     const m = s.match(/^(\d{4}-\d{2}-\d{2})/);
     return m ? m[1] : "";
-}
-
-function groupByDate(sessions: Session[]) {
-    const map = new Map<string, Session[]>();
-    for (const s of sessions) {
-        const k = dateKeyFromAny(
-            (s as any).date ?? (s as any).session_date ?? (s as any).sessionDate
-        );
-        if (!k) continue;
-        const arr = map.get(k) ?? [];
-        arr.push(s);
-        map.set(k, arr);
-    }
-    return map;
-}
-
-function ym(d: Date) {
-    const yyyy = d.getFullYear();
-    const mm = String(d.getMonth() + 1).padStart(2, "0");
-    return `${yyyy}-${mm}`;
 }
 
 function buildTrainingKeys(anchorMonth: Date) {
@@ -66,7 +43,6 @@ function buildTrainingKeys(anchorMonth: Date) {
 export default function MonthGrid({
                                       anchorMonth,
                                       data,
-                                      onRefresh,
                                   }: {
     anchorMonth: Date;
     data: PlannerResponse;
@@ -79,49 +55,33 @@ export default function MonthGrid({
     const dow = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
     const totalRooms = data.rooms?.length ?? 0;
 
-    const trainingKeys = useMemo(
-        () => buildTrainingKeys(anchorMonth),
-        [anchorMonth]
-    );
+    const trainingKeys = useMemo(() => buildTrainingKeys(anchorMonth), [anchorMonth]);
 
     const roomsById = useMemo(() => {
         const m = new Map<number, string>();
-        for (const r of (data?.rooms ?? []) as any[]) {
-            m.set(Number(r.id), String(r.name));
-        }
+        for (const r of (data?.rooms ?? []) as any[]) m.set(Number(r.id), String(r.name));
         return m;
     }, [data]);
 
     const cliniciansById = useMemo(() => {
         const m = new Map<number, string>();
-        for (const c of (data?.clinicians ?? []) as any[]) {
+        for (const c of (data?.clinicians ?? []) as any[])
             m.set(Number(c.id), String(c.full_name ?? c.display_name ?? ""));
-        }
         return m;
     }, [data]);
 
-    // ✅ Single source of truth for sessions keyed by LOCAL YYYY-MM-DD
+    // ✅ Group by day_key FIRST (stable)
     const sessionsByDay = useMemo(() => {
         const map: Record<string, any[]> = {};
         for (const s of (data?.sessions ?? []) as any[]) {
-            const key = dateKeyFromAny(s.date ?? s.session_date ?? s.sessionDate);
+            const key = dateKeyFromAny(
+                s.day_key ?? s.dayKey ?? s.date_key ?? s.session_date ?? s.date ?? s.sessionDate
+            );
             if (!key) continue;
             (map[key] ??= []).push(s);
         }
         return map;
     }, [data?.sessions]);
-
-    // Drawer support (still uses same local keying)
-    const sessionsByDate = useMemo(
-        () => groupByDate((data.sessions ?? []) as Session[]),
-        [data.sessions]
-    );
-
-    const [selectedDate, setSelectedDate] = useState<Date | null>(null);
-    const selectedIso = selectedDate ? ymdLocal(selectedDate) : null;
-    const selectedSessions = selectedIso
-        ? sessionsByDate.get(selectedIso) ?? []
-        : [];
 
     return (
         <div>
@@ -135,7 +95,7 @@ export default function MonthGrid({
 
             <div className="grid grid-cols-7 border border-slate-200 rounded-xl overflow-hidden bg-white">
                 {days.map((d) => {
-                    const dateKey = ymdLocal(d); // ✅ local YYYY-MM-DD
+                    const dateKey = ymdLocal(d);
                     const inMonth = isSameMonth(d, anchorMonth);
 
                     return (
@@ -154,16 +114,6 @@ export default function MonthGrid({
                     );
                 })}
             </div>
-
-            <DayDrawer
-                open={!!selectedDate}
-                date={selectedDate}
-                sessions={selectedSessions}
-                roomsById={roomsById}
-                cliniciansById={cliniciansById}
-                onClose={() => setSelectedDate(null)}
-                onRefresh={onRefresh}
-            />
         </div>
     );
 }

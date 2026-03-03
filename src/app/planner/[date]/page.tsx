@@ -28,7 +28,7 @@ function normalizeTotals(raw: any) {
     const root = raw?.data ?? raw ?? {};
     const stats = root?.stats ?? {};
 
-    // 1) Prefer explicit totals if your API provides them
+    // 1) Prefer explicit totals from API if present
     const explicitSt = stats.totalStValue ?? root.totalStValue;
     const explicitCl = stats.totalClValue ?? root.totalClValue;
 
@@ -39,26 +39,29 @@ function normalizeTotals(raw: any) {
         };
     }
 
-    // 2) Fallback: compute totals from sessions array
+    // 2) Fallback: compute totals from sessions array (match MonthGrid/DayCell logic)
     const sessions: any[] = Array.isArray(root.sessions) ? root.sessions : [];
 
     let totalStValue = 0;
     let totalClValue = 0;
 
     for (const s of sessions) {
+        // match month grid: ignore cancelled
+        if (String(s?.status ?? "").trim().toUpperCase() === "CANCELLED") continue;
+
         const t = String(s.session_type ?? s.type ?? s.clinic_code ?? "")
             .trim()
             .toUpperCase();
 
+        // ✅ SINGLE SOURCE OF TRUTH: use API-computed `value`
+        // (this is derived from clinician_capacity join in /api/planner)
         const rawVal =
-            s.st_value ??
-            s.cl_value ??
             s.value ??
             s.session_value ??
             s.clinic_value ??
             0;
-        const v = typeof rawVal === "number" ? rawVal : parseFloat(String(rawVal));
 
+        const v = typeof rawVal === "number" ? rawVal : parseFloat(String(rawVal));
         if (!Number.isFinite(v)) continue;
 
         if (t.startsWith("ST")) totalStValue += v;

@@ -2,47 +2,18 @@
 
 import type { Session } from "../types/planner";
 
-function isActiveSession(s: any) {
-    return String(s?.status ?? "").toUpperCase() !== "CANCELLED";
-}
-
-function getSessionTypeCode(s: any): string {
-    return String(s?.session_type ?? s?.type ?? s?.clinic_code ?? s?.clinicCode ?? "")
-        .trim()
-        .toUpperCase();
-}
-
-function getSessionNumericValue(s: any): number {
-    const raw =
-        s?.value ??
-        s?.session_value ??
-        s?.clinic_value ??
-        s?.st_value ??
-        s?.cl_value ??
-        0;
-
-    const n = typeof raw === "number" ? raw : parseFloat(String(raw));
-    return Number.isFinite(n) ? n : 0;
-}
-
-function sumValue(sessions: Session[], code: string): number {
+function sumValue(sessions: any[], code: "ST" | "CL") {
     let total = 0;
-    const target = code.toUpperCase();
 
-    for (const s of sessions as any[]) {
-        if (!isActiveSession(s)) continue;
+    for (const s of sessions) {
+        const c = String(s.session_type ?? s.type ?? s.clinic_code ?? "")
+            .trim()
+            .toUpperCase();
 
-        const c = getSessionTypeCode(s);
-        const v = getSessionNumericValue(s);
+        if (!c.startsWith(code)) continue;
 
-        // ✅ allow ST, ST1, ST-..., "ST ..." etc.
-        const matches =
-            c === target ||
-            c.startsWith(target) ||
-            c.includes(` ${target}`) ||
-            c.includes(`${target} `);
-
-        if (matches) total += v;
+        const v = Number(s.value ?? 0); // <-- ONLY USE API value
+        if (Number.isFinite(v)) total += v;
     }
 
     return total;
@@ -51,10 +22,8 @@ function sumValue(sessions: Session[], code: string): number {
 function usedRoomsCount(sessions: Session[]) {
     const set = new Set<number>();
     for (const s of sessions as any[]) {
-        if (!isActiveSession(s)) continue;
-
-        const rid = Number(s.room_id ?? s.roomId ?? s.room?.id);
-        if (Number.isFinite(rid)) set.add(rid);
+        const rid = Number(s.room_id ?? s.roomId);
+        if (Number.isFinite(rid) && rid > 0) set.add(rid);
     }
     return set.size;
 }
@@ -80,10 +49,11 @@ export default function DayCell({
     onSelect: (dateKey: string) => void;
     isTrainingWeekend?: boolean;
 }) {
-    // ✅ IMPORTANT: do NOT re-filter by date here — MonthGrid already passed the correct day's sessions
-    const daySessions = (sessions ?? []).filter(isActiveSession) as any[];
+    // ✅ MonthGrid already grouped sessions for this dateKey.
+    // Do NOT re-filter here (Date objects / timezone parsing causes mismatches).
+    const daySessions = (sessions ?? []) as any[];
 
-    const usedRooms = usedRoomsCount(daySessions as any);
+    const usedRooms = usedRoomsCount(daySessions);
     const emptyRooms = Math.max(0, (totalRooms ?? 0) - usedRooms);
 
     const valueST = sumValue(daySessions as any, "ST");

@@ -25,33 +25,23 @@ export type PlannerResponse = {
         totalStValue: number;
         totalClValue: number;
     };
-    dayRules: any[]; // ✅ add this
+    dayRules: any[];
 };
 
-function dayKey(raw: any): string {
-    return String(raw ?? "").slice(0, 10);
+function safeYmd(raw: any): string {
+    const s = String(raw ?? "").trim();
+    const m = s.match(/^(\d{4}-\d{2}-\d{2})/);
+    return m ? m[1] : "";
+}
+
+function isActiveSession(s: any) {
+    return String(s?.status ?? "").trim().toUpperCase() !== "CANCELLED";
 }
 
 function getClinicCode(s: any): string {
-    return String(
-        s?.session_type ?? s?.type ?? s?.clinic_code ?? s?.clinicCode ?? ""
-    )
+    return String(s?.session_type ?? s?.type ?? s?.clinic_code ?? s?.clinicCode ?? "")
         .trim()
         .toUpperCase();
-}
-
-function getNumericValue(s: any): number {
-    const raw =
-        s?.st_value ??
-        s?.value ??
-        s?.session_value ??
-        s?.clinic_value ??
-        s?.sessionValue ??
-        s?.clinicValue ??
-        0;
-
-    const n = typeof raw === "number" ? raw : Number(String(raw).trim());
-    return Number.isFinite(n) ? n : 0;
 }
 
 export async function GET(req: Request) {
@@ -69,12 +59,11 @@ export async function GET(req: Request) {
                     sessions: [],
                     supervisionByDate: [],
                     stats: { totalStValue: 0, totalClValue: 0 },
+                    dayRules: [],
                 },
                 { status: 400 }
             );
         }
-
-        console.log("[/api/planner] from,to =", from, to);
 
         const [rooms] = await db.query<RowDataPacket[]>(
             `SELECT id, name FROM rooms WHERE is_active=1`
@@ -82,15 +71,16 @@ export async function GET(req: Request) {
 
         const [clinicians] = await db.query<RowDataPacket[]>(
             `SELECT id, display_name, full_name, role_code, grade_code, is_supervisor, is_active
-       FROM clinicians
-       WHERE is_active=1`
+             FROM clinicians
+             WHERE is_active=1`
         );
 
-        // ✅ Sessions inclusive of 'to' date (any time on that day)
+        // ✅ include stable day_key for all consumers
         const [sessions] = await db.query<RowDataPacket[]>(
             `
                 SELECT
                     s.*,
+                    DATE_FORMAT(s.session_date, '%Y-%m-%d') AS day_key,
                     CASE
                         WHEN UPPER(s.session_type) LIKE 'ST%' THEN COALESCE(cc.st_value, 0)
                         WHEN UPPER(s.session_type) LIKE 'CL%' THEN COALESCE(cc.cl_value, 0)
@@ -108,29 +98,27 @@ export async function GET(req: Request) {
             [from, to]
         );
 
-        // ✅ Load supervisors marked as "in store"
-        const [inStoreRows] = await db.query(
+        const [inStoreRows] = await db.query<RowDataPacket[]>(
             `
-      SELECT in_store_date as date, clinician_id
-      FROM supervisor_in_store
-      WHERE in_store_date BETWEEN ? AND ?
-      `,
+                SELECT in_store_date AS date, clinician_id
+                FROM supervisor_in_store
+                WHERE in_store_date BETWEEN ? AND ?
+            `,
             [from, to]
         );
 
         const [dayRules] = await db.query<RowDataPacket[]>(
             `
-      SELECT clinician_id, weekday, pattern_code, activity_code, start_time, end_time,
-             effective_from, effective_to, note, is_active, is_available_shift
-      FROM clinician_day_rule
-      WHERE is_active = 1
-        AND effective_from <= ?
-        AND (effective_to IS NULL OR effective_to >= ?)
-      `,
+                SELECT clinician_id, weekday, pattern_code, activity_code, start_time, end_time,
+                       effective_from, effective_to, note, is_active, is_available_shift
+                FROM clinician_day_rule
+                WHERE is_active = 1
+                  AND effective_from <= ?
+                  AND (effective_to IS NULL OR effective_to >= ?)
+            `,
             [to, from]
         );
 
-        // ✅ clinician lookup
         const clinicianById = new Map<number, any>();
         for (const c of clinicians as any[]) clinicianById.set(Number(c.id), c);
 
@@ -139,31 +127,37 @@ export async function GET(req: Request) {
             Number(c.grade_code) === 1 &&
             Number(c.is_supervisor) === 1;
 
-        // =========================
-        // 1) Compute ST / CL totals
-        // =========================
+// 1) Compute ST / CL totals (MUST match MonthGrid/DayCell)
+// - exclude CANCELLED
+// - use ONLY the API-computed `value` column from the SQL query
         let totalStValue = 0;
         let totalClValue = 0;
 
         for (const s of sessions as any[]) {
+            if (String(s?.status ?? "").trim().toUpperCase() === "CANCELLED") continue;
+
             const code = getClinicCode(s);
-            const v = getNumericValue(s);
+
+            const vRaw = s?.value ?? 0;
+            const v = typeof vRaw === "number" ? vRaw : Number(String(vRaw).trim());
+            if (!Number.isFinite(v)) continue;
 
             if (code.startsWith("ST")) totalStValue += v;
-            if (code.startsWith("CL")) totalClValue += v;
+            else if (code.startsWith("CL")) totalClValue += v;
         }
 
         // ==========================================
-        // 2) Supervision stats by date (your logic)
+        // 2) Supervision stats by date (EXCLUDE CANCELLED)
         // ==========================================
         const dayStatsByDate = new Map<
             string,
             { preRegs: Set<number>; supervisorsClinic: Set<number>; supervisorsStore: Set<number> }
         >();
 
-        // From SESSIONS: collect pre-reg OOs + supervisor testers
         for (const s of sessions as any[]) {
-            const dk = dayKey(s.session_date);
+            if (!isActiveSession(s)) continue;
+
+            const dk = safeYmd(s.day_key) || safeYmd(s.session_date) || safeYmd(s.date);
             if (!dk) continue;
 
             if (!dayStatsByDate.has(dk)) {
@@ -185,16 +179,12 @@ export async function GET(req: Request) {
             const role = Number(c.role_code);
             const grade = Number(c.grade_code);
 
-            // pre-reg OO: role_code=1, grade_code=2
             if (role === 1 && grade === 2) bucket.preRegs.add(cid);
-
-            // registered supervisor OO: role_code=1, grade_code=1, is_supervisor=1
             if (isRegisteredOoSupervisor(c)) bucket.supervisorsClinic.add(cid);
         }
 
-        // From IN-STORE table: add supervisors present even if not testing
         for (const r of inStoreRows as any[]) {
-            const dk = dayKey(r.date);
+            const dk = safeYmd(r.date);
             if (!dk) continue;
 
             if (!dayStatsByDate.has(dk)) {
@@ -216,10 +206,7 @@ export async function GET(req: Request) {
             if (isRegisteredOoSupervisor(c)) bucket.supervisorsStore.add(cid);
         }
 
-        // Flatten to JSON-friendly shape
-        const supervisionByDate: SupervisionByDateRow[] = Array.from(
-            dayStatsByDate.entries()
-        )
+        const supervisionByDate: SupervisionByDateRow[] = Array.from(dayStatsByDate.entries())
             .sort(([a], [b]) => a.localeCompare(b))
             .map(([date, b]) => {
                 const allSupervisors = new Set<number>([
@@ -252,7 +239,6 @@ export async function GET(req: Request) {
             sessions,
             supervisionByDate,
             stats: { totalStValue, totalClValue },
-            // leaving this here in case your UI uses it later; remove if unused
             dayRules,
         } satisfies PlannerResponse);
     } catch (err: any) {
@@ -266,6 +252,7 @@ export async function GET(req: Request) {
                 sessions: [],
                 supervisionByDate: [],
                 stats: { totalStValue: 0, totalClValue: 0 },
+                dayRules: [],
             },
             { status: 500 }
         );
