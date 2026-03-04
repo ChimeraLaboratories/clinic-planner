@@ -41,37 +41,37 @@ const activityVisuals: Record<
     { row: string; badge: string; muted?: boolean }
 > = {
     TESTING: {
-        row: "bg-green-50 border-l-4 border-green-400",
-        badge: "bg-green-100 text-green-800 border border-green-300 font-semibold",
+        row: "bg-green-50 border-l-4 border-green-400 dark:bg-emerald-950/30 dark:border-emerald-500/60",
+        badge: "bg-green-100 text-green-800 border border-green-300 font-semibold dark:bg-emerald-950/50 dark:text-emerald-200 dark:border-emerald-700/60",
     },
     SF: {
-        row: "bg-blue-50 border-l-4 border-blue-400",
-        badge: "bg-blue-100 text-blue-800 border border-blue-300 font-semibold",
+        row: "bg-blue-50 border-l-4 border-blue-400 dark:bg-sky-950/30 dark:border-sky-500/60",
+        badge: "bg-blue-100 text-blue-800 border border-blue-300 font-semibold dark:bg-sky-950/50 dark:text-sky-200 dark:border-sky-700/60",
     },
     CL: {
-        row: "bg-purple-50 border-l-4 border-purple-400",
-        badge: "bg-purple-100 text-purple-800 border border-purple-300 font-semibold",
+        row: "bg-purple-50 border-l-4 border-purple-400 dark:bg-purple-950/30 dark:border-purple-500/60",
+        badge: "bg-purple-100 text-purple-800 border border-purple-300 font-semibold dark:bg-purple-950/50 dark:text-purple-200 dark:border-purple-700/60",
     },
     SG: {
-        row: "bg-orange-50 border-l-4 border-orange-400",
-        badge: "bg-orange-100 text-orange-800 border border-orange-300 font-semibold",
+        row: "bg-orange-50 border-l-4 border-orange-400 dark:bg-orange-950/25 dark:border-orange-500/60",
+        badge: "bg-orange-100 text-orange-800 border border-orange-300 font-semibold dark:bg-orange-950/45 dark:text-orange-200 dark:border-orange-700/60",
     },
     ADMIN: {
-        row: "bg-amber-50 border-l-4 border-amber-400",
-        badge: "bg-amber-100 text-amber-800 border border-amber-300 font-semibold",
+        row: "bg-amber-50 border-l-4 border-amber-400 dark:bg-amber-950/25 dark:border-amber-500/60",
+        badge: "bg-amber-100 text-amber-800 border border-amber-300 font-semibold dark:bg-amber-950/45 dark:text-amber-200 dark:border-amber-700/60",
     },
     GF_DAY: {
-        row: "bg-slate-50 border-l-4 border-slate-400",
-        badge: "bg-slate-100 text-slate-700 border border-slate-300 font-semibold",
+        row: "bg-slate-50 border-l-4 border-slate-400 dark:bg-slate-900/50 dark:border-slate-500/60",
+        badge: "bg-slate-100 text-slate-700 border border-slate-300 font-semibold dark:bg-slate-900 dark:text-slate-200 dark:border-slate-700",
     },
     "D/O": {
-        row: "bg-red-50 border-l-4 border-red-400",
-        badge: "bg-red-100 text-red-800 border border-red-300 font-bold",
+        row: "bg-red-50 border-l-4 border-red-400 dark:bg-red-950/25 dark:border-red-500/60",
+        badge: "bg-red-100 text-red-800 border border-red-300 font-bold dark:bg-red-950/45 dark:text-red-200 dark:border-red-700/60",
         muted: true,
     },
     UNSET: {
-        row: "bg-gray-50 border-l-4 border-gray-300",
-        badge: "bg-gray-100 text-gray-600 border border-gray-300 font-medium",
+        row: "bg-gray-50 border-l-4 border-gray-300 dark:bg-slate-900/40 dark:border-slate-700",
+        badge: "bg-gray-100 text-gray-600 border border-gray-300 font-medium dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700",
         muted: true,
     },
 };
@@ -266,21 +266,21 @@ export default function DayRulesClient({ clinicianId }: { clinicianId: number })
         <div className="space-y-4">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
                 <div>
-                    <div className="text-lg font-semibold">Weekly Day Rules</div>
-                    <div className="text-sm text-gray-500">Sun → Sat</div>
-                    <div className="text-sm">
-                        <span className="text-gray-500">Pattern:</span>{" "}
+                    <div className="text-lg font-semibold text-gray-900 dark:text-slate-100">Weekly Day Rules</div>
+                    <div className="text-sm text-gray-500 dark:text-slate-400">Sun → Sat</div>
+                    <div className="text-sm text-gray-900 dark:text-slate-200">
+                        <span className="text-gray-500 dark:text-slate-400">Pattern:</span>{" "}
                         <span className="font-medium">{patternLabel(pattern)}</span>
                     </div>
                 </div>
 
                 <div className="flex flex-wrap items-end gap-2">
-                    <label className="flex flex-col gap-1 text-xs text-gray-500">
+                    <label className="flex flex-col gap-1 text-xs text-gray-500 dark:text-slate-400">
                         Pattern
                         <select
                             value={pattern}
                             onChange={(e) => setPattern(normalizePattern(e.target.value))}
-                            className="rounded border px-3 py-2 text-sm"
+                            className="rounded border border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-3 py-2 text-sm text-gray-900 dark:text-slate-100"
                             disabled={saving}
                             title="Choose alternate-week ruleset to view/edit"
                         >
@@ -292,31 +292,31 @@ export default function DayRulesClient({ clinicianId }: { clinicianId: number })
                         </select>
                     </label>
 
-                    <label className="flex flex-col gap-1 text-xs text-gray-500">
+                    <label className="flex flex-col gap-1 text-xs text-gray-500 dark:text-slate-400">
                         View as of
                         <input
                             type="date"
                             value={viewAsOfDate}
                             onChange={(e) => setViewAsOfDate(e.target.value)}
-                            className="rounded border px-3 py-2 text-sm"
+                            className="rounded border border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-3 py-2 text-sm text-gray-900 dark:text-slate-100"
                             disabled={saving}
                         />
                     </label>
 
-                    <label className="flex flex-col gap-1 text-xs text-gray-500">
+                    <label className="flex flex-col gap-1 text-xs text-gray-500 dark:text-slate-400">
                         Effective from
                         <input
                             type="date"
                             value={effectiveFrom}
                             onChange={(e) => setEffectiveFrom(e.target.value)}
-                            className="rounded border px-3 py-2 text-sm"
+                            className="rounded border border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-3 py-2 text-sm text-gray-900 dark:text-slate-100"
                             disabled={saving}
                         />
                     </label>
 
                     <button
                         onClick={load}
-                        className="rounded border px-3 py-2 text-sm hover:bg-gray-50 disabled:opacity-50"
+                        className="rounded border border-gray-200 dark:border-slate-800 px-3 py-2 text-sm hover:bg-gray-50 dark:hover:bg-slate-900 text-gray-900 dark:text-slate-100 disabled:opacity-50"
                         disabled={loading || saving}
                     >
                         {loading ? "Loading…" : "Refresh"}
@@ -324,7 +324,7 @@ export default function DayRulesClient({ clinicianId }: { clinicianId: number })
 
                     <button
                         onClick={() => setLayout((v) => (v === "table" ? "cards" : "table"))}
-                        className="rounded border px-3 py-2 text-sm hover:bg-gray-50 disabled:opacity-50"
+                        className="rounded border border-gray-200 dark:border-slate-800 px-3 py-2 text-sm hover:bg-gray-50 dark:hover:bg-slate-900 text-gray-900 dark:text-slate-100 disabled:opacity-50"
                         disabled={loading || saving}
                         title="Toggle layout"
                     >
@@ -333,7 +333,7 @@ export default function DayRulesClient({ clinicianId }: { clinicianId: number })
 
                     <button
                         onClick={save}
-                        className="rounded bg-black px-4 py-2 text-sm text-white disabled:opacity-50"
+                        className="rounded bg-black dark:bg-slate-200 px-4 py-2 text-sm text-white dark:text-slate-900 disabled:opacity-50"
                         disabled={saving || loading || !isDirty}
                         title={!isDirty ? "No changes to save" : "Save changes"}
                     >
@@ -343,18 +343,20 @@ export default function DayRulesClient({ clinicianId }: { clinicianId: number })
             </div>
 
             {error && (
-                <div className="rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
+                <div className="rounded border border-red-200 dark:border-red-900/60 bg-red-50 dark:bg-red-950/30 px-3 py-2 text-sm text-red-800 dark:text-red-200">
                     {error}
                 </div>
             )}
 
             {/* ✅ Don’t flash UNSET while loading */}
             {loading ? (
-                <div className="rounded border bg-white p-4 text-sm text-gray-600">Loading day rules…</div>
+                <div className="rounded border border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-950 p-4 text-sm text-gray-600 dark:text-slate-300">
+                    Loading day rules…
+                </div>
             ) : layout === "table" ? (
-                <div className="overflow-x-auto rounded border bg-white">
+                <div className="overflow-x-auto rounded border border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-950">
                     <table className="min-w-full text-sm">
-                        <thead className="bg-gray-50 text-left text-xs uppercase text-gray-500">
+                        <thead className="bg-gray-50 dark:bg-slate-900 text-left text-xs uppercase text-gray-500 dark:text-slate-400">
                         <tr>
                             <th className="px-3 py-2">Day</th>
                             <th className="px-3 py-2">Activity</th>
@@ -374,20 +376,20 @@ export default function DayRulesClient({ clinicianId }: { clinicianId: number })
                             const off = isDayOff(r?.activity_code);
 
                             return (
-                                <tr key={weekday} className={`${visual.row} border-t`}>
-                                    <td className="px-3 py-2 font-medium">{dayName}</td>
+                                <tr key={weekday} className={`${visual.row} border-t border-gray-200 dark:border-slate-800`}>
+                                    <td className="px-3 py-2 font-medium text-gray-900 dark:text-slate-100">{dayName}</td>
 
                                     <td className="px-3 py-2">
-                      <span className={`inline-flex items-center rounded px-2 py-1 text-xs ${visual.badge}`}>
-                        {activityLabel(r?.activity_code)}
-                      </span>
+                                        <span className={`inline-flex items-center rounded px-2 py-1 text-xs ${visual.badge}`}>
+                                            {activityLabel(r?.activity_code)}
+                                        </span>
                                     </td>
 
                                     <td className="px-3 py-2">
                                         <select
                                             value={r?.activity_code ?? "UNSET"}
                                             onChange={(e) => updateWeekday(weekday, { activity_code: e.target.value })}
-                                            className="w-full rounded border px-2 py-1 text-sm"
+                                            className="w-full rounded border border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-2 py-1 text-sm text-gray-900 dark:text-slate-100"
                                             disabled={saving || !r}
                                         >
                                             {activityOptions.map((opt) => (
@@ -407,10 +409,10 @@ export default function DayRulesClient({ clinicianId }: { clinicianId: number })
                                                     start_time: e.target.value ? `${e.target.value}:00` : null,
                                                 })
                                             }
-                                            className="w-full rounded border px-2 py-1 text-sm"
+                                            className="w-full rounded border border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-2 py-1 text-sm text-gray-900 dark:text-slate-100"
                                             disabled={saving || !r || off}
                                         />
-                                        {off && <div className="mt-1 text-xs text-gray-500">(times disabled)</div>}
+                                        {off && <div className="mt-1 text-xs text-gray-500 dark:text-slate-400">(times disabled)</div>}
                                     </td>
 
                                     <td className="px-3 py-2">
@@ -422,7 +424,7 @@ export default function DayRulesClient({ clinicianId }: { clinicianId: number })
                                                     end_time: e.target.value ? `${e.target.value}:00` : null,
                                                 })
                                             }
-                                            className="w-full rounded border px-2 py-1 text-sm"
+                                            className="w-full rounded border border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-2 py-1 text-sm text-gray-900 dark:text-slate-100"
                                             disabled={saving || !r || off}
                                         />
                                     </td>
@@ -431,13 +433,13 @@ export default function DayRulesClient({ clinicianId }: { clinicianId: number })
                                         <input
                                             value={r?.note ?? ""}
                                             onChange={(e) => updateWeekday(weekday, { note: e.target.value || null })}
-                                            className="w-full rounded border px-2 py-1 text-sm"
+                                            className="w-full rounded border border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-2 py-1 text-sm text-gray-900 dark:text-slate-100 placeholder:text-gray-400 dark:placeholder:text-slate-500"
                                             disabled={saving || !r}
                                             placeholder="Optional"
                                         />
                                     </td>
 
-                                    <td className="px-3 py-2 text-xs text-gray-700">
+                                    <td className="px-3 py-2 text-xs text-gray-700 dark:text-slate-300">
                                         {r?.effective_from ?? "-"}
                                         {r?.effective_to ? ` → ${r.effective_to}` : ""}
                                     </td>
@@ -455,21 +457,21 @@ export default function DayRulesClient({ clinicianId }: { clinicianId: number })
                         const off = isDayOff(r?.activity_code);
 
                         return (
-                            <div key={weekday} className={`rounded border bg-white p-4 ${visual.row}`}>
+                            <div key={weekday} className={`rounded border border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-950 p-4 ${visual.row}`}>
                                 <div className="flex items-start justify-between">
-                                    <div className="font-semibold">{dayName}</div>
+                                    <div className="font-semibold text-gray-900 dark:text-slate-100">{dayName}</div>
                                     <span className={`inline-flex items-center rounded px-2 py-1 text-xs ${visual.badge}`}>
-                    {activityLabel(r?.activity_code)}
-                  </span>
+                                        {activityLabel(r?.activity_code)}
+                                    </span>
                                 </div>
 
                                 <div className="mt-3 grid gap-2">
-                                    <label className="text-xs text-gray-500">
+                                    <label className="text-xs text-gray-500 dark:text-slate-400">
                                         Activity
                                         <select
                                             value={r?.activity_code ?? "UNSET"}
                                             onChange={(e) => updateWeekday(weekday, { activity_code: e.target.value })}
-                                            className="mt-1 w-full rounded border px-2 py-1 text-sm"
+                                            className="mt-1 w-full rounded border border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-2 py-1 text-sm text-gray-900 dark:text-slate-100"
                                             disabled={saving || !r}
                                         >
                                             {activityOptions.map((opt) => (
@@ -480,7 +482,7 @@ export default function DayRulesClient({ clinicianId }: { clinicianId: number })
                                         </select>
                                     </label>
 
-                                    <label className="text-xs text-gray-500">
+                                    <label className="text-xs text-gray-500 dark:text-slate-400">
                                         Start
                                         <input
                                             type="time"
@@ -490,12 +492,12 @@ export default function DayRulesClient({ clinicianId }: { clinicianId: number })
                                                     start_time: e.target.value ? `${e.target.value}:00` : null,
                                                 })
                                             }
-                                            className="mt-1 w-full rounded border px-2 py-1 text-sm"
+                                            className="mt-1 w-full rounded border border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-2 py-1 text-sm text-gray-900 dark:text-slate-100"
                                             disabled={saving || !r || off}
                                         />
                                     </label>
 
-                                    <label className="text-xs text-gray-500">
+                                    <label className="text-xs text-gray-500 dark:text-slate-400">
                                         End
                                         <input
                                             type="time"
@@ -505,24 +507,24 @@ export default function DayRulesClient({ clinicianId }: { clinicianId: number })
                                                     end_time: e.target.value ? `${e.target.value}:00` : null,
                                                 })
                                             }
-                                            className="mt-1 w-full rounded border px-2 py-1 text-sm"
+                                            className="mt-1 w-full rounded border border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-2 py-1 text-sm text-gray-900 dark:text-slate-100"
                                             disabled={saving || !r || off}
                                         />
-                                        {off && <div className="mt-1 text-xs text-gray-500">(times disabled)</div>}
+                                        {off && <div className="mt-1 text-xs text-gray-500 dark:text-slate-400">(times disabled)</div>}
                                     </label>
 
-                                    <label className="text-xs text-gray-500">
+                                    <label className="text-xs text-gray-500 dark:text-slate-400">
                                         Note
                                         <input
                                             value={r?.note ?? ""}
                                             onChange={(e) => updateWeekday(weekday, { note: e.target.value || null })}
-                                            className="mt-1 w-full rounded border px-2 py-1 text-sm"
+                                            className="mt-1 w-full rounded border border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-2 py-1 text-sm text-gray-900 dark:text-slate-100 placeholder:text-gray-400 dark:placeholder:text-slate-500"
                                             disabled={saving || !r}
                                             placeholder="Optional"
                                         />
                                     </label>
 
-                                    <div className="text-xs text-gray-600">
+                                    <div className="text-xs text-gray-600 dark:text-slate-300">
                                         {r?.effective_from ?? "-"}
                                         {r?.effective_to ? ` → ${r?.effective_to}` : ""}
                                     </div>
@@ -533,7 +535,7 @@ export default function DayRulesClient({ clinicianId }: { clinicianId: number })
                 </div>
             )}
 
-            <div className="text-xs text-gray-500">
+            <div className="text-xs text-gray-500 dark:text-slate-400">
                 Saving updates the existing weekly ruleset rows for the selected pattern (no duplicate rows created).
             </div>
         </div>

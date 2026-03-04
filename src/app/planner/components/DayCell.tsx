@@ -71,36 +71,38 @@ export default function DayCell({
             onClick={() => inMonth && onSelect(dateKey)}
             disabled={!inMonth}
             className={`h-[140px] border p-2 text-left w-full transition ${
-                inMonth ? "bg-white hover:bg-slate-50" : "bg-slate-50 opacity-50 cursor-default"
+                inMonth
+                    ? "bg-white hover:bg-slate-50 dark:bg-slate-900 dark:hover:bg-slate-800"
+                    : "bg-slate-50 opacity-50 cursor-default dark:bg-slate-950/60"
             } ${
                 isTrainingWeekend && inMonth
-                    ? "border-purple-300 bg-gradient-to-br from-purple-50 to-white ring-2 ring-purple-400"
-                    : "border-slate-200"
+                    ? "border-purple-300 bg-gradient-to-br from-purple-50 to-white ring-2 ring-purple-400 dark:border-purple-900/60 dark:from-purple-950/30 dark:to-slate-900 dark:ring-purple-500/30"
+                    : "border-slate-200 dark:border-slate-800"
             }`}
         >
             {/* ✅ Header row: date left, badges right (no overlap) */}
             <div className="flex items-start justify-between gap-2">
-                <div className="text-xs text-slate-700 font-medium leading-none pt-0.5">
+                <div className="text-xs text-slate-700 dark:text-slate-200 font-medium leading-none pt-0.5">
                     {inMonth ? date.getDate() : ""}
                 </div>
 
                 <div className="flex flex-wrap items-center justify-end gap-1 max-w-[75%]">
                     {inMonth && missing > 0 && (
                         <div
-                            className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-red-600 text-white font-semibold shadow-sm whitespace-nowrap"
+                            className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-red-600 text-white font-semibold shadow-sm whitespace-nowrap dark:shadow-none"
                             title={`${missing} expected clinician${missing === 1 ? "" : "s"} not assigned`}
                         >
-              <span className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-200 opacity-75" />
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-white" />
-              </span>
+                            <span className="relative flex h-2 w-2">
+                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-200 opacity-75 dark:bg-red-400/30" />
+                                <span className="relative inline-flex rounded-full h-2 w-2 bg-white" />
+                            </span>
                             MISSING {missing}
                         </div>
                     )}
 
                     {inMonth && isTrainingWeekend && (
                         <div
-                            className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-purple-600 text-white font-semibold shadow-sm tracking-wide whitespace-nowrap"
+                            className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-purple-600 text-white font-semibold shadow-sm tracking-wide whitespace-nowrap dark:shadow-none"
                             title="Monthly Training Weekend"
                         >
                             <span className="w-1.5 h-1.5 bg-white rounded-full opacity-80"></span>
@@ -112,10 +114,12 @@ export default function DayCell({
 
             {/* ✅ Body content sits UNDER header */}
             {inMonth && (
-                <div className="mt-2 space-y-1 text-[11px] text-slate-600">
+                <div className="mt-2 space-y-1 text-[11px] text-slate-600 dark:text-slate-300">
                     <div
                         className={`flex justify-between rounded px-1 py-0.5 ${
-                            emptyRooms >= 3 ? "bg-red-600 text-white font-medium" : "text-slate-800"
+                            emptyRooms >= 3
+                                ? "bg-red-600 text-white font-medium"
+                                : "text-slate-800 dark:text-slate-100"
                         }`}
                     >
                         <span>Empty Rooms</span>
@@ -125,10 +129,10 @@ export default function DayCell({
                     <div
                         className={`flex justify-between rounded px-1 py-0.5 ${
                             valueST > 6
-                                ? "text-slate-800"
+                                ? "text-slate-800 dark:text-slate-100"
                                 : valueST > 5
-                                    ? "bg-orange-100 text-slate-900 font-medium"
-                                    : "bg-red-100 text-red-700 font-medium"
+                                    ? "bg-orange-100 text-slate-900 font-medium dark:bg-orange-950/35 dark:text-orange-100"
+                                    : "bg-red-100 text-red-700 font-medium dark:bg-red-950/35 dark:text-red-200"
                         }`}
                     >
                         <span>Total ST Clinics</span>
@@ -138,10 +142,10 @@ export default function DayCell({
                     <div
                         className={`flex justify-between rounded px-1 py-0.5 ${
                             valueCL >= 1
-                                ? "text-slate-800"
+                                ? "text-slate-800 dark:text-slate-100"
                                 : valueCL > 0 && valueCL < 1
-                                    ? "bg-orange-100 text-slate-900 font-medium"
-                                    : "bg-red-100 text-red-700 font-medium"
+                                    ? "bg-orange-100 text-slate-900 font-medium dark:bg-orange-950/35 dark:text-orange-100"
+                                    : "bg-red-100 text-red-700 font-medium dark:bg-red-950/35 dark:text-red-200"
                         }`}
                     >
                         <span>Total CL Clinics</span>

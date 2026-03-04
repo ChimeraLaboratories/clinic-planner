@@ -67,10 +67,10 @@ export default function HolidayBookedView({
         <div className="space-y-4">
             <div className="flex items-center justify-between">
                 <div>
-                    <div className="text-sm font-semibold text-slate-900">
+                    <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">
                         Holidays booked
                     </div>
-                    <div className="text-xs text-slate-500">
+                    <div className="text-xs text-slate-500 dark:text-slate-400">
                         {from} → {to}
                     </div>
                 </div>
@@ -80,17 +80,17 @@ export default function HolidayBookedView({
                         value={query}
                         onChange={(e) => setQuery(e.target.value)}
                         placeholder="Search name / date…"
-                        className="w-64 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-200"
+                        className="w-64 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 outline-none placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-400/30"
                     />
 
-                    <div className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
+                    <div className="rounded-full bg-slate-100 dark:bg-slate-800 px-3 py-1 text-xs font-semibold text-slate-700 dark:text-slate-200">
                         {holidays.length} total
                     </div>
                 </div>
             </div>
 
-            <div className="rounded-2xl border border-slate-200 overflow-hidden">
-                <div className="grid grid-cols-12 bg-slate-50 px-4 py-2 text-xs font-semibold text-slate-600">
+            <div className="rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden">
+                <div className="grid grid-cols-12 bg-slate-50 dark:bg-slate-900 px-4 py-2 text-xs font-semibold text-slate-600 dark:text-slate-300">
                     <div className="col-span-4">Clinician</div>
                     <div className="col-span-3">From</div>
                     <div className="col-span-3">To</div>
@@ -99,33 +99,36 @@ export default function HolidayBookedView({
 
                 {holidays.length === 0 ? (
                     <div className="px-4 py-10 text-center">
-                        <div className="text-sm font-semibold text-slate-800">
+                        <div className="text-sm font-semibold text-slate-800 dark:text-slate-100">
                             No holidays found
                         </div>
-                        <div className="mt-1 text-xs text-slate-500">
+                        <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">
                             Add a holiday using the "Add Holiday" button.
                         </div>
                     </div>
                 ) : (
-                    <div className="divide-y divide-slate-100">
+                    <div className="divide-y divide-slate-100 dark:divide-slate-800">
                         {holidays.map((h) => (
-                            <div key={String(h.id)} className="grid grid-cols-12 px-4 py-3 text-sm">
-                                <div className="col-span-4 font-semibold text-slate-900">
+                            <div
+                                key={String(h.id)}
+                                className="grid grid-cols-12 px-4 py-3 text-sm bg-white dark:bg-slate-950"
+                            >
+                                <div className="col-span-4 font-semibold text-slate-900 dark:text-slate-100">
                                     {h.clinician_name}
                                 </div>
 
-                                <div className="col-span-3 text-slate-800">
+                                <div className="col-span-3 text-slate-800 dark:text-slate-200">
                                     {h.date_from}
                                 </div>
 
-                                <div className="col-span-3 text-slate-800">
+                                <div className="col-span-3 text-slate-800 dark:text-slate-200">
                                     {h.date_to ?? "—"}
                                 </div>
 
                                 <div className="col-span-2 text-right">
-                  <span className="inline-flex rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-700">
-                    {h.type ?? "Holiday"}
-                  </span>
+                                    <span className="inline-flex rounded-full bg-slate-100 dark:bg-slate-800 px-2 py-0.5 text-xs font-semibold text-slate-700 dark:text-slate-200">
+                                        {h.type ?? "Holiday"}
+                                    </span>
                                 </div>
                             </div>
                         ))}

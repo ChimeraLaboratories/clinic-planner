@@ -13,7 +13,7 @@ export default async function ClinicianDayRulesPage({
     if (!Number.isFinite(clinicianId)) {
         return (
             <div className="p-6">
-                <div className="rounded-lg border bg-white p-4">
+                <div className="rounded-lg border border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-950 p-4 text-gray-900 dark:text-slate-100">
                     Invalid clinician id.
                 </div>
             </div>
@@ -27,21 +27,21 @@ export default async function ClinicianDayRulesPage({
     const clinicianName = rows?.[0]?.full_name ?? null;
 
     return (
-        <div className="p-6 space-y-4">
+        <div className="min-h-screen bg-gray-50 dark:bg-slate-950 p-6 space-y-4">
             <div className="flex items-start justify-between">
                 <div>
-                    <div className="text-sm text-gray-500">Clinician</div>
-                    <h1 className="text-2xl font-bold">
+                    <div className="text-sm text-gray-500 dark:text-slate-400">Clinician</div>
+                    <h1 className="text-2xl font-bold text-gray-900 dark:text-slate-100">
                         Day Rules{clinicianName ? ` - ${clinicianName}` : ""}
                     </h1>
-                    <div className="text-sm text-gray-600">
+                    <div className="text-sm text-gray-600 dark:text-slate-300">
                         Clinician ID: {clinicianId}
                     </div>
                 </div>
 
                 <Link
                     href="/planner/clinicians"
-                    className="rounded-lg border px-4 py-2 text-sm font-medium hover:bg-gray-50 transition shadow-sm"
+                    className="rounded-lg border border-gray-200 dark:border-slate-800 px-4 py-2 text-sm font-medium hover:bg-gray-50 dark:hover:bg-slate-900 transition shadow-sm text-gray-900 dark:text-slate-100"
                 >
                     ← Back to Clinician Management
                 </Link>

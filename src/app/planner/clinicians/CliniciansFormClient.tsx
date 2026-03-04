@@ -126,20 +126,20 @@ export default function ClinicianFormClient({
     }
 
     return (
-        <div className="rounded-lg border bg-white p-5 shadow-sm">
+        <div className="rounded-lg border border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-950 p-5 shadow-sm dark:shadow-none">
             <div className="flex items-start justify-between gap-4">
                 <div>
-                    <div className="text-lg font-semibold">
+                    <div className="text-lg font-semibold text-gray-900 dark:text-slate-100">
                         {mode === "new" ? "Add Clinician" : "Edit Clinician"}
                     </div>
-                    <div className="text-sm text-gray-500">
+                    <div className="text-sm text-gray-500 dark:text-slate-400">
                         Role: {roleLabel(roleCode)} · Grade: {gradeLabel(gradeCode)}
                     </div>
                 </div>
 
                 <button
                     onClick={() => router.push("/planner/clinicians")}
-                    className="text-xs px-2 py-1 rounded border hover:bg-gray-50"
+                    className="text-xs px-2 py-1 rounded border border-gray-200 dark:border-slate-800 hover:bg-gray-50 dark:hover:bg-slate-900 text-gray-700 dark:text-slate-200"
                     disabled={saving}
                 >
                     Back to list
@@ -147,20 +147,20 @@ export default function ClinicianFormClient({
             </div>
 
             <div className="mt-4 grid gap-3">
-                <label className="text-sm">
+                <label className="text-sm text-gray-900 dark:text-slate-200">
                     Full name
                     <input
-                        className="mt-1 w-full border rounded p-2"
+                        className="mt-1 w-full border border-gray-200 dark:border-slate-800 rounded p-2 bg-white dark:bg-slate-900 text-gray-900 dark:text-slate-100 placeholder:text-gray-400 dark:placeholder:text-slate-500"
                         value={fullName}
                         onChange={(e) => setFullName(e.target.value)}
                         placeholder="e.g. Cane Emmingham"
                     />
                 </label>
 
-                <label className="text-sm">
+                <label className="text-sm text-gray-900 dark:text-slate-200">
                     Display name
                     <input
-                        className="mt-1 w-full border rounded p-2"
+                        className="mt-1 w-full border border-gray-200 dark:border-slate-800 rounded p-2 bg-white dark:bg-slate-900 text-gray-900 dark:text-slate-100 placeholder:text-gray-400 dark:placeholder:text-slate-500"
                         value={displayName}
                         onChange={(e) => setDisplayName(e.target.value)}
                         placeholder="e.g. Cane"
@@ -168,10 +168,10 @@ export default function ClinicianFormClient({
                 </label>
 
                 <div className="grid grid-cols-2 gap-3">
-                    <label className="text-sm">
+                    <label className="text-sm text-gray-900 dark:text-slate-200">
                         Role
                         <select
-                            className="mt-1 w-full border rounded p-2"
+                            className="mt-1 w-full border border-gray-200 dark:border-slate-800 rounded p-2 bg-white dark:bg-slate-900 text-gray-900 dark:text-slate-100"
                             value={roleCode}
                             onChange={(e) => setRoleCode(Number(e.target.value))}
                         >
@@ -180,10 +180,10 @@ export default function ClinicianFormClient({
                         </select>
                     </label>
 
-                    <label className="text-sm">
+                    <label className="text-sm text-gray-900 dark:text-slate-200">
                         Grade
                         <select
-                            className="mt-1 w-full border rounded p-2"
+                            className="mt-1 w-full border border-gray-200 dark:border-slate-800 rounded p-2 bg-white dark:bg-slate-900 text-gray-900 dark:text-slate-100"
                             value={gradeCode}
                             onChange={(e) => setGradeCode(Number(e.target.value))}
                         >
@@ -193,10 +193,10 @@ export default function ClinicianFormClient({
                     </label>
                 </div>
 
-                <label className="text-sm">
+                <label className="text-sm text-gray-900 dark:text-slate-200">
                     GOC number (optional)
                     <input
-                        className="mt-1 w-full border rounded p-2"
+                        className="mt-1 w-full border border-gray-200 dark:border-slate-800 rounded p-2 bg-white dark:bg-slate-900 text-gray-900 dark:text-slate-100 placeholder:text-gray-400 dark:placeholder:text-slate-500"
                         value={goc}
                         onChange={(e) => setGoc(e.target.value)}
                         placeholder="Optional"
@@ -204,7 +204,7 @@ export default function ClinicianFormClient({
                 </label>
 
                 <div className="grid grid-cols-2 gap-3">
-                    <label className="flex items-center gap-2 text-sm border rounded p-2">
+                    <label className="flex items-center gap-2 text-sm border border-gray-200 dark:border-slate-800 rounded p-2 bg-white dark:bg-slate-900 text-gray-900 dark:text-slate-200">
                         <input
                             type="checkbox"
                             checked={isSupervisor}
@@ -213,7 +213,7 @@ export default function ClinicianFormClient({
                         Supervisor
                     </label>
 
-                    <label className="flex items-center gap-2 text-sm border rounded p-2">
+                    <label className="flex items-center gap-2 text-sm border border-gray-200 dark:border-slate-800 rounded p-2 bg-white dark:bg-slate-900 text-gray-900 dark:text-slate-200">
                         <input
                             type="checkbox"
                             checked={isActive}
@@ -223,17 +223,17 @@ export default function ClinicianFormClient({
                     </label>
                 </div>
 
-                {err && <div className="text-sm text-red-600">{err}</div>}
+                {err && <div className="text-sm text-red-600 dark:text-red-300">{err}</div>}
 
                 <button
                     onClick={save}
                     disabled={saving}
-                    className="mt-1 rounded bg-slate-900 px-3 py-2 text-white hover:bg-slate-800 disabled:opacity-50"
+                    className="mt-1 rounded bg-slate-900 px-3 py-2 text-white hover:bg-slate-800 disabled:opacity-50 dark:bg-slate-200 dark:text-slate-900 dark:hover:bg-white"
                 >
                     {saving ? "Saving…" : mode === "new" ? "Create clinician" : "Save changes"}
                 </button>
 
-                <div className="text-xs text-gray-500">
+                <div className="text-xs text-gray-500 dark:text-slate-400">
                     Tip: Set inactive instead of deleting to preserve historic session links.
                 </div>
             </div>

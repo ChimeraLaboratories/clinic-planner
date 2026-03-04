@@ -36,19 +36,19 @@ export default function LowCLValueSidebar({
     }, [data.sessions, threshold]);
 
     return (
-        <div className="rounded-xl border bg-white shadow-sm p-4">
+        <div className="rounded-xl border border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm dark:shadow-none p-4">
             <div className="flex items-center justify-between mb-3">
-                <h3 className="text-sm font-semibold text-gray-800">
+                <h3 className="text-sm font-semibold text-gray-800 dark:text-slate-100">
                     Days with Low CL Value
                 </h3>
 
-                <span className="text-xs bg-gray-100 px-2 py-1 rounded">
-          {lowDays.length}
-        </span>
+                <span className="text-xs bg-gray-100 dark:bg-slate-800 text-gray-700 dark:text-slate-200 px-2 py-1 rounded">
+                    {lowDays.length}
+                </span>
             </div>
 
             {lowDays.length === 0 && (
-                <div className="text-sm text-gray-500">
+                <div className="text-sm text-gray-500 dark:text-slate-400">
                     All CL clinics meet expected value
                 </div>
             )}
@@ -57,13 +57,13 @@ export default function LowCLValueSidebar({
                 {lowDays.map(([date, value]) => (
                     <div
                         key={date}
-                        className="flex items-center justify-between text-sm border rounded-md px-3 py-2"
+                        className="flex items-center justify-between text-sm border border-gray-200 dark:border-slate-800 rounded-md px-3 py-2 bg-white dark:bg-slate-950"
                     >
-                        <span>{date}</span>
+                        <span className="text-gray-900 dark:text-slate-100">{date}</span>
 
-                        <span className="text-red-600 font-medium">
-              {value} / {threshold}
-            </span>
+                        <span className="text-red-600 dark:text-red-300 font-medium">
+                            {value} / {threshold}
+                        </span>
                     </div>
                 ))}
             </div>

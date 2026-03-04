@@ -170,21 +170,21 @@ export default function CreateSessionModal({
         <>
             <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
                 {/* backdrop */}
-                <div className="absolute inset-0 bg-black/40" onClick={onClose} />
+                <div className="absolute inset-0 bg-black/40 dark:bg-black/60" onClick={onClose} />
 
                 {/* modal */}
-                <div className="relative w-full max-w-lg rounded-2xl bg-white shadow-xl ring-1 ring-black/5">
+                <div className="relative w-full max-w-lg rounded-2xl bg-white dark:bg-slate-950 shadow-xl ring-1 ring-black/5 dark:ring-white/10">
                     {/* header */}
-                    <div className="flex items-start justify-between border-b px-6 py-4">
+                    <div className="flex items-start justify-between border-b border-slate-200 dark:border-slate-800 px-6 py-4">
                         <div>
-                            <div className="text-base font-semibold text-slate-900">Create session</div>
-                            <div className="mt-1 text-sm text-slate-500">
+                            <div className="text-base font-semibold text-slate-900 dark:text-slate-100">Create session</div>
+                            <div className="mt-1 text-sm text-slate-500 dark:text-slate-400">
                                 Assign a clinician and set the session type.
                             </div>
                         </div>
                         <button
                             onClick={onClose}
-                            className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-700"
+                            className="rounded-lg p-2 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-700 dark:hover:text-slate-200"
                             aria-label="Close"
                         >
                             ✕
@@ -195,10 +195,10 @@ export default function CreateSessionModal({
                     <div className="px-6 py-5">
                         <div className="grid gap-4">
                             {/* Clinician */}
-                            <label className="text-sm font-medium text-slate-700">
-                                Clinician <span className="text-red-600">*</span>
+                            <label className="text-sm font-medium text-slate-700 dark:text-slate-200">
+                                Clinician <span className="text-red-600 dark:text-red-400">*</span>
                                 <select
-                                    className="mt-2 w-full rounded-xl border border-slate-200 bg-white p-3 text-slate-900 shadow-sm outline-none transition focus:border-slate-400 focus:ring-4 focus:ring-slate-100"
+                                    className="mt-2 w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-3 text-slate-900 dark:text-slate-100 shadow-sm outline-none transition focus:border-slate-400 dark:focus:border-slate-600 focus:ring-4 focus:ring-slate-100 dark:focus:ring-slate-800"
                                     value={clinician_id ?? ""}
                                     onChange={(e) => {
                                         const nextId = e.target.value ? Number(e.target.value) : null;
@@ -225,18 +225,18 @@ export default function CreateSessionModal({
                                     ))}
                                 </select>
 
-                                <div className="mt-1 text-xs text-slate-500">
+                                <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">
                                     Selecting a CLO automatically sets Type to{" "}
                                     <span className="font-semibold">CL</span>.
                                 </div>
                             </label>
 
                             {/* Type */}
-                            <label className="text-sm font-medium text-slate-700">
+                            <label className="text-sm font-medium text-slate-700 dark:text-slate-200">
                                 Type
                                 <select
-                                    className={`mt-2 w-full rounded-xl border border-slate-200 bg-white p-3 text-slate-900 shadow-sm outline-none transition focus:border-slate-400 focus:ring-4 focus:ring-slate-100 ${
-                                        isCLO ? "cursor-not-allowed bg-slate-50 text-slate-500" : ""
+                                    className={`mt-2 w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-3 text-slate-900 dark:text-slate-100 shadow-sm outline-none transition focus:border-slate-400 dark:focus:border-slate-600 focus:ring-4 focus:ring-slate-100 dark:focus:ring-slate-800 ${
+                                        isCLO ? "cursor-not-allowed bg-slate-50 dark:bg-slate-900/60 text-slate-500 dark:text-slate-400" : ""
                                     }`}
                                     value={session_type}
                                     onChange={(e) => setSessionType(e.target.value as SessionType)}
@@ -249,10 +249,10 @@ export default function CreateSessionModal({
                             </label>
 
                             {/* Notes */}
-                            <label className="text-sm font-medium text-slate-700">
-                                Notes <span className="text-slate-400 font-normal">(optional)</span>
+                            <label className="text-sm font-medium text-slate-700 dark:text-slate-200">
+                                Notes <span className="text-slate-400 dark:text-slate-500 font-normal">(optional)</span>
                                 <input
-                                    className="mt-2 w-full rounded-xl border border-slate-200 bg-white p-3 text-slate-900 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-slate-400 focus:ring-4 focus:ring-slate-100"
+                                    className="mt-2 w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-3 text-slate-900 dark:text-slate-100 shadow-sm outline-none transition placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:border-slate-400 dark:focus:border-slate-600 focus:ring-4 focus:ring-slate-100 dark:focus:ring-slate-800"
                                     value={notes}
                                     onChange={(e) => setNotes(e.target.value)}
                                     placeholder="Add a short note…"
@@ -262,17 +262,17 @@ export default function CreateSessionModal({
                     </div>
 
                     {/* footer */}
-                    <div className="flex items-center justify-end gap-3 border-t bg-slate-50 px-6 py-4">
+                    <div className="flex items-center justify-end gap-3 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/40 px-6 py-4">
                         <button
                             onClick={onClose}
-                            className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-100 disabled:opacity-60"
+                            className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-4 py-2.5 text-sm font-semibold text-slate-700 dark:text-slate-200 shadow-sm hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-60"
                             disabled={saving}
                         >
                             Cancel
                         </button>
                         <button
                             onClick={save}
-                            className="rounded-xl bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-slate-800 disabled:opacity-60"
+                            className="rounded-xl bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-slate-800 disabled:opacity-60 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white"
                             disabled={saving}
                         >
                             {saving ? "Saving…" : "Save"}

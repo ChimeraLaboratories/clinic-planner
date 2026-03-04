@@ -44,9 +44,9 @@ export default function CliniciansTableClient({ clinicians }: { clinicians: Clin
     }
 
     return (
-        <div className="rounded-lg border bg-white shadow-sm overflow-x-auto">
+        <div className="rounded-lg border border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-950 shadow-sm dark:shadow-none overflow-x-auto">
             <table className="min-w-full text-sm">
-                <thead className="bg-gray-50 text-gray-600">
+                <thead className="bg-gray-50 dark:bg-slate-900 text-gray-600 dark:text-slate-300">
                 <tr>
                     <th className="text-left p-3">Display</th>
                     <th className="text-left p-3">Full name</th>
@@ -62,26 +62,26 @@ export default function CliniciansTableClient({ clinicians }: { clinicians: Clin
                 {clinicians.map((c) => (
                     <tr
                         key={c.id}
-                        className="border-t cursor-pointer hover:bg-gray-50 transition"
+                        className="border-t border-gray-200 dark:border-slate-800 cursor-pointer hover:bg-gray-50 dark:hover:bg-slate-900/60 transition"
                         onClick={() => router.push(`/planner/clinicians/${c.id}/day-rules`)}
                         title="Open day rules"
                     >
-                        <td className="p-3 font-medium">{c.display_name}</td>
-                        <td className="p-3 text-gray-700">{c.full_name}</td>
-                        <td className="p-3">{roleLabel(c.role_code)}</td>
-                        <td className="p-3">{gradeLabel(c.grade_code)}</td>
-                        <td className="p-3">{c.is_supervisor ? "Yes" : "No"}</td>
+                        <td className="p-3 font-medium text-gray-900 dark:text-slate-100">{c.display_name}</td>
+                        <td className="p-3 text-gray-700 dark:text-slate-300">{c.full_name}</td>
+                        <td className="p-3 text-gray-900 dark:text-slate-200">{roleLabel(c.role_code)}</td>
+                        <td className="p-3 text-gray-900 dark:text-slate-200">{gradeLabel(c.grade_code)}</td>
+                        <td className="p-3 text-gray-900 dark:text-slate-200">{c.is_supervisor ? "Yes" : "No"}</td>
 
                         <td className="p-3">
-                                <span
-                                    className={`px-2 py-1 rounded-full text-xs ${
-                                        c.is_active
-                                            ? "bg-green-100 text-green-700"
-                                            : "bg-gray-100 text-gray-600"
-                                    }`}
-                                >
-                                    {c.is_active ? "Active" : "Inactive"}
-                                </span>
+                            <span
+                                className={`px-2 py-1 rounded-full text-xs ${
+                                    c.is_active
+                                        ? "bg-green-100 text-green-700 dark:bg-emerald-950/40 dark:text-emerald-200"
+                                        : "bg-gray-100 text-gray-600 dark:bg-slate-800 dark:text-slate-300"
+                                }`}
+                            >
+                                {c.is_active ? "Active" : "Inactive"}
+                            </span>
                         </td>
 
                         <td className="p-3 text-right">
@@ -94,8 +94,8 @@ export default function CliniciansTableClient({ clinicians }: { clinicians: Clin
                                     disabled={togglingId === c.id}
                                     className={`text-xs px-2 py-1 rounded border disabled:opacity-50 ${
                                         c.is_active
-                                            ? "border-gray-300 hover:bg-gray-50"
-                                            : "border-green-300 text-green-700 hover:bg-green-50"
+                                            ? "border-gray-300 dark:border-slate-700 hover:bg-gray-50 dark:hover:bg-slate-900"
+                                            : "border-green-300 dark:border-emerald-900/60 text-green-700 dark:text-emerald-200 hover:bg-green-50 dark:hover:bg-emerald-950/30"
                                     }`}
                                 >
                                     {togglingId === c.id
@@ -107,7 +107,7 @@ export default function CliniciansTableClient({ clinicians }: { clinicians: Clin
 
                                 <Link
                                     href={`/planner/clinicians/${c.id}`}
-                                    className="text-blue-600 hover:underline"
+                                    className="text-blue-600 dark:text-blue-300 hover:underline"
                                     onClick={(e) => e.stopPropagation()}
                                 >
                                     Edit
@@ -115,7 +115,7 @@ export default function CliniciansTableClient({ clinicians }: { clinicians: Clin
 
                                 <Link
                                     href={`/planner/clinicians/${c.id}/day-rules`}
-                                    className="text-blue-600 hover:underline"
+                                    className="text-blue-600 dark:text-blue-300 hover:underline"
                                     onClick={(e) => e.stopPropagation()}
                                 >
                                     Day rules
@@ -127,7 +127,7 @@ export default function CliniciansTableClient({ clinicians }: { clinicians: Clin
 
                 {clinicians.length === 0 && (
                     <tr>
-                        <td className="p-6 text-gray-500" colSpan={7}>
+                        <td className="p-6 text-gray-500 dark:text-slate-400" colSpan={7}>
                             No clinicians found.
                         </td>
                     </tr>

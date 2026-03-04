@@ -135,16 +135,15 @@ export default function DayRoomsClient({
 
     return (
         <>
-
             <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                 <div>
-                    <div className="text-sm text-gray-500">Date</div>
-                    <div className="text-lg font-semibold text-gray-900">{date}</div>
+                    <div className="text-sm text-gray-500 dark:text-slate-400">Date</div>
+                    <div className="text-lg font-semibold text-gray-900 dark:text-slate-100">{date}</div>
                 </div>
 
                 <div className="flex items-center gap-2">
                     <select
-                        className="rounded-lg border px-3 py-2 text-sm bg-white shadow-sm"
+                        className="rounded-lg border border-gray-200 dark:border-slate-800 px-3 py-2 text-sm bg-white dark:bg-slate-900 text-gray-900 dark:text-slate-100 shadow-sm dark:shadow-none"
                         value={supervisorId}
                         onChange={(e) => setSupervisorId(e.target.value ? Number(e.target.value) : "")}
                     >
@@ -159,13 +158,14 @@ export default function DayRoomsClient({
                     <button
                         onClick={addSupervisorInStore}
                         disabled={addingSupervisor || supervisorId === "" || supervisorOptions.length === 0}
-                        className="rounded-lg border px-4 py-2 text-sm font-medium shadow-sm hover:bg-gray-50 disabled:opacity-50"
+                        className="rounded-lg border border-gray-200 dark:border-slate-800 px-4 py-2 text-sm font-medium shadow-sm dark:shadow-none text-gray-900 dark:text-slate-100 hover:bg-gray-50 dark:hover:bg-slate-900 disabled:opacity-50"
                         title="Marks the selected supervisor as present in store for this date"
                     >
                         {addingSupervisor ? "Adding…" : "Add"}
                     </button>
                 </div>
             </div>
+
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 items-start">
                 {rooms.map((room) => {
                     const hasSessions = room.sessions.length > 0;
@@ -185,24 +185,24 @@ export default function DayRoomsClient({
                     return (
                         <div
                             key={room.id}
-                            className={`rounded-lg border bg-white shadow-sm ${
+                            className={`rounded-lg border shadow-sm dark:shadow-none ${
                                 hasSessions ? "p-5" : "p-4"
                             } ${
                                 needsSupervisorWarning
-                                    ? "border-red-600 bg-red-50"
+                                    ? "border-red-600 bg-red-50 dark:border-red-900/70 dark:bg-red-950/30"
                                     : room.used
-                                        ? "border-red-300"
-                                        : "border-green-300"
+                                        ? "border-red-300 bg-white dark:border-red-900/50 dark:bg-slate-900"
+                                        : "border-green-300 bg-white dark:border-emerald-900/50 dark:bg-slate-900"
                             }`}
                         >
                             <div className="flex items-center justify-between">
-                                <h3 className="font-semibold text-gray-900">{room.name}</h3>
+                                <h3 className="font-semibold text-gray-900 dark:text-slate-100">{room.name}</h3>
 
                                 <div className="flex items-center gap-2">
                                     {!hasSessions ? (
                                         <button
                                             onClick={() => openCreateForRoom(room.id)}
-                                            className="text-xs px-2 py-1 rounded border hover:bg-blue-50 text-blue-600 border-blue-200"
+                                            className="text-xs px-2 py-1 rounded border border-blue-200 dark:border-blue-900/60 hover:bg-blue-50 dark:hover:bg-blue-950/30 text-blue-600 dark:text-blue-300"
                                         >
                                             + Add
                                         </button>
@@ -212,7 +212,7 @@ export default function DayRoomsClient({
                                                 deleteRoomSessions(room.sessions.map((s) => s.id))
                                             }
                                             disabled={deleting !== null}
-                                            className="text-xs px-2 py-1 rounded border hover:bg-gray-50 disabled:opacity-50"
+                                            className="text-xs px-2 py-1 rounded border border-gray-200 dark:border-slate-800 hover:bg-gray-50 dark:hover:bg-slate-800 disabled:opacity-50 text-gray-900 dark:text-slate-100"
                                             title="Delete session(s) in this room"
                                         >
                                             {deleting !== null ? "Deleting…" : "Delete"}
@@ -222,23 +222,23 @@ export default function DayRoomsClient({
                                     <span
                                         className={`inline-flex items-center justify-center text-center leading-tight text-xs font-medium px-3 py-1 rounded-full ${
                                             needsSupervisorWarning
-                                                ? "bg-red-200 text-red-800"
+                                                ? "bg-red-200 text-red-800 dark:bg-red-950/50 dark:text-red-200"
                                                 : room.used
-                                                    ? "bg-red-100 text-red-600"
-                                                    : "bg-green-100 text-green-600"
+                                                    ? "bg-red-100 text-red-600 dark:bg-red-950/35 dark:text-red-200"
+                                                    : "bg-green-100 text-green-600 dark:bg-emerald-950/35 dark:text-emerald-200"
                                         }`}
                                     >
-                    {needsSupervisorWarning
-                        ? "Needs Supervisor"
-                        : room.used
-                            ? "In Use"
-                            : "Free"}
-                  </span>
+                                        {needsSupervisorWarning
+                                            ? "Needs Supervisor"
+                                            : room.used
+                                                ? "In Use"
+                                                : "Free"}
+                                    </span>
                                 </div>
                             </div>
 
                             {/* Only show a simple summary line under the header */}
-                            <div className="mt-3 text-sm text-gray-600">
+                            <div className="mt-3 text-sm text-gray-600 dark:text-slate-300">
                                 {hasSessions ? (
                                     <div className="space-y-1">
                                         {clinicianNames.length > 0 ? (
@@ -246,11 +246,11 @@ export default function DayRoomsClient({
                                                 <div key={name}>• {name}</div>
                                             ))
                                         ) : (
-                                            <div className="text-gray-400">• Unassigned</div>
+                                            <div className="text-gray-400 dark:text-slate-500">• Unassigned</div>
                                         )}
                                     </div>
                                 ) : (
-                                    <div className="text-gray-400">No Clinic today</div>
+                                    <div className="text-gray-400 dark:text-slate-500">No Clinic today</div>
                                 )}
                             </div>
                         </div>

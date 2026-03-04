@@ -267,7 +267,7 @@ export default function MonthGrid({
 
     return (
         <div>
-            <div className="grid grid-cols-7 bg-slate-50 border border-slate-200 border-b-0 rounded-t-xl text-sm font-medium text-slate-600">
+            <div className="grid grid-cols-7 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 border-b-0 rounded-t-xl text-sm font-medium text-slate-600 dark:text-slate-300">
                 {dow.map((d) => (
                     <div key={d} className="px-2 py-2">
                         {d}
@@ -275,7 +275,7 @@ export default function MonthGrid({
                 ))}
             </div>
 
-            <div className="grid grid-cols-7 border border-slate-200 rounded-xl overflow-hidden bg-white">
+            <div className="grid grid-cols-7 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden bg-white dark:bg-slate-950">
                 {days.map((d) => {
                     const dateKey = ymdLocal(d);
                     const inMonth = isSameMonth(d, anchorMonth);

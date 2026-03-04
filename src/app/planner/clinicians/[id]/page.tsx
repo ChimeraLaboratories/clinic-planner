@@ -36,9 +36,11 @@ export default async function EditClinicianPage({
     const clinician: Clinician = await res.json();
 
     return (
-        <div className="min-h-screen bg-gray-50 p-8">
+        <div className="min-h-screen bg-gray-50 dark:bg-slate-950 p-8">
             <div className="max-w-2xl mx-auto space-y-6">
-                <h1 className="text-2xl font-bold">Clinician Management</h1>
+                <h1 className="text-2xl font-bold text-gray-900 dark:text-slate-100">
+                    Clinician Management
+                </h1>
 
                 <ClinicianFormClient
                     mode="edit"

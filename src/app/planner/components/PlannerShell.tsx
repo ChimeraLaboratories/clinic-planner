@@ -345,7 +345,7 @@ export default function PlannerShell({
     }
 
     return (
-        <div className="min-h-screen bg-slate-100">
+        <div className="min-h-screen bg-slate-100 dark:bg-slate-950">
             <TopBar
                 anchorMonth={anchorMonth}
                 onPrevMonth={onPrevMonth}
@@ -362,20 +362,22 @@ export default function PlannerShell({
                         <div className="space-y-6">
                             {/* NEEDS SUPERVISOR CARD */}
                             <div
-                                className={`rounded-2xl border shadow-sm p-6 transition-all ${
+                                className={`rounded-2xl border shadow-sm dark:shadow-none p-6 transition-all ${
                                     needsSupervisorDays.length > 0
-                                        ? "bg-red-50 border-red-200"
-                                        : "bg-emerald-50 border-emerald-200"
+                                        ? "bg-red-50 border-red-200 dark:bg-red-950/30 dark:border-red-900/60"
+                                        : "bg-emerald-50 border-emerald-200 dark:bg-emerald-950/25 dark:border-emerald-900/60"
                                 }`}
                             >
-                                <div className="text-xs font-semibold tracking-wide uppercase text-slate-600">
+                                <div className="text-xs font-semibold tracking-wide uppercase text-slate-600 dark:text-slate-300">
                                     Days Requiring Supervisors
                                 </div>
 
                                 <div className="mt-3 flex items-center gap-3">
                                     <div
                                         className={`text-4xl font-bold leading-none ${
-                                            needsSupervisorDays.length > 0 ? "text-red-600" : "text-emerald-600"
+                                            needsSupervisorDays.length > 0
+                                                ? "text-red-600 dark:text-red-300"
+                                                : "text-emerald-600 dark:text-emerald-300"
                                         }`}
                                     >
                                         {needsSupervisorDays.length}
@@ -383,25 +385,25 @@ export default function PlannerShell({
 
                                     {needsSupervisorDays.length > 0 ? (
                                         <span className="relative flex h-3 w-3">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
-                      <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500" />
-                    </span>
+                                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75 dark:bg-red-500/30" />
+                                            <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500" />
+                                        </span>
                                     ) : (
                                         <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-emerald-600">
-                      <svg viewBox="0 0 20 20" fill="none" className="h-4 w-4">
-                        <path
-                            d="M16.25 5.75L8.5 13.5L3.75 8.75"
-                            stroke="white"
-                            strokeWidth="2.5"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                        />
-                      </svg>
-                    </span>
+                                            <svg viewBox="0 0 20 20" fill="none" className="h-4 w-4">
+                                                <path
+                                                    d="M16.25 5.75L8.5 13.5L3.75 8.75"
+                                                    stroke="white"
+                                                    strokeWidth="2.5"
+                                                    strokeLinecap="round"
+                                                    strokeLinejoin="round"
+                                                />
+                                            </svg>
+                                        </span>
                                     )}
                                 </div>
 
-                                <div className="mt-3 text-sm text-slate-700">
+                                <div className="mt-3 text-sm text-slate-700 dark:text-slate-200">
                                     {needsSupervisorDays.length > 0
                                         ? "Pre-Reg OO scheduled without a supervising Registered OO (clinic OR in-store)."
                                         : "All clinics properly supervised."}
@@ -413,15 +415,19 @@ export default function PlannerShell({
                                             <button
                                                 key={d.date}
                                                 onClick={() => router.push(`/planner/${d.date}`)}
-                                                className="w-full text-left rounded-xl border border-red-200 bg-white px-4 py-3 hover:bg-red-50 transition"
+                                                className="w-full text-left rounded-xl border border-red-200 dark:border-red-900/60 bg-white dark:bg-slate-900 px-4 py-3 hover:bg-red-50 dark:hover:bg-red-950/30 transition"
                                             >
                                                 <div className="flex items-center justify-between">
                                                     <div className="min-w-0">
-                                                        <div className="text-sm font-semibold text-slate-900">{d.date}</div>
-                                                        <div className="mt-1 text-xs text-slate-500">{d.preRegs}</div>
+                                                        <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                                                            {d.date}
+                                                        </div>
+                                                        <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                                                            {d.preRegs}
+                                                        </div>
                                                     </div>
 
-                                                    <div className="text-xs font-semibold text-red-700 bg-red-100 rounded-full px-2 py-0.5">
+                                                    <div className="text-xs font-semibold text-red-700 bg-red-100 dark:text-red-200 dark:bg-red-950/40 rounded-full px-2 py-0.5">
                                                         Attention
                                                     </div>
                                                 </div>
@@ -433,15 +439,15 @@ export default function PlannerShell({
 
                             {/* CLINICS (ST VALUE) CARD */}
                             <div
-                                className={`rounded-2xl border shadow-sm p-6 transition-all ${
+                                className={`rounded-2xl border shadow-sm dark:shadow-none p-6 transition-all ${
                                     stCardStatus === "critical"
-                                        ? "bg-red-50 border-red-200"
+                                        ? "bg-red-50 border-red-200 dark:bg-red-950/30 dark:border-red-900/60"
                                         : stCardStatus === "warning"
-                                            ? "bg-orange-50 border-orange-200"
-                                            : "bg-emerald-50 border-emerald-200"
+                                            ? "bg-orange-50 border-orange-200 dark:bg-orange-950/25 dark:border-orange-900/60"
+                                            : "bg-emerald-50 border-emerald-200 dark:bg-emerald-950/25 dark:border-emerald-900/60"
                                 }`}
                             >
-                                <div className="text-xs font-semibold tracking-wide uppercase text-slate-600">
+                                <div className="text-xs font-semibold tracking-wide uppercase text-slate-600 dark:text-slate-300">
                                     Days with Low ST Value
                                 </div>
 
@@ -449,10 +455,10 @@ export default function PlannerShell({
                                     <div
                                         className={`text-4xl font-bold leading-none ${
                                             stCardStatus === "critical"
-                                                ? "text-red-600"
+                                                ? "text-red-600 dark:text-red-300"
                                                 : stCardStatus === "warning"
-                                                    ? "text-orange-700"
-                                                    : "text-emerald-600"
+                                                    ? "text-orange-700 dark:text-orange-300"
+                                                    : "text-emerald-600 dark:text-emerald-300"
                                         }`}
                                     >
                                         {lowSTValueDays.length}
@@ -460,30 +466,30 @@ export default function PlannerShell({
 
                                     {stCardStatus === "critical" ? (
                                         <span className="relative flex h-3 w-3">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
-                      <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500" />
-                    </span>
+                                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75 dark:bg-red-500/30" />
+                                            <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500" />
+                                        </span>
                                     ) : stCardStatus === "warning" ? (
                                         <span className="relative flex h-3 w-3">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-orange-400 opacity-60" />
-                      <span className="relative inline-flex rounded-full h-3 w-3 bg-orange-600" />
-                    </span>
+                                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-orange-400 opacity-60 dark:bg-orange-500/25" />
+                                            <span className="relative inline-flex rounded-full h-3 w-3 bg-orange-600" />
+                                        </span>
                                     ) : (
                                         <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-emerald-600">
-                      <svg viewBox="0 0 20 20" fill="none" className="h-4 w-4">
-                        <path
-                            d="M16.25 5.75L8.5 13.5L3.75 8.75"
-                            stroke="white"
-                            strokeWidth="2.5"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                        />
-                      </svg>
-                    </span>
+                                            <svg viewBox="0 0 20 20" fill="none" className="h-4 w-4">
+                                                <path
+                                                    d="M16.25 5.75L8.5 13.5L3.75 8.75"
+                                                    stroke="white"
+                                                    strokeWidth="2.5"
+                                                    strokeLinecap="round"
+                                                    strokeLinejoin="round"
+                                                />
+                                            </svg>
+                                        </span>
                                     )}
                                 </div>
 
-                                <div className="mt-3 text-sm text-slate-700">
+                                <div className="mt-3 text-sm text-slate-700 dark:text-slate-200">
                                     {stCardStatus === "critical"
                                         ? "Some days have Total ST Value below 5."
                                         : stCardStatus === "warning"
@@ -497,16 +503,18 @@ export default function PlannerShell({
                                             <button
                                                 key={d.date}
                                                 onClick={() => router.push(`/planner/${d.date}`)}
-                                                className={`w-full text-left rounded-xl border bg-white px-4 py-3 transition ${
+                                                className={`w-full text-left rounded-xl border bg-white dark:bg-slate-900 px-4 py-3 transition ${
                                                     d.status === "critical"
-                                                        ? "border-red-200 hover:bg-red-50"
-                                                        : "border-orange-200 hover:bg-orange-50"
+                                                        ? "border-red-200 dark:border-red-900/60 hover:bg-red-50 dark:hover:bg-red-950/30"
+                                                        : "border-orange-200 dark:border-orange-900/60 hover:bg-orange-50 dark:hover:bg-orange-950/25"
                                                 }`}
                                             >
                                                 <div className="flex items-center justify-between">
                                                     <div>
-                                                        <div className="text-sm font-semibold text-slate-900">{d.date}</div>
-                                                        <div className="mt-1 text-xs text-slate-500">
+                                                        <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                                                            {d.date}
+                                                        </div>
+                                                        <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">
                                                             Total ST Value: {d.totalST.toFixed(2)}
                                                         </div>
                                                     </div>
@@ -514,8 +522,8 @@ export default function PlannerShell({
                                                     <div
                                                         className={`text-xs font-semibold rounded-full px-2 py-0.5 ${
                                                             d.status === "critical"
-                                                                ? "text-red-700 bg-red-100"
-                                                                : "text-orange-800 bg-orange-100"
+                                                                ? "text-red-700 bg-red-100 dark:text-red-200 dark:bg-red-950/40"
+                                                                : "text-orange-800 bg-orange-100 dark:text-orange-200 dark:bg-orange-950/35"
                                                         }`}
                                                     >
                                                         {d.status === "critical" ? "Attention" : "Warning"}
@@ -529,15 +537,15 @@ export default function PlannerShell({
 
                             {/* ✅ NEW: CLINICS (CL VALUE) CARD — identical styling */}
                             <div
-                                className={`rounded-2xl border shadow-sm p-6 transition-all ${
+                                className={`rounded-2xl border shadow-sm dark:shadow-none p-6 transition-all ${
                                     clCardStatus === "critical"
-                                        ? "bg-red-50 border-red-200"
+                                        ? "bg-red-50 border-red-200 dark:bg-red-950/30 dark:border-red-900/60"
                                         : clCardStatus === "warning"
-                                            ? "bg-orange-50 border-orange-200"
-                                            : "bg-emerald-50 border-emerald-200"
+                                            ? "bg-orange-50 border-orange-200 dark:bg-orange-950/25 dark:border-orange-900/60"
+                                            : "bg-emerald-50 border-emerald-200 dark:bg-emerald-950/25 dark:border-emerald-900/60"
                                 }`}
                             >
-                                <div className="text-xs font-semibold tracking-wide uppercase text-slate-600">
+                                <div className="text-xs font-semibold tracking-wide uppercase text-slate-600 dark:text-slate-300">
                                     Days with Low CL Value
                                 </div>
 
@@ -545,10 +553,10 @@ export default function PlannerShell({
                                     <div
                                         className={`text-4xl font-bold leading-none ${
                                             clCardStatus === "critical"
-                                                ? "text-red-600"
+                                                ? "text-red-600 dark:text-red-300"
                                                 : clCardStatus === "warning"
-                                                    ? "text-orange-700"
-                                                    : "text-emerald-600"
+                                                    ? "text-orange-700 dark:text-orange-300"
+                                                    : "text-emerald-600 dark:text-emerald-300"
                                         }`}
                                     >
                                         {lowCLValueDays.length}
@@ -556,33 +564,33 @@ export default function PlannerShell({
 
                                     {clCardStatus === "critical" ? (
                                         <span className="relative flex h-3 w-3">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
-                      <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500" />
-                    </span>
+                                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75 dark:bg-red-500/30" />
+                                            <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500" />
+                                        </span>
                                     ) : clCardStatus === "warning" ? (
                                         <span className="relative flex h-3 w-3">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-orange-400 opacity-60" />
-                      <span className="relative inline-flex rounded-full h-3 w-3 bg-orange-600" />
-                    </span>
+                                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-orange-400 opacity-60 dark:bg-orange-500/25" />
+                                            <span className="relative inline-flex rounded-full h-3 w-3 bg-orange-600" />
+                                        </span>
                                     ) : (
                                         <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-emerald-600">
-                      <svg viewBox="0 0 20 20" fill="none" className="h-4 w-4">
-                        <path
-                            d="M16.25 5.75L8.5 13.5L3.75 8.75"
-                            stroke="white"
-                            strokeWidth="2.5"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                        />
-                      </svg>
-                    </span>
+                                            <svg viewBox="0 0 20 20" fill="none" className="h-4 w-4">
+                                                <path
+                                                    d="M16.25 5.75L8.5 13.5L3.75 8.75"
+                                                    stroke="white"
+                                                    strokeWidth="2.5"
+                                                    strokeLinecap="round"
+                                                    strokeLinejoin="round"
+                                                />
+                                            </svg>
+                                        </span>
                                     )}
                                 </div>
 
-                                <div className="mt-3 text-sm text-slate-700">
+                                <div className="mt-3 text-sm text-slate-700 dark:text-slate-200">
                                     {clCardStatus === "critical"
                                         ? "Some days have Total CL Value of 0."
-                                            : "All days meet CL value target."}
+                                        : "All days meet CL value target."}
                                 </div>
 
                                 {lowCLValueDays.length > 0 && (
@@ -591,16 +599,18 @@ export default function PlannerShell({
                                             <button
                                                 key={d.date}
                                                 onClick={() => router.push(`/planner/${d.date}`)}
-                                                className={`w-full text-left rounded-xl border bg-white px-4 py-3 transition ${
+                                                className={`w-full text-left rounded-xl border bg-white dark:bg-slate-900 px-4 py-3 transition ${
                                                     d.status === "critical"
-                                                        ? "border-red-200 hover:bg-red-50"
-                                                        : "border-orange-200 hover:bg-orange-50"
+                                                        ? "border-red-200 dark:border-red-900/60 hover:bg-red-50 dark:hover:bg-red-950/30"
+                                                        : "border-orange-200 dark:border-orange-900/60 hover:bg-orange-50 dark:hover:bg-orange-950/25"
                                                 }`}
                                             >
                                                 <div className="flex items-center justify-between">
                                                     <div>
-                                                        <div className="text-sm font-semibold text-slate-900">{d.date}</div>
-                                                        <div className="mt-1 text-xs text-slate-500">
+                                                        <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                                                            {d.date}
+                                                        </div>
+                                                        <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">
                                                             Total CL Value: {d.totalCL.toFixed(2)}
                                                         </div>
                                                     </div>
@@ -608,8 +618,8 @@ export default function PlannerShell({
                                                     <div
                                                         className={`text-xs font-semibold rounded-full px-2 py-0.5 ${
                                                             d.status === "critical"
-                                                                ? "text-red-700 bg-red-100"
-                                                                : "text-orange-800 bg-orange-100"
+                                                                ? "text-red-700 bg-red-100 dark:text-red-200 dark:bg-red-950/40"
+                                                                : "text-orange-800 bg-orange-100 dark:text-orange-200 dark:bg-orange-950/35"
                                                         }`}
                                                     >
                                                         {d.status === "critical" ? "Attention" : "Warning"}
@@ -627,14 +637,14 @@ export default function PlannerShell({
                     </aside>
 
                     {/* MAIN CARD */}
-                    <div className="flex-1 min-w-0 bg-white rounded-2xl shadow-sm border border-slate-200">
+                    <div className="flex-1 min-w-0 bg-white dark:bg-slate-950 rounded-2xl shadow-sm dark:shadow-none border border-slate-200 dark:border-slate-800">
                         <div className="px-6 pt-5">
                             <ViewTabs value={activeTab} onChange={setActiveTab} />
                         </div>
 
                         <div className="p-6">
-                            {loading && <div className="text-slate-600">Loading…</div>}
-                            {error && <div className="text-red-600">{error}</div>}
+                            {loading && <div className="text-slate-600 dark:text-slate-300">Loading…</div>}
+                            {error && <div className="text-red-600 dark:text-red-300">{error}</div>}
 
                             {!loading && !error && data && activeTab === "month" && (
                                 <MonthGrid anchorMonth={anchorMonth} data={data} onRefresh={onRefresh} />
