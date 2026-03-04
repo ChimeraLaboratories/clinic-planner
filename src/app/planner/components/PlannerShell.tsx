@@ -2,16 +2,16 @@
 
 import type { PlannerResponse } from "../types/planner";
 import TopBar from "./TopBar";
-import ViewTabs from "./ViewTabs";
+import ViewTabs, { type PlannerTab } from "./ViewTabs";
 import MonthGrid from "./MonthGrid";
-import {useEffect, useMemo} from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import HolidayBookedView from "@/app/planner/components/HolidayBookedView";
 
 function getSessionDateKey(s: any): string | null {
     const v = s?.session_date ?? s?.date ?? s?.sessionDate ?? null;
     if (!v) return null;
 
-    // If it's a string, parse to Date so timezone is applied correctly
     if (typeof v === "string") {
         const d = new Date(v);
         if (!isNaN(d.getTime())) {
@@ -20,13 +20,10 @@ function getSessionDateKey(s: any): string | null {
             const dd = String(d.getDate()).padStart(2, "0");
             return `${yyyy}-${mm}-${dd}`;
         }
-
-        // fallback if it's already YYYY-MM-DD but not parseable
         const m = v.match(/^(\d{4}-\d{2}-\d{2})/);
         return m ? m[1] : null;
     }
 
-    // If MySQL driver returns a Date object
     if (v instanceof Date && !isNaN(v.getTime())) {
         const yyyy = v.getFullYear();
         const mm = String(v.getMonth() + 1).padStart(2, "0");
@@ -94,6 +91,12 @@ export default function PlannerShell({
     onRefresh: () => void | Promise<void>;
 }) {
     const router = useRouter();
+    const [activeTab, setActiveTab] = useState<PlannerTab>("month");
+
+    // Optional: if user changes month, keep them on month view (feels natural)
+    useEffect(() => {
+        setActiveTab("month");
+    }, [anchorMonth]);
 
     const ooClinicianId = useMemo(() => {
         const list = (data?.clinicians ?? []) as any[];
@@ -264,21 +267,21 @@ export default function PlannerShell({
 
                                     {needsSupervisorDays.length > 0 ? (
                                         <span className="relative flex h-3 w-3">
-                                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-                                            <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
-                                        </span>
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
+                    </span>
                                     ) : (
                                         <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-emerald-600">
-                                            <svg viewBox="0 0 20 20" fill="none" className="h-4 w-4">
-                                                <path
-                                                    d="M16.25 5.75L8.5 13.5L3.75 8.75"
-                                                    stroke="white"
-                                                    strokeWidth="2.5"
-                                                    strokeLinecap="round"
-                                                    strokeLinejoin="round"
-                                                />
-                                            </svg>
-                                        </span>
+                      <svg viewBox="0 0 20 20" fill="none" className="h-4 w-4">
+                        <path
+                            d="M16.25 5.75L8.5 13.5L3.75 8.75"
+                            stroke="white"
+                            strokeWidth="2.5"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                        />
+                      </svg>
+                    </span>
                                     )}
                                 </div>
 
@@ -305,8 +308,8 @@ export default function PlannerShell({
                                                             <div className="mt-1 text-xs text-emerald-700">
                                                                 Supervisor:{" "}
                                                                 <span className="font-semibold">
-                                                                    {(d.supervisorsInClinic || d.supervisorsInStore).trim()}
-                                                                </span>
+                                  {(d.supervisorsInClinic || d.supervisorsInStore).trim()}
+                                </span>
                                                             </div>
                                                         )}
                                                     </div>
@@ -350,26 +353,26 @@ export default function PlannerShell({
 
                                     {stCardStatus === "critical" ? (
                                         <span className="relative flex h-3 w-3">
-                                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-                                            <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
-                                        </span>
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
+                    </span>
                                     ) : stCardStatus === "warning" ? (
                                         <span className="relative flex h-3 w-3">
-                                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-orange-400 opacity-60"></span>
-                                            <span className="relative inline-flex rounded-full h-3 w-3 bg-orange-600"></span>
-                                        </span>
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-orange-400 opacity-60"></span>
+                      <span className="relative inline-flex rounded-full h-3 w-3 bg-orange-600"></span>
+                    </span>
                                     ) : (
                                         <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-emerald-600">
-                                            <svg viewBox="0 0 20 20" fill="none" className="h-4 w-4">
-                                                <path
-                                                    d="M16.25 5.75L8.5 13.5L3.75 8.75"
-                                                    stroke="white"
-                                                    strokeWidth="2.5"
-                                                    strokeLinecap="round"
-                                                    strokeLinejoin="round"
-                                                />
-                                            </svg>
-                                        </span>
+                      <svg viewBox="0 0 20 20" fill="none" className="h-4 w-4">
+                        <path
+                            d="M16.25 5.75L8.5 13.5L3.75 8.75"
+                            stroke="white"
+                            strokeWidth="2.5"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                        />
+                      </svg>
+                    </span>
                                     )}
                                 </div>
 
@@ -403,9 +406,7 @@ export default function PlannerShell({
 
                                                     <div
                                                         className={`text-xs font-semibold rounded-full px-2 py-0.5 ${
-                                                            d.status === "critical"
-                                                                ? "text-red-700 bg-red-100"
-                                                                : "text-orange-800 bg-orange-100"
+                                                            d.status === "critical" ? "text-red-700 bg-red-100" : "text-orange-800 bg-orange-100"
                                                         }`}
                                                     >
                                                         {d.status === "critical" ? "Attention" : "Warning"}
@@ -419,17 +420,26 @@ export default function PlannerShell({
                         </div>
                     </aside>
 
-                    {/* MAIN MONTH CARD */}
+                    {/* MAIN CARD */}
                     <div className="flex-1 min-w-0 bg-white rounded-2xl shadow-sm border border-slate-200">
                         <div className="px-6 pt-5">
-                            <ViewTabs />
+                            <ViewTabs value={activeTab} onChange={setActiveTab} />
                         </div>
 
                         <div className="p-6">
                             {loading && <div className="text-slate-600">Loading…</div>}
                             {error && <div className="text-red-600">{error}</div>}
-                            {!loading && !error && data && (
+
+                            {!loading && !error && data && activeTab === "month" && (
                                 <MonthGrid anchorMonth={anchorMonth} data={data} onRefresh={onRefresh} />
+                            )}
+
+                            {!loading && !error && data && activeTab === "holidays" && (
+                                <HolidayBookedView
+                                    anchorMonth={anchorMonth}
+                                    data={data}
+                                    ooClinicianId={ooClinicianId}
+                                />
                             )}
                         </div>
                     </div>
