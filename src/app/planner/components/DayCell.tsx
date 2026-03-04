@@ -12,7 +12,7 @@ function sumValue(sessions: any[], code: "ST" | "CL") {
 
         if (!c.startsWith(code)) continue;
 
-        const v = Number(s.value ?? 0); // <-- ONLY USE API value
+        const v = Number(s.value ?? 0); // uses API-computed value
         if (Number.isFinite(v)) total += v;
     }
 
@@ -21,10 +21,12 @@ function sumValue(sessions: any[], code: "ST" | "CL") {
 
 function usedRoomsCount(sessions: Session[]) {
     const set = new Set<number>();
+
     for (const s of sessions as any[]) {
         const rid = Number(s.room_id ?? s.roomId);
         if (Number.isFinite(rid) && rid > 0) set.add(rid);
     }
+
     return set.size;
 }
 
@@ -34,11 +36,12 @@ export default function DayCell({
                                     sessions,
                                     dateKey,
                                     totalRooms,
-                                    roomsById,
-                                    cliniciansById,
+                                    roomsById, // kept (unused currently)
+                                    cliniciansById, // kept (unused currently)
                                     onSelect,
                                     isTrainingWeekend,
-                                    onAddOoHoliday, // ✅ NEW
+                                    onAddOoHoliday,
+                                    missingExpectedCount,
                                 }: {
     date: Date;
     inMonth: boolean;
@@ -49,10 +52,9 @@ export default function DayCell({
     dateKey: string;
     onSelect: (dateKey: string) => void;
     isTrainingWeekend?: boolean;
-    onAddOoHoliday?: (dateKey: string) => void; // ✅ NEW
+    onAddOoHoliday?: (dateKey: string) => void;
+    missingExpectedCount?: number;
 }) {
-    // ✅ MonthGrid already grouped sessions for this dateKey.
-    // Do NOT re-filter here (Date objects / timezone parsing causes mismatches).
     const daySessions = (sessions ?? []) as any[];
 
     const usedRooms = usedRoomsCount(daySessions);
@@ -61,12 +63,14 @@ export default function DayCell({
     const valueST = sumValue(daySessions as any, "ST");
     const valueCL = sumValue(daySessions as any, "CL");
 
+    const missing = Number(missingExpectedCount ?? 0);
+
     return (
         <button
             type="button"
             onClick={() => inMonth && onSelect(dateKey)}
             disabled={!inMonth}
-            className={`h-[140px] border p-2 relative text-left w-full transition ${
+            className={`h-[140px] border p-2 text-left w-full transition ${
                 inMonth ? "bg-white hover:bg-slate-50" : "bg-slate-50 opacity-50 cursor-default"
             } ${
                 isTrainingWeekend && inMonth
@@ -74,23 +78,41 @@ export default function DayCell({
                     : "border-slate-200"
             }`}
         >
-            <div className="absolute top-2 left-2 text-xs text-slate-700 font-medium">
-                {inMonth ? date.getDate() : ""}
+            {/* ✅ Header row: date left, badges right (no overlap) */}
+            <div className="flex items-start justify-between gap-2">
+                <div className="text-xs text-slate-700 font-medium leading-none pt-0.5">
+                    {inMonth ? date.getDate() : ""}
+                </div>
+
+                <div className="flex flex-wrap items-center justify-end gap-1 max-w-[75%]">
+                    {inMonth && missing > 0 && (
+                        <div
+                            className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-red-600 text-white font-semibold shadow-sm whitespace-nowrap"
+                            title={`${missing} expected clinician${missing === 1 ? "" : "s"} not assigned`}
+                        >
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-200 opacity-75" />
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-white" />
+              </span>
+                            MISSING {missing}
+                        </div>
+                    )}
+
+                    {inMonth && isTrainingWeekend && (
+                        <div
+                            className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-purple-600 text-white font-semibold shadow-sm tracking-wide whitespace-nowrap"
+                            title="Monthly Training Weekend"
+                        >
+                            <span className="w-1.5 h-1.5 bg-white rounded-full opacity-80"></span>
+                            TRAINING
+                        </div>
+                    )}
+                </div>
             </div>
 
-            {/* If training weekend, keep the badge but move it down so it doesn't overlap */}
-            {inMonth && isTrainingWeekend && (
-                <div
-                    className="absolute top-2 right-2 flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-purple-600 text-white font-semibold shadow-sm tracking-wide"
-                    title="Monthly Training Weekend"
-                >
-                    <span className="w-1.5 h-1.5 bg-white rounded-full opacity-80"></span>
-                    TRAINING
-                </div>
-            )}
-
+            {/* ✅ Body content sits UNDER header */}
             {inMonth && (
-                <div className="mt-5 space-y-1 text-[11px] text-slate-600">
+                <div className="mt-2 space-y-1 text-[11px] text-slate-600">
                     <div
                         className={`flex justify-between rounded px-1 py-0.5 ${
                             emptyRooms >= 3 ? "bg-red-600 text-white font-medium" : "text-slate-800"

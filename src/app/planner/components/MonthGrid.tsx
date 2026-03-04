@@ -1,10 +1,19 @@
 "use client";
-
 import type { PlannerResponse } from "../types/planner";
-import { buildMonthGrid, getFirstFullWeekend, isSameMonth, toISODate } from "../utils/date";
+
+import {
+    buildMonthGrid,
+    getFirstFullWeekend,
+    isSameMonth,
+    toISODate,
+} from "../utils/date";
+
 import DayCell from "./DayCell";
+
 import { useMemo } from "react";
+
 import { useRouter } from "next/navigation";
+import { getWeekPatternFromYmd } from "@/lib/WeekPattern";
 
 function ym(d: Date) {
     const yyyy = d.getFullYear();
@@ -27,17 +36,72 @@ function dateKeyFromAny(input: any): string {
     return m ? m[1] : "";
 }
 
+function addDays(ymd: string, days: number) {
+    // ymd is "YYYY-MM-DD"
+    const [y, m, d] = ymd.split("-").map((x) => Number(x));
+    const dt = new Date(y, (m ?? 1) - 1, d ?? 1);
+    dt.setDate(dt.getDate() + days);
+    return ymdLocal(dt);
+}
+
 function buildTrainingKeys(anchorMonth: Date) {
     const year = anchorMonth.getFullYear();
     const month = anchorMonth.getMonth();
-
     const wk = getFirstFullWeekend(year, month);
+
     if (!wk) return new Set<string>();
 
     const sat = new Date(year, month, wk.saturday);
     const sun = new Date(year, month, wk.sunday);
 
     return new Set([toISODate(sat), toISODate(sun)]);
+}
+
+/**
+ * Treat these activity codes as "NOT expected to be assigned a session".
+ * (Matches your sidebar logic style.)
+ */
+function isWorkingActivity(activityCodeRaw: any): boolean {
+    const a = String(activityCodeRaw ?? "").trim().toUpperCase();
+    if (!a) return false;
+
+    const notWorking = new Set([
+        "D/O",
+        "DO",
+        "DAY OFF",
+        "DAY_OFF",
+        "OFF",
+        "HOL",
+        "HOLIDAY",
+        "AL",
+        "ANNUAL_LEAVE",
+        "SICK",
+        "SL",
+        "SG",
+        "ADMIN",
+        "SF",
+    ]);
+
+    return !notWorking.has(a);
+}
+
+function ruleAppliesPattern(rule: any, weekPattern: string): boolean {
+    const p = String(rule?.pattern_code ?? "EVERY").trim().toUpperCase();
+    if (!p || p === "EVERY") return true;
+    return p === weekPattern;
+}
+
+function weekdayMatchesRule(date: Date, rule: any): boolean {
+    const jsDay = date.getDay(); // Sun=0..Sat=6
+    const raw =
+        rule?.weekday ??
+        rule?.uk_day ??
+        rule?.day_of_week ??
+        rule?.dayOfWeek ??
+        rule?.dow;
+    const n = Number(raw);
+    if (Number.isFinite(n) && n >= 0 && n <= 6) return n === jsDay;
+    return false;
 }
 
 export default function MonthGrid({
@@ -51,8 +115,10 @@ export default function MonthGrid({
     const router = useRouter();
 
     const monthParam = ym(anchorMonth);
+
     const days = buildMonthGrid(anchorMonth);
     const dow = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
     const totalRooms = data.rooms?.length ?? 0;
 
     const trainingKeys = useMemo(() => buildTrainingKeys(anchorMonth), [anchorMonth]);
@@ -91,12 +157,13 @@ export default function MonthGrid({
             const fn = String(c?.full_name ?? "").trim().toUpperCase();
             return dn === "OO" || fn === "OO";
         });
+
         const id = oo?.id ?? null;
         const n = Number(id);
         return Number.isFinite(n) ? n : null;
     }, [data?.clinicians]);
 
-    // ✅ Add OO holiday for a date (next step adds the API route + DB table)
+    // ✅ Add OO holiday for a date
     async function addOoHoliday(dateKey: string) {
         if (!ooClinicianId) return;
 
@@ -106,9 +173,98 @@ export default function MonthGrid({
             body: JSON.stringify({ date: dateKey }),
         });
 
-        // refresh month grid data
         router.refresh();
     }
+
+    // ✅ NEW: compute "missing expected clinicians" per dateKey (based on dayRules vs assigned sessions),
+    //        excluding clinicians who are on holiday that date.
+    const missingExpectedCountByDay = useMemo(() => {
+        const out: Record<string, number> = {};
+        const rules = (data?.dayRules ?? []) as any[];
+        const holidays = (data?.holidays ?? []) as any[];
+
+        // Build set of visible dateKeys to keep holiday expansion cheap
+        const visibleKeys = new Set<string>(days.map((d) => ymdLocal(d)));
+
+        // Build lookup: dateKey -> Set(clinician_id) on holiday
+        const holidayByDate = new Map<string, Set<number>>();
+
+        for (const h of holidays) {
+            const cid = Number(h?.clinician_id ?? h?.clinicianId);
+            if (!Number.isFinite(cid) || cid <= 0) continue;
+
+            const single = String(h?.date ?? "").slice(0, 10);
+            if (single) {
+                if (!visibleKeys.has(single)) continue;
+                const set = holidayByDate.get(single) ?? new Set<number>();
+                set.add(cid);
+                holidayByDate.set(single, set);
+                continue;
+            }
+
+            const from = String(h?.date_from ?? h?.from ?? "").slice(0, 10);
+            if (!from) continue;
+
+            const to = String(h?.date_to ?? h?.to ?? "").slice(0, 10) || from;
+
+            let cur = from;
+            let guard = 0;
+            while (cur <= to && guard < 400) {
+                if (visibleKeys.has(cur)) {
+                    const set = holidayByDate.get(cur) ?? new Set<number>();
+                    set.add(cid);
+                    holidayByDate.set(cur, set);
+                }
+                cur = addDays(cur, 1);
+                guard++;
+            }
+        }
+
+        for (const d of days) {
+            const dateKey = ymdLocal(d);
+            const weekPattern = getWeekPatternFromYmd(dateKey); // "W1" | "W2"
+
+            // expected clinician ids for this day
+            const expected = new Set<number>();
+            for (const r of rules) {
+                if (!weekdayMatchesRule(d, r)) continue;
+                if (!ruleAppliesPattern(r, weekPattern)) continue;
+                if (!isWorkingActivity(r?.activity_code)) continue;
+
+                const cid = Number(r?.clinician_id);
+                if (Number.isFinite(cid) && cid > 0) expected.add(cid);
+            }
+
+            // ✅ remove clinicians on holiday for this dateKey
+            const holidaySet = holidayByDate.get(dateKey);
+            if (holidaySet && holidaySet.size > 0) {
+                for (const cid of holidaySet) expected.delete(cid);
+            }
+
+            if (expected.size === 0) {
+                out[dateKey] = 0;
+                continue;
+            }
+
+            // assigned clinician ids for this day (from sessions)
+            const assigned = new Set<number>();
+            const daySessions = (sessionsByDay[dateKey] ?? []) as any[];
+            for (const s of daySessions) {
+                const status = String(s?.status ?? "").trim().toUpperCase();
+                if (status === "CANCELLED") continue;
+
+                const cid = Number(s?.clinician_id ?? s?.clinicianId);
+                if (Number.isFinite(cid) && cid > 0) assigned.add(cid);
+            }
+
+            let missing = 0;
+            for (const cid of expected) if (!assigned.has(cid)) missing++;
+
+            out[dateKey] = missing;
+        }
+
+        return out;
+    }, [data?.dayRules, data?.holidays, days, sessionsByDay]);
 
     return (
         <div>
@@ -137,7 +293,9 @@ export default function MonthGrid({
                             cliniciansById={cliniciansById}
                             onSelect={(key) => router.push(`/planner/${key}?m=${monthParam}`)}
                             isTrainingWeekend={inMonth && trainingKeys.has(toISODate(d))}
-                            // ✅ NEW: pass handler down to render the button in DayCell
+                            // ✅ NEW: show flag on month cell when not all expected clinicians are assigned
+                            missingExpectedCount={inMonth ? (missingExpectedCountByDay[dateKey] ?? 0) : 0}
+                            // ✅ existing
                             onAddOoHoliday={addOoHoliday}
                         />
                     );
