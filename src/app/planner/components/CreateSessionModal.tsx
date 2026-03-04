@@ -2,23 +2,53 @@
 
 import { useMemo, useState } from "react";
 import ErrorModal from "@/app/planner/components/ErrorModal";
+import { matchesPattern } from "../utils/date";
 
 type Slot = "AM" | "PM" | "FULL";
 type SessionType = "ST" | "CL" | "OTHER";
 type Status = "DRAFT" | "PUBLISHED" | "CANCELLED";
 
 // role_code: 1 = OO, 2 = CLO
-type Clinician = { id: number; full_name: string; role_code?: number };
+type Clinician = {
+    id: number;
+    full_name?: string | null;
+    display_name?: string | null;
+    role_code?: number | null;
+};
+
+// Minimal DayRule shape (only what we need)
+type DayRule = {
+    clinician_id: number;
+    weekday: number; // 0..6
+    is_available_shift?: number | null;
+    pattern_code?: string | number | null;
+};
+
+function parseYMDToLocalDate(ymd: string) {
+    const y = Number(ymd.slice(0, 4));
+    const m = Number(ymd.slice(5, 7));
+    const d = Number(ymd.slice(8, 10));
+    return new Date(y, m - 1, d);
+}
+
+function clinicianLabel(c: any) {
+    return (
+        String(c?.full_name ?? c?.name ?? "").trim() ||
+        `Clinician ${String(c?.id ?? "")}`
+    );
+}
 
 export default function CreateSessionModal({
                                                rooms,
                                                clinicians,
+                                               dayRules,
                                                defaults,
                                                onClose,
                                                onCreated,
                                            }: {
     rooms: { id: number; name: string }[];
     clinicians: Clinician[];
+    dayRules?: DayRule[];
     defaults: { session_date: string; room_id: number; slot: Slot };
     onClose: () => void;
     onCreated: () => void;
@@ -45,6 +75,49 @@ export default function CreateSessionModal({
     }, [clinician_id, clinicians]);
 
     const isCLO = (selectedClinician?.role_code ?? 0) === 2;
+
+    // ✅ Alternate-week + weekday eligibility filtering
+    const eligibleClinicians = useMemo(() => {
+        const rules = dayRules ?? [];
+
+        // If rules are not loaded, don't block selection (old behaviour)
+        if (rules.length === 0) {
+            return [...clinicians].sort((a, b) => clinicianLabel(a).localeCompare(clinicianLabel(b)));
+        }
+
+        const dateObj = parseYMDToLocalDate(session_date);
+        const weekday = dateObj.getDay(); // 0..6
+
+        // index rules by clinician
+        const byClinician = new Map<number, DayRule[]>();
+        for (const r of rules as any[]) {
+            const cid = Number((r as any).clinician_id);
+            if (!Number.isFinite(cid)) continue;
+            const arr = byClinician.get(cid) ?? [];
+            arr.push(r as DayRule);
+            byClinician.set(cid, arr);
+        }
+
+        const out: Clinician[] = [];
+
+        for (const c of clinicians as any[]) {
+            const cRules = byClinician.get(Number(c.id)) ?? [];
+
+            const ok = cRules.some((r: any) => {
+                if (Number(r.weekday) !== weekday) return false;
+
+                // must be an "available shift"
+                if (Number(r.is_available_shift ?? 0) !== 1) return false;
+
+                // must match alternate-week pattern
+                return matchesPattern(r.pattern_code, dateObj);
+            });
+
+            if (ok) out.push(c as Clinician);
+        }
+
+        return out.sort((a, b) => clinicianLabel(a).localeCompare(clinicianLabel(b)));
+    }, [clinicians, dayRules, session_date]);
 
     async function save() {
         // ✅ validation: clinician required
@@ -145,20 +218,16 @@ export default function CreateSessionModal({
                                         Select clinician…
                                     </option>
 
-                                    {clinicians.map((c: any) => {
-                                        const label =
-                                            String(c.full_name ?? c.full_name ?? c.name ?? "").trim() ||
-                                            `Clinician ${c.id}`;
-
-                                        return (
-                                            <option key={c.id} value={c.id}>
-                                                {label}
-                                            </option>
-                                        );
-                                    })}
+                                    {eligibleClinicians.map((c: any) => (
+                                        <option key={c.id} value={c.id}>
+                                            {clinicianLabel(c)}
+                                        </option>
+                                    ))}
                                 </select>
+
                                 <div className="mt-1 text-xs text-slate-500">
-                                    Selecting a CLO automatically sets Type to <span className="font-semibold">CL</span>.
+                                    Selecting a CLO automatically sets Type to{" "}
+                                    <span className="font-semibold">CL</span>.
                                 </div>
                             </label>
 

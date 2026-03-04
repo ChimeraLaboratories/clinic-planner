@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import {useRouter} from "next/navigation";
+
+type Pattern = "EVERY" | "W1" | "W2";
 
 type DayRuleRow = {
     id: number | null;
@@ -12,12 +13,13 @@ type DayRuleRow = {
     note: string | null;
     effective_from: string | null;
     effective_to: string | null;
-    pattern_code: string;
+    pattern_code: string; // returned by API (for debug/display)
 };
 
 type ApiResponse = {
     clinician_id: number;
     date: string;
+    pattern?: Pattern;
     weekly: DayRuleRow[];
 };
 
@@ -28,16 +30,13 @@ const activityOptions = [
     { value: "D/O", label: "Day Off" },
     { value: "SF", label: "Shop Floor" },
     { value: "CL", label: "CL Testing" },
-    { value: "GF_DAY", label: "Ground Floor"},
-    { value: "ADMIN", label: "Admin"},
-    { value: "SG", label: "SG Testing"},
-    { value: "UNSET", label: "— Not Set —"}
+    { value: "GF_DAY", label: "Ground Floor" },
+    { value: "ADMIN", label: "Admin" },
+    { value: "SG", label: "SG Testing" },
+    { value: "UNSET", label: "— Not Set —" },
 ];
 
-const activityVisuals: Record<
-    string,
-    { row: string; badge: string; muted?: boolean }
-> = {
+const activityVisuals: Record<string, { row: string; badge: string; muted?: boolean }> = {
     TESTING: {
         row: "bg-green-50 border-l-4 border-green-400",
         badge: "bg-green-100 text-green-800 border border-green-300 font-semibold",
@@ -74,6 +73,16 @@ const activityVisuals: Record<
     },
 };
 
+const patternOptions: { value: Pattern; label: string; helper: string }[] = [
+    { value: "EVERY", label: "Every week", helper: "Applies every week" },
+    { value: "W1", label: "Week A", helper: "Odd ISO weeks" },
+    { value: "W2", label: "Week B", helper: "Even ISO weeks" },
+];
+
+function patternLabel(p: Pattern) {
+    return patternOptions.find((x) => x.value === p)?.label ?? p;
+}
+
 function activityLabel(code: string | null | undefined) {
     return activityOptions.find((a) => a.value === code)?.label ?? code ?? "—";
 }
@@ -89,7 +98,16 @@ function toLocalISODate(d: Date) {
     return `${y}-${m}-${day}`;
 }
 
-function normalizeWeekly(input: DayRuleRow[]) {
+function normalizePattern(raw: any): Pattern {
+    if (raw === null || raw === undefined) return "EVERY";
+    const s = String(raw).trim().toUpperCase();
+    if (s === "" || s === "0" || s === "ALL" || s === "EVERY") return "EVERY";
+    if (s === "1" || s === "A" || s === "ODD" || s === "W1" || s === "WEEK1") return "W1";
+    if (s === "2" || s === "B" || s === "EVEN" || s === "W2" || s === "WEEK2") return "W2";
+    return "EVERY";
+}
+
+function normalizeWeekly(input: DayRuleRow[], selectedPattern: Pattern) {
     const by = new Map<number, DayRuleRow>();
     for (const r of input) by.set(r.weekday, r);
 
@@ -104,7 +122,8 @@ function normalizeWeekly(input: DayRuleRow[]) {
             note: r?.note ?? null,
             effective_from: r?.effective_from ?? null,
             effective_to: r?.effective_to ?? null,
-            pattern_code: r?.pattern_code ?? "EVERY",
+            // keep pattern_code consistent with what we're editing
+            pattern_code: String(r?.pattern_code ?? selectedPattern),
         } satisfies DayRuleRow;
     });
 }
@@ -113,7 +132,9 @@ export default function DayRulesClient({ clinicianId }: { clinicianId: number })
     const [viewAsOfDate, setViewAsOfDate] = useState<string>(() => toLocalISODate(new Date()));
     const [effectiveFrom, setEffectiveFrom] = useState<string>(() => toLocalISODate(new Date()));
     const [layout, setLayout] = useState<"table" | "cards">("table");
-    const router = useRouter();
+
+    // ✅ Option A: one pattern selector for the whole weekly set
+    const [pattern, setPattern] = useState<Pattern>("EVERY");
 
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
@@ -128,9 +149,15 @@ export default function DayRulesClient({ clinicianId }: { clinicianId: number })
     }, [weekly]);
 
     const isDirty = useMemo(() => {
-        const now = JSON.stringify(weekly.map(({ weekday, activity_code, start_time, end_time, note }) => ({
-            weekday, activity_code, start_time, end_time, note
-        })));
+        const now = JSON.stringify(
+            weekly.map(({ weekday, activity_code, start_time, end_time, note }) => ({
+                weekday,
+                activity_code,
+                start_time,
+                end_time,
+                note,
+            }))
+        );
         return originalWeeklyJson !== "" && now !== originalWeeklyJson;
     }, [weekly, originalWeeklyJson]);
 
@@ -140,18 +167,28 @@ export default function DayRulesClient({ clinicianId }: { clinicianId: number })
 
         try {
             const res = await fetch(
-                `/planner/api/clinicians/${clinicianId}/day-rules?date=${encodeURIComponent(viewAsOfDate)}`,
+                `/planner/api/clinicians/${clinicianId}/day-rules?date=${encodeURIComponent(viewAsOfDate)}&pattern=${encodeURIComponent(
+                    pattern
+                )}`,
                 { cache: "no-store" }
             );
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
             const json = (await res.json()) as ApiResponse;
-            const normalized = normalizeWeekly(json.weekly ?? []);
+
+            // We drive pattern from UI. Ignore json.pattern to avoid reload loops.
+            const normalized = normalizeWeekly(json.weekly ?? [], pattern);
             setWeekly(normalized);
 
-            const snap = JSON.stringify(normalized.map(({ weekday, activity_code, start_time, end_time, note }) => ({
-                weekday, activity_code, start_time, end_time, note
-            })));
+            const snap = JSON.stringify(
+                normalized.map(({ weekday, activity_code, start_time, end_time, note }) => ({
+                    weekday,
+                    activity_code,
+                    start_time,
+                    end_time,
+                    note,
+                }))
+            );
             setOriginalWeeklyJson(snap);
         } catch (e: any) {
             setError(e?.message ?? "Failed to load day rules");
@@ -165,7 +202,7 @@ export default function DayRulesClient({ clinicianId }: { clinicianId: number })
     useEffect(() => {
         load();
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [clinicianId, viewAsOfDate]);
+    }, [clinicianId, viewAsOfDate, pattern]);
 
     function updateWeekday(weekday: number, patch: Partial<DayRuleRow>) {
         setWeekly((prev) =>
@@ -178,9 +215,6 @@ export default function DayRulesClient({ clinicianId }: { clinicianId: number })
                 if (patch.activity_code !== undefined && isDayOff(patch.activity_code)) {
                     next.start_time = null;
                     next.end_time = null;
-
-                    // Optional: keep notes, or clear them. Uncomment if you want to clear notes too:
-                    // next.note = null;
                 }
 
                 return next;
@@ -195,6 +229,7 @@ export default function DayRulesClient({ clinicianId }: { clinicianId: number })
         try {
             const payload = {
                 effectiveFrom,
+                pattern, // ✅ Option A: save weekly set under this pattern
                 rules: weekly.map((r) => ({
                     weekday: r.weekday,
                     activity_code: r.activity_code,
@@ -217,8 +252,6 @@ export default function DayRulesClient({ clinicianId }: { clinicianId: number })
 
             // After save, re-load using the effectiveFrom date so you see what you just created
             setViewAsOfDate(effectiveFrom);
-            // load will run from effect; but also safe to call immediately:
-            // await load();
         } catch (e: any) {
             setError(e?.message ?? "Failed to save");
         } finally {
@@ -233,10 +266,30 @@ export default function DayRulesClient({ clinicianId }: { clinicianId: number })
                     <div>
                         <div className="text-sm text-gray-500">Weekly Day Rules</div>
                         <div className="text-lg font-semibold">Sun → Sat</div>
+
+                        <div className="mt-1 text-xs text-gray-500">
+                            Pattern: <span className="font-semibold text-gray-700">{patternLabel(pattern)}</span>
+                        </div>
                     </div>
 
-
                     <div className="flex flex-wrap items-end gap-3">
+                        <div>
+                            <label className="block text-xs text-gray-500 mb-1">Pattern</label>
+                            <select
+                                value={pattern}
+                                onChange={(e) => setPattern(normalizePattern(e.target.value))}
+                                className="rounded border px-3 py-2 text-sm"
+                                disabled={saving}
+                                title="Choose alternate-week ruleset to view/edit"
+                            >
+                                {patternOptions.map((p) => (
+                                    <option key={p.value} value={p.value}>
+                                        {p.label} — {p.helper}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+
                         <div>
                             <label className="block text-xs text-gray-500 mb-1">View as of</label>
                             <input
@@ -287,11 +340,7 @@ export default function DayRulesClient({ clinicianId }: { clinicianId: number })
                     </div>
                 </div>
 
-                {error && (
-                    <div className="mt-4 rounded border border-red-200 bg-red-50 p-3 text-sm text-red-700">
-                        {error}
-                    </div>
-                )}
+                {error && <div className="mt-4 rounded border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</div>}
 
                 <div className="mt-4">
                     {layout === "table" ? (
@@ -311,7 +360,7 @@ export default function DayRulesClient({ clinicianId }: { clinicianId: number })
                                 <tbody>
                                 {weekdayNames.map((dayName, weekday) => {
                                     const r = weekdayMap.get(weekday);
-                                    const code = activityOptions.some(a => a.value === r?.activity_code)
+                                    const code = activityOptions.some((a) => a.value === r?.activity_code)
                                         ? (r?.activity_code as string)
                                         : "UNSET";
                                     const visual = activityVisuals[code];
@@ -329,9 +378,9 @@ export default function DayRulesClient({ clinicianId }: { clinicianId: number })
                                         >
                                             <td className="p-3">
                                                 <div className="flex items-center gap-3">
-                    <span className={["text-sm", off ? "font-bold" : "font-semibold"].join(" ")}>
-                      {dayName}
-                    </span>
+                            <span className={["text-sm", off ? "font-bold" : "font-semibold"].join(" ")}>
+                              {dayName}
+                            </span>
 
                                                     <span
                                                         className={[
@@ -339,8 +388,8 @@ export default function DayRulesClient({ clinicianId }: { clinicianId: number })
                                                             visual?.badge ?? "bg-gray-100 text-gray-700 border border-gray-200 font-medium",
                                                         ].join(" ")}
                                                     >
-                      {activityLabel(r?.activity_code)}
-                    </span>
+                              {activityLabel(r?.activity_code)}
+                            </span>
 
                                                     {off && <span className="text-xs text-gray-500">(times disabled)</span>}
                                                 </div>
@@ -387,7 +436,9 @@ export default function DayRulesClient({ clinicianId }: { clinicianId: number })
 
                                             <td className="p-3">
                                                 <input
-                                                    className={["w-full min-w-[180px] rounded border px-2 py-1", off ? "bg-gray-50" : ""].join(" ")}
+                                                    className={["w-full min-w-[180px] rounded border px-2 py-1", off ? "bg-gray-50" : ""].join(
+                                                        " "
+                                                    )}
                                                     value={r?.note ?? ""}
                                                     onChange={(e) => updateWeekday(weekday, { note: e.target.value || null })}
                                                     disabled={loading || saving || !r}
@@ -429,14 +480,14 @@ export default function DayRulesClient({ clinicianId }: { clinicianId: number })
                                                 </div>
 
                                                 <div className="mt-2">
-                  <span
-                      className={[
-                          "inline-flex px-2 py-1 rounded-md text-xs",
-                          visual?.badge ?? "bg-gray-100 text-gray-700 border border-gray-200 font-medium",
-                      ].join(" ")}
-                  >
-                    {activityLabel(r?.activity_code)}
-                  </span>
+                          <span
+                              className={[
+                                  "inline-flex px-2 py-1 rounded-md text-xs",
+                                  visual?.badge ?? "bg-gray-100 text-gray-700 border border-gray-200 font-medium",
+                              ].join(" ")}
+                          >
+                            {activityLabel(r?.activity_code)}
+                          </span>
 
                                                     {off && <span className="ml-2 text-xs text-gray-500">(times disabled)</span>}
                                                 </div>
@@ -461,7 +512,9 @@ export default function DayRulesClient({ clinicianId }: { clinicianId: number })
                                                 <div className="text-xs text-gray-500 mb-1">Start</div>
                                                 <input
                                                     type="time"
-                                                    className={["w-full rounded border px-2 py-1", off ? "bg-gray-50 text-gray-400" : ""].join(" ")}
+                                                    className={["w-full rounded border px-2 py-1", off ? "bg-gray-50 text-gray-400" : ""].join(
+                                                        " "
+                                                    )}
                                                     value={(r?.start_time ?? "").slice(0, 5)}
                                                     onChange={(e) =>
                                                         updateWeekday(weekday, { start_time: e.target.value ? `${e.target.value}:00` : null })
@@ -474,7 +527,9 @@ export default function DayRulesClient({ clinicianId }: { clinicianId: number })
                                                 <div className="text-xs text-gray-500 mb-1">End</div>
                                                 <input
                                                     type="time"
-                                                    className={["w-full rounded border px-2 py-1", off ? "bg-gray-50 text-gray-400" : ""].join(" ")}
+                                                    className={["w-full rounded border px-2 py-1", off ? "bg-gray-50 text-gray-400" : ""].join(
+                                                        " "
+                                                    )}
                                                     value={(r?.end_time ?? "").slice(0, 5)}
                                                     onChange={(e) =>
                                                         updateWeekday(weekday, { end_time: e.target.value ? `${e.target.value}:00` : null })
@@ -507,7 +562,8 @@ export default function DayRulesClient({ clinicianId }: { clinicianId: number })
                 </div>
 
                 <div className="mt-4 text-xs text-gray-500">
-                    Saving creates a new weekly ruleset effective from the selected date (history preserved).
+                    Saving creates a new weekly ruleset effective from the selected date (history preserved) for the selected
+                    pattern.
                 </div>
             </div>
         </div>
