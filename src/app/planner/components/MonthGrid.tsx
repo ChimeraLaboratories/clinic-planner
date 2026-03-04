@@ -86,8 +86,7 @@ function isWorkingActivity(activityCodeRaw: any): boolean {
 }
 
 function ruleAppliesPattern(rule: any, weekPattern: string): boolean {
-    const p = String(rule?.pattern_code ?? "EVERY").trim().toUpperCase();
-    if (!p || p === "EVERY") return true;
+    const p = String(rule?.pattern_code ?? "").trim().toUpperCase();
     return p === weekPattern;
 }
 

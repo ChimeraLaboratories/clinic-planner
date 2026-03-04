@@ -8,7 +8,7 @@ type DayRuleLike = {
     clinician_id: number | string;
     weekday?: number | string | null; // JS getDay (Sun=0..Sat=6)
     uk_day?: number | string | null;
-    pattern_code?: string | null; // "EVERY" | "W1" | "W2"
+    pattern_code?: string | null; // "W1" | "W2"
     activity_code?: string | null;
 };
 
@@ -18,8 +18,7 @@ type HolidayLike = {
 };
 
 function ruleAppliesPattern(rule: DayRuleLike, weekPattern: string) {
-    const p = String(rule?.pattern_code ?? "EVERY").trim().toUpperCase();
-    if (!p || p === "EVERY") return true;
+    const p = String(rule?.pattern_code ?? "").trim().toUpperCase();
     return p === weekPattern;
 }
 
@@ -124,8 +123,8 @@ function bestRuleForClinician(cid: number, rulesForDay: DayRuleLike[], weekPatte
     if (exact) return exact;
 
     const every = mine.find((r) => {
-        const p = String(r?.pattern_code ?? "EVERY").trim().toUpperCase();
-        return !p || p === "EVERY";
+        const p = String(r?.pattern_code ?? "").trim().toUpperCase();
+        return p === weekPattern;
     });
 
     return every ?? null;

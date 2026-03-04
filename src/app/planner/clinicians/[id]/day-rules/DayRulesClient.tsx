@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 
-type Pattern = "EVERY" | "W1" | "W2";
+type Pattern = "W1" | "W2";
 
 type DayRuleRow = {
     id: number | null;
@@ -75,7 +75,6 @@ const activityVisuals: Record<string, { row: string; badge: string; muted?: bool
 
 // ✅ include EVERY so initial render is valid
 const patternOptions: { value: Pattern; label: string; helper: string }[] = [
-    { value: "EVERY", label: "Every week", helper: "Same rules every week" },
     { value: "W1", label: "Week A", helper: "Alternate week set 1" },
     { value: "W2", label: "Week B", helper: "Alternate week set 2" },
 ];
@@ -100,12 +99,10 @@ function toLocalISODate(d: Date) {
 }
 
 function normalizePattern(raw: any): Pattern {
-    if (raw === null || raw === undefined) return "EVERY";
     const s = String(raw).trim().toUpperCase();
-    if (s === "" || s === "0" || s === "ALL" || s === "EVERY") return "EVERY";
     if (s === "1" || s === "A" || s === "ODD" || s === "W1" || s === "WEEK1") return "W1";
     if (s === "2" || s === "B" || s === "EVEN" || s === "W2" || s === "WEEK2") return "W2";
-    return "EVERY";
+    return "W1";
 }
 
 function normalizeWeekly(input: DayRuleRow[], selectedPattern: Pattern) {
@@ -133,7 +130,7 @@ export default function DayRulesClient({ clinicianId }: { clinicianId: number })
     const [effectiveFrom, setEffectiveFrom] = useState<string>(() => toLocalISODate(new Date()));
     const [layout, setLayout] = useState<"table" | "cards">("table");
 
-    const [pattern, setPattern] = useState<Pattern>("EVERY");
+    const [pattern, setPattern] = useState<Pattern>("W1");
 
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);

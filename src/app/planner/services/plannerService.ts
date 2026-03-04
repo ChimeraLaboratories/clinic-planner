@@ -56,7 +56,6 @@ export async function createSession(input: {
           FROM clinician_day_rule
           WHERE clinician_id = ?
             AND is_active = 1
-            AND pattern_code = 'EVERY'
             AND weekday = ?
             AND effective_from <= ?
             AND (effective_to IS NULL OR effective_to >= ?)
@@ -66,7 +65,6 @@ export async function createSession(input: {
          AND pick.max_from = r.effective_from
         WHERE r.clinician_id = ?
           AND r.is_active = 1
-          AND r.pattern_code = 'EVERY'
           AND r.weekday = ?
         LIMIT 1
       `,

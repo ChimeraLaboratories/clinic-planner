@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 
-type Pattern = "EVERY" | "W1" | "W2";
+type Pattern = "W1" | "W2";
 
 function isValidISODate(s: string) {
     return /^\d{4}-\d{2}-\d{2}$/.test(s);
@@ -14,12 +14,10 @@ function isValidTimeOrNull(t: any): t is string | null {
 }
 
 function normalizePattern(input: any): Pattern {
-    if (input === null || input === undefined) return "EVERY";
     const s = String(input).trim().toUpperCase();
-    if (s === "" || s === "0" || s === "ALL" || s === "EVERY") return "EVERY";
     if (s === "1" || s === "A" || s === "ODD" || s === "W1" || s === "WEEK1") return "W1";
     if (s === "2" || s === "B" || s === "EVEN" || s === "W2" || s === "WEEK2") return "W2";
-    return "EVERY";
+    return "W1";
 }
 
 function computeIsAvailableShift(activity_code: string | null | undefined): number {
@@ -104,19 +102,6 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
         return NextResponse.json({ error: "Server error" }, { status: 500 });
     }
 }
-
-/**
- * PUT /planner/api/clinicians/:id/day-rules
- * Body:
- * {
- *   effectiveFrom: "YYYY-MM-DD",
- *   pattern?: "EVERY"|"W1"|"W2",
- *   rules: [{weekday, activity_code, start_time, end_time, note, pattern_code?}, ... x7]
- * }
- *
- * Saves a NEW 7-day weekly set for a SINGLE pattern (pattern in body wins).
- * If body.pattern is missing, defaults to EVERY for backward compatibility.
- */
 export async function PUT(req: Request, ctx: { params: Promise<{ id: string }> }) {
     let conn: any;
     try {
@@ -131,7 +116,7 @@ export async function PUT(req: Request, ctx: { params: Promise<{ id: string }> }
 
         const effectiveFrom = String(body.effectiveFrom ?? "");
         const rules = body.rules as any[];
-        const pattern: Pattern = normalizePattern(body.pattern ?? "EVERY");
+        const pattern: Pattern = normalizePattern(body.pattern ?? "W1");
 
         if (!isValidISODate(effectiveFrom)) {
             return NextResponse.json({ error: "effectiveFrom must be YYYY-MM-DD" }, { status: 400 });
