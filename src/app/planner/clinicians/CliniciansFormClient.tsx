@@ -84,7 +84,20 @@ export default function ClinicianFormClient({
                     return;
                 }
 
-                router.push("/planner/clinicians");
+                // ✅ After creating, go straight to Day Rules for the new clinician
+                const newId =
+                    data?.clinician_id ??
+                    data?.id ??
+                    data?.clinician?.id ??
+                    data?.result?.insertId ??
+                    data?.insertId;
+
+                if (newId) {
+                    router.push(`/planner/clinicians/${newId}/day-rules`);
+                } else {
+                    // fallback if API didn't return an id
+                    router.push("/planner/clinicians");
+                }
                 router.refresh();
             } else {
                 if (!clinicianId) {
