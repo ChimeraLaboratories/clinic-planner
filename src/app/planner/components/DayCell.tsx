@@ -38,6 +38,7 @@ export default function DayCell({
                                     cliniciansById,
                                     onSelect,
                                     isTrainingWeekend,
+                                    onAddOoHoliday, // ✅ NEW
                                 }: {
     date: Date;
     inMonth: boolean;
@@ -48,6 +49,7 @@ export default function DayCell({
     dateKey: string;
     onSelect: (dateKey: string) => void;
     isTrainingWeekend?: boolean;
+    onAddOoHoliday?: (dateKey: string) => void; // ✅ NEW
 }) {
     // ✅ MonthGrid already grouped sessions for this dateKey.
     // Do NOT re-filter here (Date objects / timezone parsing causes mismatches).
@@ -76,6 +78,7 @@ export default function DayCell({
                 {inMonth ? date.getDate() : ""}
             </div>
 
+            {/* If training weekend, keep the badge but move it down so it doesn't overlap */}
             {inMonth && isTrainingWeekend && (
                 <div
                     className="absolute top-2 right-2 flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-purple-600 text-white font-semibold shadow-sm tracking-wide"

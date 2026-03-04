@@ -95,6 +95,17 @@ export default function PlannerShell({
 }) {
     const router = useRouter();
 
+    const ooClinicianId = useMemo(() => {
+        const list = (data?.clinicians ?? []) as any[];
+        const oo = list.find((c) => {
+            const dn = String(c?.display_name ?? "").trim().toUpperCase();
+            const fn = String(c?.full_name ?? "").trim().toUpperCase();
+            return dn === "OO" || fn === "OO";
+        });
+        const n = Number(oo?.id ?? null);
+        return Number.isFinite(n) ? n : null;
+    }, [data?.clinicians]);
+
     useEffect(() => {
         const sessions = (data?.sessions ?? []) as any[];
 
@@ -221,6 +232,8 @@ export default function PlannerShell({
                 onPrevMonth={onPrevMonth}
                 onNextMonth={onNextMonth}
                 onCurrentMonth={handleCurrentMonth}
+                clinicians={data?.clinicians ?? []}
+                onRefresh={onRefresh}
             />
 
             <main className="w-full px-6 py-8">

@@ -83,6 +83,33 @@ export default function MonthGrid({
         return map;
     }, [data?.sessions]);
 
+    // ✅ Find OO clinician id from clinicians list (by display_name or full_name)
+    const ooClinicianId = useMemo(() => {
+        const list = (data?.clinicians ?? []) as any[];
+        const oo = list.find((c) => {
+            const dn = String(c?.display_name ?? "").trim().toUpperCase();
+            const fn = String(c?.full_name ?? "").trim().toUpperCase();
+            return dn === "OO" || fn === "OO";
+        });
+        const id = oo?.id ?? null;
+        const n = Number(id);
+        return Number.isFinite(n) ? n : null;
+    }, [data?.clinicians]);
+
+    // ✅ Add OO holiday for a date (next step adds the API route + DB table)
+    async function addOoHoliday(dateKey: string) {
+        if (!ooClinicianId) return;
+
+        await fetch(`/api/clinicians/${ooClinicianId}/holidays`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ date: dateKey }),
+        });
+
+        // refresh month grid data
+        router.refresh();
+    }
+
     return (
         <div>
             <div className="grid grid-cols-7 bg-slate-50 border border-slate-200 border-b-0 rounded-t-xl text-sm font-medium text-slate-600">
@@ -110,6 +137,8 @@ export default function MonthGrid({
                             cliniciansById={cliniciansById}
                             onSelect={(key) => router.push(`/planner/${key}?m=${monthParam}`)}
                             isTrainingWeekend={inMonth && trainingKeys.has(toISODate(d))}
+                            // ✅ NEW: pass handler down to render the button in DayCell
+                            onAddOoHoliday={addOoHoliday}
                         />
                     );
                 })}

@@ -11,9 +11,13 @@ type DayRuleLike = {
     activity_code?: string | null;
 };
 
+type HolidayLike = {
+    clinician_id: number | string;
+    date: string; // "YYYY-MM-DD"
+};
+
 function getWeekPattern(date: Date, trainingStart: Date) {
-    const diffDays =
-        (date.getTime() - trainingStart.getTime()) / (1000 * 60 * 60 * 24);
+    const diffDays = (date.getTime() - trainingStart.getTime()) / (1000 * 60 * 60 * 24);
     const weekIndex = Math.floor(diffDays / 7);
     return weekIndex % 2 === 0 ? "W1" : "W2";
 }
@@ -39,15 +43,9 @@ function findClinician(clinicians: any[], id: number) {
 function weekdayMatchesRule(date: Date, rule: any): boolean {
     const jsDay = date.getDay();
 
-    const raw =
-        rule?.weekday ??
-        rule?.uk_day ??
-        rule?.day_of_week ??
-        rule?.dayOfWeek ??
-        rule?.dow;
+    const raw = rule?.weekday ?? rule?.uk_day ?? rule?.day_of_week ?? rule?.dayOfWeek ?? rule?.dow;
 
     const n = Number(raw);
-
     if (Number.isFinite(n) && n >= 0 && n <= 6) return n === jsDay;
 
     const s = String(raw ?? "").trim().toUpperCase();
@@ -121,20 +119,13 @@ function classifyActivity(activityCodeRaw: any): "OO" | "CLO" | null {
     if (notWorking.has(a)) return null;
 
     if (a === "CL" || a.startsWith("CL_") || a.includes("CLO")) return "CLO";
-
     return "OO";
 }
 
-function bestRuleForClinician(
-    cid: number,
-    rulesForDay: DayRuleLike[],
-    weekPattern: string
-): DayRuleLike | null {
+function bestRuleForClinician(cid: number, rulesForDay: DayRuleLike[], weekPattern: string): DayRuleLike | null {
     const mine = (rulesForDay ?? []).filter((r) => Number(r?.clinician_id) === cid);
 
-    const exact = mine.find(
-        (r) => String(r?.pattern_code ?? "").trim().toUpperCase() === weekPattern
-    );
+    const exact = mine.find((r) => String(r?.pattern_code ?? "").trim().toUpperCase() === weekPattern);
     if (exact) return exact;
 
     const every = mine.find((r) => {
@@ -179,45 +170,58 @@ function StatusDot({ status }: { status: "ok" | "warning" | "critical" }) {
     );
 }
 
+function holidayIdsForDate(holidays: HolidayLike[] | undefined, dateISO: string): Set<number> {
+    const ids = new Set<number>();
+    const key = String(dateISO).slice(0, 10);
+
+    for (const h of holidays ?? []) {
+        const d = String((h as any)?.date ?? "").slice(0, 10);
+        if (d !== key) continue;
+        const cid = Number((h as any)?.clinician_id ?? (h as any)?.clinicianId);
+        if (Number.isFinite(cid) && cid > 0) ids.add(cid);
+    }
+    return ids;
+}
+
 export default function DayExpectedSidebar({
                                                dateISO,
                                                clinicians,
                                                dayRules,
                                                trainingStartISO,
                                                rooms,
+                                               holidays, // ✅ NEW
                                            }: {
     dateISO: string;
     clinicians: Clinician[];
     dayRules: DayRuleLike[];
     trainingStartISO: string;
     rooms: any[];
+    holidays?: HolidayLike[]; // ✅ NEW
 }) {
     const date = parseYmdLocal(dateISO);
     const trainingStart = parseYmdLocal(trainingStartISO);
 
-    if (
-        !Number.isFinite(date.getTime()) ||
-        !Number.isFinite(trainingStart.getTime())
-    ) {
-        console.log("[DayExpectedSidebar] invalid date inputs", {
-            dateISO,
-            trainingStartISO,
-        });
+    if (!Number.isFinite(date.getTime()) || !Number.isFinite(trainingStart.getTime())) {
+        console.log("[DayExpectedSidebar] invalid date inputs", { dateISO, trainingStartISO });
         return null;
     }
 
     const weekPattern = getWeekPattern(date, trainingStart);
+
     const assignedClinicianIds = extractAssignedClinicianIds(rooms);
+    const holidayClinicianIds = holidayIdsForDate(holidays, dateISO);
+
+    console.log("[ExpectedSidebar] holiday match", {
+        dateISO: String(dateISO).slice(0, 10),
+        holidaysCount: (holidays ?? []).length,
+        holidayIds: Array.from(holidayClinicianIds),
+    });
 
     // Rules for selected weekday + pattern/EVERY
-    const rulesForSelectedWeekday = (dayRules ?? []).filter((r) =>
-        weekdayMatchesRule(date, r)
-    );
-    const rulesForThisDay = rulesForSelectedWeekday.filter((r) =>
-        ruleAppliesPattern(r, weekPattern)
-    );
+    const rulesForSelectedWeekday = (dayRules ?? []).filter((r) => weekdayMatchesRule(date, r));
+    const rulesForThisDay = rulesForSelectedWeekday.filter((r) => ruleAppliesPattern(r, weekPattern));
 
-    // Build "remaining" (exclude assigned clinicians entirely)
+    // Build "remaining" (exclude assigned clinicians AND holiday clinicians)
     const remainingOOIds = new Set<number>();
     const remainingCLOIds = new Set<number>();
 
@@ -225,6 +229,10 @@ export default function DayExpectedSidebar({
         const cid = clinicianIdOf(c);
         if (!Number.isFinite(cid) || cid <= 0) continue;
 
+        // ✅ If they're on holiday, they are not expected that day
+        if (holidayClinicianIds.has(cid)) continue;
+
+        // existing: if already assigned in a room, not remaining
         if (assignedClinicianIds.has(cid)) continue;
 
         const rule = bestRuleForClinician(cid, rulesForThisDay, weekPattern);
@@ -235,21 +243,11 @@ export default function DayExpectedSidebar({
     }
 
     const remainingOO = Array.from(remainingOOIds).map((id) => {
-        return (
-            findClinician(clinicians as any[], id) ?? {
-                id,
-                display_name: `Clinician ${id}`,
-            }
-        );
+        return findClinician(clinicians as any[], id) ?? { id, display_name: `Clinician ${id}` };
     });
 
     const remainingCLO = Array.from(remainingCLOIds).map((id) => {
-        return (
-            findClinician(clinicians as any[], id) ?? {
-                id,
-                display_name: `Clinician ${id}`,
-            }
-        );
+        return findClinician(clinicians as any[], id) ?? { id, display_name: `Clinician ${id}` };
     });
 
     const remainingTotal = remainingOO.length + remainingCLO.length;
@@ -285,9 +283,7 @@ export default function DayExpectedSidebar({
             </div>
 
             <div className="mt-3 flex items-center gap-3">
-                <div className={`text-4xl font-bold leading-none ${countClass}`}>
-                    {remainingTotal}
-                </div>
+                <div className={`text-4xl font-bold leading-none ${countClass}`}>{remainingTotal}</div>
                 <StatusDot status={status} />
             </div>
 
@@ -306,9 +302,7 @@ export default function DayExpectedSidebar({
                             <div className="text-sm font-semibold text-slate-900">OO</div>
                             <div
                                 className={`text-xs font-semibold rounded-full px-2 py-0.5 ${
-                                    remainingOO.length > 0
-                                        ? "text-red-700 bg-red-100"
-                                        : "text-emerald-700 bg-emerald-100"
+                                    remainingOO.length > 0 ? "text-red-700 bg-red-100" : "text-emerald-700 bg-emerald-100"
                                 }`}
                             >
                                 {remainingOO.length > 0 ? "Remaining" : "Complete"}
@@ -338,9 +332,7 @@ export default function DayExpectedSidebar({
                             <div className="text-sm font-semibold text-slate-900">CLO</div>
                             <div
                                 className={`text-xs font-semibold rounded-full px-2 py-0.5 ${
-                                    remainingCLO.length > 0
-                                        ? "text-red-700 bg-red-100"
-                                        : "text-emerald-700 bg-emerald-100"
+                                    remainingCLO.length > 0 ? "text-red-700 bg-red-100" : "text-emerald-700 bg-emerald-100"
                                 }`}
                             >
                                 {remainingCLO.length > 0 ? "Remaining" : "Complete"}

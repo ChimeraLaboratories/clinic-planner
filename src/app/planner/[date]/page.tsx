@@ -135,6 +135,7 @@ export default async function PlannerDayPage({
                         dayRules={dayRules}
                         trainingStartISO={"2026-01-05T00:00:00"}
                         rooms={dayData.rooms}
+                        holidays={(dayData as any)?.holidays ?? []}
                     />
                 </div>
 

@@ -25,7 +25,7 @@ export async function GET(req: Request) {
         return NextResponse.json({ error: "No date" }, { status: 400 });
     }
 
-// ✅ Is a registered OO supervisor in store today (even if not testing)?
+    // ✅ Is a registered OO supervisor in store today (even if not testing)?
     const [inStoreSupRows] = await db.query<RowDataPacket[]>(
         `
             SELECT COUNT(*) AS cnt
@@ -42,9 +42,7 @@ export async function GET(req: Request) {
 
     const inStoreSupervisorPresent = Number((inStoreSupRows as any[])[0]?.cnt ?? 0) > 0;
 
-    const [rooms] = await db.query<RoomRow[]>(
-        `SELECT id, name FROM rooms ORDER BY name`
-    );
+    const [rooms] = await db.query<RoomRow[]>(`SELECT id, name FROM rooms ORDER BY name`);
 
     const [sessions] = await db.query<SessionRow[]>(
         `
@@ -76,14 +74,24 @@ export async function GET(req: Request) {
         [date]
     );
 
+    // ✅ NEW: fetch holidays for this date
+    const [holidayRows] = await db.query<RowDataPacket[]>(
+        `
+      SELECT
+        clinician_id,
+        DATE_FORMAT(holiday_date, '%Y-%m-%d') AS date,
+        note
+      FROM clinician_holiday
+      WHERE holiday_date = ?
+    `,
+        [date]
+    );
+
     // ✅ compute warning flag ONCE
-// ✅ compute warning flag ONCE
     const sessionsWithWarnings = sessions.map((s) => ({
         ...s,
         requiresSupervisorWarning:
-            Number(s.grade_code) === 2 &&
-            Number(s.supervisor_present) === 0 &&
-            !inStoreSupervisorPresent,
+            Number(s.grade_code) === 2 && Number(s.supervisor_present) === 0 && !inStoreSupervisorPresent,
     }));
 
     // ✅ build room map
@@ -115,13 +123,12 @@ export async function GET(req: Request) {
 
     return NextResponse.json({
         rooms: roomData,
+        holidays: holidayRows, // ✅ NEW: include holidays in day payload
         stats: {
             totalSessions: sessionsWithWarnings.length,
             roomsUsed: roomData.filter((room) => room.used).length,
             clinicians: new Set(
-                sessionsWithWarnings
-                    .filter((s) => s.clinician_id != null)
-                    .map((s) => s.clinician_id!)
+                sessionsWithWarnings.filter((s) => s.clinician_id != null).map((s) => s.clinician_id!)
             ).size,
         },
     });
