@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 
 export default function ErrorModal({
                                        open,
@@ -13,6 +14,10 @@ export default function ErrorModal({
     message: string;
     onClose: () => void;
 }) {
+    const [mounted, setMounted] = useState(false);
+
+    useEffect(() => setMounted(true), []);
+
     // Close on Escape
     useEffect(() => {
         function handleKey(e: KeyboardEvent) {
@@ -22,10 +27,10 @@ export default function ErrorModal({
         return () => window.removeEventListener("keydown", handleKey);
     }, [open, onClose]);
 
-    if (!open) return null;
+    if (!open || !mounted) return null;
 
-    return (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+    return createPortal(
+        <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4">
             {/* Backdrop */}
             <div
                 className="absolute inset-0 bg-black/50 backdrop-blur-sm transition-opacity"
@@ -34,7 +39,6 @@ export default function ErrorModal({
 
             {/* Modal */}
             <div className="relative w-full max-w-md rounded-2xl bg-white shadow-2xl border border-red-100 border-t-[5px] border-t-red-500 overflow-hidden">
-
                 <div className="p-6">
                     <div className="flex items-start gap-4">
                         {/* Icon */}
@@ -43,9 +47,7 @@ export default function ErrorModal({
                         </div>
 
                         <div className="flex-1">
-                            <h2 className="text-lg font-semibold text-gray-900">
-                                {title}
-                            </h2>
+                            <h2 className="text-lg font-semibold text-gray-900">{title}</h2>
 
                             <p className="mt-2 text-sm text-gray-600 leading-relaxed whitespace-pre-wrap">
                                 {message}
@@ -64,6 +66,7 @@ export default function ErrorModal({
                     </div>
                 </div>
             </div>
-        </div>
+        </div>,
+        document.body
     );
 }
