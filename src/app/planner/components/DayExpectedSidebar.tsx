@@ -5,10 +5,10 @@ import { parseYmdLocal } from "@/app/planner/utils/date";
 
 type DayRuleLike = {
     clinician_id: number | string;
-    weekday?: number | string | null; // expected: JS getDay convention (Sun=0..Sat=6)
+    weekday?: number | string | null; // JS getDay (Sun=0..Sat=6)
     uk_day?: number | string | null;
     pattern_code?: string | null; // "EVERY" | "W1" | "W2"
-    activity_code?: string | null; // e.g. "GF_DAY"
+    activity_code?: string | null;
 };
 
 function getWeekPattern(date: Date, trainingStart: Date) {
@@ -37,7 +37,7 @@ function findClinician(clinicians: any[], id: number) {
  * STRICT JS getDay matching (Sun=0..Sat=6)
  */
 function weekdayMatchesRule(date: Date, rule: any): boolean {
-    const jsDay = date.getDay(); // Sun=0..Sat=6
+    const jsDay = date.getDay();
 
     const raw =
         rule?.weekday ??
@@ -48,12 +48,8 @@ function weekdayMatchesRule(date: Date, rule: any): boolean {
 
     const n = Number(raw);
 
-    // Strict numeric: 0..6 only
-    if (Number.isFinite(n) && n >= 0 && n <= 6) {
-        return n === jsDay;
-    }
+    if (Number.isFinite(n) && n >= 0 && n <= 6) return n === jsDay;
 
-    // String forms
     const s = String(raw ?? "").trim().toUpperCase();
     const mapJS: Record<string, number> = {
         SUN: 0,
@@ -102,12 +98,10 @@ function clinicianLabel(c: any) {
     return Number.isFinite(id) ? `Clinician ${id}` : "Clinician";
 }
 
-// Your codes: GF_DAY should count as OO expected
 function classifyActivity(activityCodeRaw: any): "OO" | "CLO" | null {
     const a = String(activityCodeRaw ?? "").trim().toUpperCase();
     if (!a) return null;
 
-    // Not expected in clinic (per your rules)
     const notWorking = new Set([
         "D/O",
         "DO",
@@ -126,10 +120,8 @@ function classifyActivity(activityCodeRaw: any): "OO" | "CLO" | null {
     ]);
     if (notWorking.has(a)) return null;
 
-    // CLO bucket
     if (a === "CL" || a.startsWith("CL_") || a.includes("CLO")) return "CLO";
 
-    // Otherwise expected in clinic (OO)
     return "OO";
 }
 
@@ -140,7 +132,6 @@ function bestRuleForClinician(
 ): DayRuleLike | null {
     const mine = (rulesForDay ?? []).filter((r) => Number(r?.clinician_id) === cid);
 
-    // prefer W1/W2 over EVERY
     const exact = mine.find(
         (r) => String(r?.pattern_code ?? "").trim().toUpperCase() === weekPattern
     );
@@ -152,6 +143,40 @@ function bestRuleForClinician(
     });
 
     return every ?? null;
+}
+
+function StatusDot({ status }: { status: "ok" | "warning" | "critical" }) {
+    if (status === "critical") {
+        return (
+            <span className="relative flex h-3 w-3">
+        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
+        <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500" />
+      </span>
+        );
+    }
+
+    if (status === "warning") {
+        return (
+            <span className="relative flex h-3 w-3">
+        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-orange-400 opacity-60" />
+        <span className="relative inline-flex rounded-full h-3 w-3 bg-orange-600" />
+      </span>
+        );
+    }
+
+    return (
+        <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-emerald-600">
+      <svg viewBox="0 0 20 20" fill="none" className="h-4 w-4">
+        <path
+            d="M16.25 5.75L8.5 13.5L3.75 8.75"
+            stroke="white"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+        />
+      </svg>
+    </span>
+    );
 }
 
 export default function DayExpectedSidebar({
@@ -174,7 +199,7 @@ export default function DayExpectedSidebar({
         !Number.isFinite(date.getTime()) ||
         !Number.isFinite(trainingStart.getTime())
     ) {
-        console.log("[ExpectedSidebar] invalid date inputs", {
+        console.log("[DayExpectedSidebar] invalid date inputs", {
             dateISO,
             trainingStartISO,
         });
@@ -182,11 +207,9 @@ export default function DayExpectedSidebar({
     }
 
     const weekPattern = getWeekPattern(date, trainingStart);
-
-    // Assigned clinician ids for THIS day (any session in rooms array)
     const assignedClinicianIds = extractAssignedClinicianIds(rooms);
 
-    // Rules for the selected day + week pattern
+    // Rules for selected weekday + pattern/EVERY
     const rulesForSelectedWeekday = (dayRules ?? []).filter((r) =>
         weekdayMatchesRule(date, r)
     );
@@ -194,26 +217,24 @@ export default function DayExpectedSidebar({
         ruleAppliesPattern(r, weekPattern)
     );
 
-    // Build expected IDs (OO / CLO) from rules
-    const expectedOOIds = new Set<number>();
-    const expectedCLOIds = new Set<number>();
+    // Build "remaining" (exclude assigned clinicians entirely)
+    const remainingOOIds = new Set<number>();
+    const remainingCLOIds = new Set<number>();
 
     for (const c of clinicians as any[]) {
         const cid = clinicianIdOf(c);
         if (!Number.isFinite(cid) || cid <= 0) continue;
 
-        // If already assigned, we DO NOT show them in the sidebar at all
         if (assignedClinicianIds.has(cid)) continue;
 
         const rule = bestRuleForClinician(cid, rulesForThisDay, weekPattern);
         const bucket = classifyActivity(rule?.activity_code);
 
-        if (bucket === "OO") expectedOOIds.add(cid);
-        if (bucket === "CLO") expectedCLOIds.add(cid);
+        if (bucket === "OO") remainingOOIds.add(cid);
+        if (bucket === "CLO") remainingCLOIds.add(cid);
     }
 
-    // Map ids to clinician objects (fallback to ID label)
-    const expectedOO = Array.from(expectedOOIds).map((id) => {
+    const remainingOO = Array.from(remainingOOIds).map((id) => {
         return (
             findClinician(clinicians as any[], id) ?? {
                 id,
@@ -222,7 +243,7 @@ export default function DayExpectedSidebar({
         );
     });
 
-    const expectedCLO = Array.from(expectedCLOIds).map((id) => {
+    const remainingCLO = Array.from(remainingCLOIds).map((id) => {
         return (
             findClinician(clinicians as any[], id) ?? {
                 id,
@@ -231,83 +252,119 @@ export default function DayExpectedSidebar({
         );
     });
 
-    const expectedTotal = expectedOO.length + expectedCLO.length;
+    const remainingTotal = remainingOO.length + remainingCLO.length;
+
+    const status: "ok" | "warning" | "critical" =
+        remainingTotal === 0 ? "ok" : remainingTotal <= 2 ? "warning" : "critical";
+
+    const cardClass =
+        status === "critical"
+            ? "bg-red-50 border-red-200"
+            : status === "warning"
+                ? "bg-orange-50 border-orange-200"
+                : "bg-emerald-50 border-emerald-200";
+
+    const countClass =
+        status === "critical"
+            ? "text-red-600"
+            : status === "warning"
+                ? "text-orange-700"
+                : "text-emerald-600";
+
+    const subtitle =
+        status === "ok"
+            ? "All expected clinicians are assigned."
+            : status === "warning"
+                ? "A small number of expected clinicians remain unassigned."
+                : "Expected clinicians remain unassigned for today.";
 
     return (
-        <div className="w-full rounded-2xl border p-5 shadow-sm bg-white border-slate-200">
-            <div className="flex items-center justify-between mb-3">
-                <div className="text-xs font-semibold tracking-wide text-slate-500 uppercase">
-                    Expected Clinicians
+        <div className={`rounded-2xl border shadow-sm p-6 transition-all ${cardClass}`}>
+            <div className="text-xs font-semibold tracking-wide uppercase text-slate-600">
+                Expected Clinicians Remaining
+            </div>
+
+            <div className="mt-3 flex items-center gap-3">
+                <div className={`text-4xl font-bold leading-none ${countClass}`}>
+                    {remainingTotal}
                 </div>
+                <StatusDot status={status} />
             </div>
 
-            <div className="text-xs text-slate-500 mb-4">
-                Week pattern:{" "}
-                <span className="font-semibold text-slate-700">{weekPattern}</span>
-                {expectedTotal > 0 ? (
-                    <>
-                        {" "}
-                        •{" "}
-                        <span className="text-slate-700 font-semibold">
-              {expectedTotal} remaining
-            </span>
-                    </>
-                ) : (
-                    <>
-                        {" "}
-                        •{" "}
-                        <span className="text-slate-700 font-semibold">None remaining</span>
-                    </>
-                )}
+            <div className="mt-3 text-sm text-slate-700">
+                {subtitle}{" "}
+                <span className="text-slate-500">
+          (Pattern: <span className="font-semibold text-slate-700">{weekPattern}</span>)
+        </span>
             </div>
 
-            <div className="space-y-4">
-                <div>
-                    <div className="text-xs font-semibold text-slate-600 mb-1">ST</div>
-
-                    {expectedOO.length === 0 ? (
-                        <div className="text-sm text-slate-400">None remaining</div>
-                    ) : (
-                        <div className="space-y-1">
-                            {expectedOO.map((c: any) => {
-                                const id = clinicianIdOf(c);
-                                return (
-                                    <div
-                                        key={`oo-${id}`}
-                                        className="flex items-center gap-2 text-sm text-slate-800"
-                                    >
-                                        <span className="text-slate-400">•</span>
-                                        <span>{clinicianLabel(c)}</span>
-                                    </div>
-                                );
-                            })}
+            {remainingTotal > 0 && (
+                <div className="mt-5 space-y-4">
+                    {/* OO LIST */}
+                    <div className="rounded-xl border bg-white px-4 py-3">
+                        <div className="flex items-center justify-between">
+                            <div className="text-sm font-semibold text-slate-900">OO</div>
+                            <div
+                                className={`text-xs font-semibold rounded-full px-2 py-0.5 ${
+                                    remainingOO.length > 0
+                                        ? "text-red-700 bg-red-100"
+                                        : "text-emerald-700 bg-emerald-100"
+                                }`}
+                            >
+                                {remainingOO.length > 0 ? "Remaining" : "Complete"}
+                            </div>
                         </div>
-                    )}
-                </div>
 
-                <div>
-                    <div className="text-xs font-semibold text-slate-600 mb-1">CL</div>
+                        {remainingOO.length === 0 ? (
+                            <div className="mt-2 text-xs text-slate-500">None remaining</div>
+                        ) : (
+                            <div className="mt-3 space-y-2">
+                                {remainingOO.map((c: any) => {
+                                    const id = clinicianIdOf(c);
+                                    return (
+                                        <div key={`oo-${id}`} className="flex items-center gap-2 text-sm text-slate-800">
+                                            <span className="text-slate-400">•</span>
+                                            <span className="min-w-0 truncate">{clinicianLabel(c)}</span>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        )}
+                    </div>
 
-                    {expectedCLO.length === 0 ? (
-                        <div className="text-sm text-slate-400">None remaining</div>
-                    ) : (
-                        <div className="space-y-1">
-                            {expectedCLO.map((c: any) => {
-                                const id = clinicianIdOf(c);
-                                return (
-                                    <div
-                                        key={`clo-${id}`}
-                                        className="flex items-center gap-2 text-sm text-slate-800"
-                                    >
-                                        <span className="text-slate-400">•</span>
-                                        <span>{clinicianLabel(c)}</span>
-                                    </div>
-                                );
-                            })}
+                    {/* CLO LIST */}
+                    <div className="rounded-xl border bg-white px-4 py-3">
+                        <div className="flex items-center justify-between">
+                            <div className="text-sm font-semibold text-slate-900">CLO</div>
+                            <div
+                                className={`text-xs font-semibold rounded-full px-2 py-0.5 ${
+                                    remainingCLO.length > 0
+                                        ? "text-red-700 bg-red-100"
+                                        : "text-emerald-700 bg-emerald-100"
+                                }`}
+                            >
+                                {remainingCLO.length > 0 ? "Remaining" : "Complete"}
+                            </div>
                         </div>
-                    )}
+
+                        {remainingCLO.length === 0 ? (
+                            <div className="mt-2 text-xs text-slate-500">None remaining</div>
+                        ) : (
+                            <div className="mt-3 space-y-2">
+                                {remainingCLO.map((c: any) => {
+                                    const id = clinicianIdOf(c);
+                                    return (
+                                        <div key={`clo-${id}`} className="flex items-center gap-2 text-sm text-slate-800">
+                                            <span className="text-slate-400">•</span>
+                                            <span className="min-w-0 truncate">{clinicianLabel(c)}</span>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        )}
+                    </div>
                 </div>
-            </div>
+            )}
         </div>
     );
 }
