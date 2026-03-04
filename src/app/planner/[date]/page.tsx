@@ -4,6 +4,7 @@ import Link from "next/link";
 
 import DayRoomsClient from "@/app/planner/[date]/DayRoomsClient";
 import type { DayRoom } from "@/app/planner/[date]/types";
+import DayExpectedSidebar from "@/app/planner/components/DayExpectedSidebar";
 
 type DayApiResponse = {
     rooms: DayRoom[];
@@ -55,11 +56,7 @@ function normalizeTotals(raw: any) {
 
         // ✅ SINGLE SOURCE OF TRUTH: use API-computed `value`
         // (this is derived from clinician_capacity join in /api/planner)
-        const rawVal =
-            s.value ??
-            s.session_value ??
-            s.clinic_value ??
-            0;
+        const rawVal = s.value ?? s.session_value ?? s.clinic_value ?? 0;
 
         const v = typeof rawVal === "number" ? rawVal : parseFloat(String(rawVal));
         if (!Number.isFinite(v)) continue;
@@ -99,19 +96,26 @@ export default async function PlannerDayPage({
     if (!dayRes.ok) return notFound();
     const dayData: DayApiResponse = await dayRes.json();
 
-    // ✅ B) Month-view endpoint for totals (single-day range)
+    // ✅ B) Month-view endpoint for totals (single-day range) + dayRules
     let totals = { totalStValue: 0, totalClValue: 0 };
+    let dayRules: any[] = [];
+
     try {
         const totalsRes = await fetch(
             `${protocol}://${host}/planner/api/planner?from=${date}&to=${date}`,
             { cache: "no-store" }
         );
+
         if (totalsRes.ok) {
             const rawTotals: PlannerTotalsLikeResponse = await totalsRes.json();
             totals = normalizeTotals(rawTotals);
+
+            const root = (rawTotals as any)?.data ?? rawTotals ?? {};
+            dayRules = Array.isArray(root?.dayRules) ? root.dayRules : [];
         }
     } catch {
         totals = { totalStValue: 0, totalClValue: 0 };
+        dayRules = [];
     }
 
     // clinicians list for the modal dropdown
@@ -125,6 +129,9 @@ export default async function PlannerDayPage({
     const dayName = displayDate.toLocaleDateString("en-GB", { weekday: "long" });
 
     const backHref = monthParam ? `/planner?m=${monthParam}` : "/planner";
+
+    // IMPORTANT: set this to your rota’s Week A anchor date (same one used everywhere else)
+    const trainingStart = new Date("2026-01-05T00:00:00");
 
     return (
         <div className="min-h-screen bg-gray-50 p-8">
@@ -147,7 +154,9 @@ export default async function PlannerDayPage({
                 {/* Stats */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                     <div className="bg-white rounded-lg border p-6 shadow-sm">
-                        <div className="text-base font-medium text-gray-700 tracking-tight">Rooms Used</div>
+                        <div className="text-base font-medium text-gray-700 tracking-tight">
+                            Rooms Used
+                        </div>
                         <div className="text-3xl font-bold">{dayData.stats.roomsUsed}</div>
                     </div>
 
@@ -155,14 +164,18 @@ export default async function PlannerDayPage({
                     <div className="bg-white rounded-lg border shadow-sm overflow-hidden">
                         <div className="grid grid-cols-2">
                             <div className="p-6">
-                                <div className="text-base font-medium text-gray-700 tracking-tight">Total ST</div>
+                                <div className="text-base font-medium text-gray-700 tracking-tight">
+                                    Total ST
+                                </div>
                                 <div className="text-3xl font-bold text-gray-900">
                                     {totals.totalStValue.toFixed(2)}
                                 </div>
                             </div>
 
                             <div className="p-6 border-l">
-                                <div className="text-base font-medium text-gray-700 tracking-tight">Total CL</div>
+                                <div className="text-base font-medium text-gray-700 tracking-tight">
+                                    Total CL
+                                </div>
                                 <div className="text-3xl font-bold text-gray-900">
                                     {totals.totalClValue.toFixed(2)}
                                 </div>
@@ -171,7 +184,9 @@ export default async function PlannerDayPage({
                     </div>
 
                     <div className="bg-white rounded-lg border p-6 shadow-sm">
-                        <div className="text-base font-medium text-gray-700 tracking-tight">Available Rooms</div>
+                        <div className="text-base font-medium text-gray-700 tracking-tight">
+                            Available Rooms
+                        </div>
                         <div className="text-3xl font-bold">
                             {dayData.rooms.length - dayData.stats.roomsUsed}
                         </div>
@@ -180,7 +195,23 @@ export default async function PlannerDayPage({
 
                 <section>
                     <h2 className="text-xl font-semibold mb-4">Room Overview</h2>
-                    <DayRoomsClient initialRooms={dayData.rooms} date={date} clinicians={clinicianList} />
+
+                    <div className="flex gap-6">
+                        <div className="flex-1">
+                            <DayRoomsClient
+                                initialRooms={dayData.rooms}
+                                date={date}
+                                clinicians={clinicianList}
+                            />
+                        </div>
+
+                        <DayExpectedSidebar
+                            date={displayDate}
+                            clinicians={clinicianList}
+                            dayRules={dayRules}
+                            trainingStart={trainingStart}
+                        />
+                    </div>
                 </section>
             </div>
         </div>
