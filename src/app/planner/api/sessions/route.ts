@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { createSession } from "@/app/planner/services/plannerService";
+import {getWeekPatternFromYmd, patternToLabel} from "@/lib/WeekPattern";
 
 type Pattern = "W1" | "W2";
 
@@ -10,25 +11,6 @@ function parseYMDToLocalDate(ymd: string) {
     const m = Number(ymd.slice(5, 7));
     const d = Number(ymd.slice(8, 10));
     return new Date(y, m - 1, d);
-}
-
-/** ISO week number (Mon-start, week 1 contains Jan 4). */
-function getISOWeekNumber(date: Date) {
-    // Convert to UTC to avoid DST issues
-    const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
-    // ISO: Monday=1..Sunday=7
-    const dayNum = d.getUTCDay() || 7;
-    // Set to Thursday of this week
-    d.setUTCDate(d.getUTCDate() + 4 - dayNum);
-    const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
-    const weekNo = Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
-    return weekNo;
-}
-
-function patternForDate(ymd: string): Pattern {
-    const d = parseYMDToLocalDate(ymd);
-    const week = getISOWeekNumber(d);
-    return week % 2 === 1 ? "W1" : "W2";
 }
 
 function weekdayForDate(ymd: string): number {
@@ -55,7 +37,7 @@ async function assertClinicianAvailableOrThrow(params: {
     // If clinician_id not set, nothing to enforce
     if (!Number.isFinite(clinician_id)) return;
 
-    const pattern = patternForDate(session_date);
+    const pattern = getWeekPatternFromYmd(session_date);
     const weekday = weekdayForDate(session_date);
 
     // Prefer pattern-specific rule, fallback to EVERY
@@ -100,7 +82,7 @@ async function assertClinicianAvailableOrThrow(params: {
 
     if (unavailable) {
         const dayName = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"][weekday];
-        const patLabel = pattern === "W1" ? "Week A" : "Week B";
+        const patLabel = patternToLabel(pattern);
 
         const err: any = new Error(
             `Clinician is marked as Day Off or is unavailable on ${dayName} (${session_date}) for ${patLabel}.`

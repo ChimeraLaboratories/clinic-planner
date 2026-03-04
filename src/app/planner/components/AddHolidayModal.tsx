@@ -158,7 +158,7 @@ export default function AddHolidayModal({
         setHolidayBusy(true);
 
         try {
-            const res = await fetch(`/api/clinicians/${clinicianId}/holidays`, {
+            const res = await fetch(`/planner/api/clinicians/${clinicianId}/holidays`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ date: holidayDate, note: holidayNote || null }),
@@ -215,7 +215,7 @@ export default function AddHolidayModal({
 
         try {
             const res = await fetch(
-                `/api/clinicians/${clinicianId}/holidays?date=${encodeURIComponent(holidayDate)}`,
+                `/planner/api/clinicians/${clinicianId}/holidays?date=${encodeURIComponent(holidayDate)}`,
                 { method: "DELETE" }
             );
 

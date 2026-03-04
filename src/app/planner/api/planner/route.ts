@@ -16,11 +16,22 @@ export type SupervisionByDateRow = {
     supervisorsInStore: string;
 };
 
+export type HolidayRow = {
+    id: number;
+    clinician_id: number;
+    clinician_name: string;
+    date_from: string; // YYYY-MM-DD
+    date_to: string | null; // YYYY-MM-DD | null
+    type: string | null;
+    note: string | null;
+};
+
 export type PlannerResponse = {
     rooms: any[];
     clinicians: any[];
     sessions: any[];
     supervisionByDate: any[];
+    holidays: HolidayRow[];
     stats: {
         totalStValue: number;
         totalClValue: number;
@@ -44,6 +55,44 @@ function getClinicCode(s: any): string {
         .toUpperCase();
 }
 
+/**
+ * clinician_holiday column detection:
+ * We don't assume your exact schema. We'll detect the best match for start/end/type/note.
+ * This avoids "Unknown column" errors when your table uses start_date/end_date/date/etc.
+ */
+async function detectHolidayColumns(): Promise<{
+    startCol: string | null;
+    endCol: string | null; // nullable means single-day holidays
+    typeCol: string | null;
+    noteCol: string | null;
+}> {
+    const [cols] = await db.query<RowDataPacket[]>(
+        `
+      SELECT COLUMN_NAME
+      FROM information_schema.COLUMNS
+      WHERE TABLE_SCHEMA = DATABASE()
+        AND TABLE_NAME = 'clinician_holiday'
+    `
+    );
+
+    const lower = new Set(
+        (cols as any[]).map((r) => String(r.COLUMN_NAME ?? "").trim().toLowerCase()).filter(Boolean)
+    );
+
+    const pick = (candidates: string[]) => candidates.find((c) => lower.has(c)) ?? null;
+
+    // Common patterns seen in holiday tables
+    const startCol =
+        pick(["date_from", "start_date", "from_date", "holiday_date", "date", "start", "from"]) ?? null;
+
+    const endCol = pick(["date_to", "end_date", "to_date", "end", "to"]) ?? null;
+
+    const typeCol = pick(["type", "holiday_type", "reason", "category"]) ?? null;
+    const noteCol = pick(["note", "notes", "comment", "comments", "description"]) ?? null;
+
+    return { startCol, endCol, typeCol, noteCol };
+}
+
 export async function GET(req: Request) {
     try {
         const { searchParams } = new URL(req.url);
@@ -58,9 +107,10 @@ export async function GET(req: Request) {
                     clinicians: [],
                     sessions: [],
                     supervisionByDate: [],
+                    holidays: [],
                     stats: { totalStValue: 0, totalClValue: 0 },
                     dayRules: [],
-                },
+                } satisfies PlannerResponse & { error: string },
                 { status: 400 }
             );
         }
@@ -71,65 +121,121 @@ export async function GET(req: Request) {
 
         const [clinicians] = await db.query<RowDataPacket[]>(
             `SELECT id, display_name, full_name, role_code, grade_code, is_supervisor, is_active
-             FROM clinicians
-             WHERE is_active=1`
+       FROM clinicians
+       WHERE is_active=1`
         );
 
         // ✅ include stable day_key for all consumers
         const [sessions] = await db.query<RowDataPacket[]>(
             `
-                SELECT
-                    s.*,
-                    DATE_FORMAT(s.session_date, '%Y-%m-%d') AS day_key,
-                    CASE
-                        WHEN UPPER(s.session_type) LIKE 'ST%' THEN COALESCE(cc.st_value, 0)
-                        WHEN UPPER(s.session_type) LIKE 'CL%' THEN COALESCE(cc.cl_value, 0)
-                        ELSE 0
-                        END AS value
-                FROM sessions s
-                    LEFT JOIN clinician_capacity cc
-                ON cc.clinician_id = s.clinician_id
-                    AND cc.effective_from <= DATE(s.session_date)
-                    AND (cc.effective_to IS NULL OR cc.effective_to >= DATE(s.session_date))
-                WHERE s.session_date >= ?
-                  AND s.session_date < DATE_ADD(?, INTERVAL 1 DAY)
-                ORDER BY s.session_date, s.room_id, s.slot
-            `,
+        SELECT
+          s.*,
+          DATE_FORMAT(s.session_date, '%Y-%m-%d') AS day_key,
+          CASE
+            WHEN UPPER(s.session_type) LIKE 'ST%' THEN COALESCE(cc.st_value, 0)
+            WHEN UPPER(s.session_type) LIKE 'CL%' THEN COALESCE(cc.cl_value, 0)
+            ELSE 0
+          END AS value
+        FROM sessions s
+        LEFT JOIN clinician_capacity cc
+          ON cc.clinician_id = s.clinician_id
+         AND cc.effective_from <= DATE(s.session_date)
+         AND (cc.effective_to IS NULL OR cc.effective_to >= DATE(s.session_date))
+        WHERE s.session_date >= ?
+          AND s.session_date < DATE_ADD(?, INTERVAL 1 DAY)
+        ORDER BY s.session_date, s.room_id, s.slot
+      `,
             [from, to]
         );
 
         const [inStoreRows] = await db.query<RowDataPacket[]>(
             `
-                SELECT in_store_date AS date, clinician_id
-                FROM supervisor_in_store
-                WHERE in_store_date BETWEEN ? AND ?
-            `,
+        SELECT in_store_date AS date, clinician_id
+        FROM supervisor_in_store
+        WHERE in_store_date BETWEEN ? AND ?
+      `,
             [from, to]
         );
 
         const [dayRules] = await db.query<RowDataPacket[]>(
             `
-                SELECT clinician_id, weekday, pattern_code, activity_code, start_time, end_time,
-                       effective_from, effective_to, note, is_active, is_available_shift
-                FROM clinician_day_rule
-                WHERE is_active = 1
-                  AND effective_from <= ?
-                  AND (effective_to IS NULL OR effective_to >= ?)
-            `,
+        SELECT clinician_id, weekday, pattern_code, activity_code, start_time, end_time,
+               effective_from, effective_to, note, is_active, is_available_shift
+        FROM clinician_day_rule
+        WHERE is_active = 1
+          AND effective_from <= ?
+          AND (effective_to IS NULL OR effective_to >= ?)
+      `,
             [to, from]
         );
 
+        // ==========================================
+        // 3) Holidays (overlapping range) — clinician_holiday (adaptive)
+        // ==========================================
+        let holidays: HolidayRow[] = [];
+
+        const { startCol, endCol, typeCol, noteCol } = await detectHolidayColumns();
+
+        if (!startCol) {
+            // Fail gracefully: no start date column detected → return [] rather than 500.
+            console.warn(
+                "[/api/planner] clinician_holiday: could not detect a start date column. Please check schema."
+            );
+            holidays = [];
+        } else {
+            const startExpr = `h.\`${startCol}\``;
+            const endExpr = endCol ? `h.\`${endCol}\`` : `h.\`${startCol}\``;
+
+            const selectType = typeCol ? `h.\`${typeCol}\` AS type` : `NULL AS type`;
+            const selectNote = noteCol ? `h.\`${noteCol}\` AS note` : `NULL AS note`;
+
+            const [holidayRows] = await db.query<RowDataPacket[]>(
+                `
+          SELECT
+            h.id,
+            h.clinician_id,
+            COALESCE(
+              NULLIF(TRIM(c.full_name), ''),
+              NULLIF(TRIM(c.display_name), ''),
+              CONCAT('#', c.id)
+            ) AS clinician_name,
+            DATE_FORMAT(${startExpr}, '%Y-%m-%d') AS date_from,
+            CASE WHEN ${endExpr} IS NULL THEN NULL ELSE DATE_FORMAT(${endExpr}, '%Y-%m-%d') END AS date_to,
+            ${selectType},
+            ${selectNote}
+          FROM clinician_holiday h
+          LEFT JOIN clinicians c ON c.id = h.clinician_id
+          -- overlap: holiday touches [from..to]
+          WHERE DATE(${startExpr}) <= DATE(?)
+            AND DATE(${endExpr}) >= DATE(?)
+          ORDER BY DATE(${startExpr}), clinician_name
+        `,
+                [to, from]
+            );
+
+            holidays = (holidayRows as any[]).map((r) => ({
+                id: Number(r.id),
+                clinician_id: Number(r.clinician_id),
+                clinician_name: String(r.clinician_name ?? "").trim(),
+                date_from: safeYmd(r.date_from),
+                date_to: r.date_to ? safeYmd(r.date_to) : null,
+                type: r.type == null ? null : String(r.type),
+                note: r.note == null ? null : String(r.note),
+            }));
+        }
+
+        // Build clinician lookup for supervision naming
         const clinicianById = new Map<number, any>();
         for (const c of clinicians as any[]) clinicianById.set(Number(c.id), c);
 
         const isRegisteredOoSupervisor = (c: any) =>
-            Number(c.role_code) === 1 &&
-            Number(c.grade_code) === 1 &&
-            Number(c.is_supervisor) === 1;
+            Number(c.role_code) === 1 && Number(c.grade_code) === 1 && Number(c.is_supervisor) === 1;
 
-// 1) Compute ST / CL totals (MUST match MonthGrid/DayCell)
-// - exclude CANCELLED
-// - use ONLY the API-computed `value` column from the SQL query
+        // ==========================================
+        // 1) Compute ST / CL totals (MUST match MonthGrid/DayCell)
+        // - exclude CANCELLED
+        // - use ONLY the API-computed `value`
+        // ==========================================
         let totalStValue = 0;
         let totalClValue = 0;
 
@@ -238,6 +344,7 @@ export async function GET(req: Request) {
             clinicians,
             sessions,
             supervisionByDate,
+            holidays,
             stats: { totalStValue, totalClValue },
             dayRules,
         } satisfies PlannerResponse);
@@ -251,9 +358,10 @@ export async function GET(req: Request) {
                 clinicians: [],
                 sessions: [],
                 supervisionByDate: [],
+                holidays: [],
                 stats: { totalStValue: 0, totalClValue: 0 },
                 dayRules: [],
-            },
+            } satisfies PlannerResponse & { error: string },
             { status: 500 }
         );
     }

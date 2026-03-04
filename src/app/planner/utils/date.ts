@@ -56,30 +56,6 @@ function isoWeekStart(d: Date) {
     return date;
 }
 
-export function getISOWeekNumber(d: Date) {
-    // Based on ISO-8601 rules
-    const date = new Date(d);
-    date.setHours(0, 0, 0, 0);
-
-    // Thursday determines ISO year/week
-    const day = date.getDay();
-    const thursdayOffset = (day === 0 ? -3 : 4) - day;
-    date.setDate(date.getDate() + thursdayOffset);
-
-    const isoYear = date.getFullYear();
-    const jan4 = new Date(isoYear, 0, 4);
-    const week1Start = isoWeekStart(jan4);
-
-    const diffMs = date.getTime() - week1Start.getTime();
-    const diffDays = Math.floor(diffMs / 86400000);
-
-    return 1 + Math.floor(diffDays / 7);
-}
-
-export function isOddISOWeek(d: Date) {
-    return getISOWeekNumber(d) % 2 === 1;
-}
-
 export type WeekPattern = "ALL" | "ODD" | "EVEN";
 
 /**

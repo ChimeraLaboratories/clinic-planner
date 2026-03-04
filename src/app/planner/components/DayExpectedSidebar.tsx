@@ -2,6 +2,7 @@
 
 import type { Clinician } from "../types/planner";
 import { parseYmdLocal } from "@/app/planner/utils/date";
+import { getWeekPatternFromYmd } from "@/lib/WeekPattern";
 
 type DayRuleLike = {
     clinician_id: number | string;
@@ -15,12 +16,6 @@ type HolidayLike = {
     clinician_id: number | string;
     date: string; // "YYYY-MM-DD"
 };
-
-function getWeekPattern(date: Date, trainingStart: Date) {
-    const diffDays = (date.getTime() - trainingStart.getTime()) / (1000 * 60 * 60 * 24);
-    const weekIndex = Math.floor(diffDays / 7);
-    return weekIndex % 2 === 0 ? "W1" : "W2";
-}
 
 function ruleAppliesPattern(rule: DayRuleLike, weekPattern: string) {
     const p = String(rule?.pattern_code ?? "EVERY").trim().toUpperCase();
@@ -187,35 +182,27 @@ export default function DayExpectedSidebar({
                                                dateISO,
                                                clinicians,
                                                dayRules,
-                                               trainingStartISO,
                                                rooms,
-                                               holidays, // ✅ NEW
+                                               holidays,
                                            }: {
     dateISO: string;
     clinicians: Clinician[];
     dayRules: DayRuleLike[];
-    trainingStartISO: string;
     rooms: any[];
-    holidays?: HolidayLike[]; // ✅ NEW
+    holidays?: HolidayLike[];
 }) {
     const date = parseYmdLocal(dateISO);
-    const trainingStart = parseYmdLocal(trainingStartISO);
 
-    if (!Number.isFinite(date.getTime()) || !Number.isFinite(trainingStart.getTime())) {
-        console.log("[DayExpectedSidebar] invalid date inputs", { dateISO, trainingStartISO });
+    if (!Number.isFinite(date.getTime())) {
+        console.log("[DayExpectedSidebar] invalid date input", { dateISO });
         return null;
     }
 
-    const weekPattern = getWeekPattern(date, trainingStart);
+    // ✅ SINGLE SOURCE OF TRUTH
+    const weekPattern = getWeekPatternFromYmd(String(dateISO).slice(0, 10));
 
     const assignedClinicianIds = extractAssignedClinicianIds(rooms);
     const holidayClinicianIds = holidayIdsForDate(holidays, dateISO);
-
-    console.log("[ExpectedSidebar] holiday match", {
-        dateISO: String(dateISO).slice(0, 10),
-        holidaysCount: (holidays ?? []).length,
-        holidayIds: Array.from(holidayClinicianIds),
-    });
 
     // Rules for selected weekday + pattern/EVERY
     const rulesForSelectedWeekday = (dayRules ?? []).filter((r) => weekdayMatchesRule(date, r));
@@ -263,11 +250,7 @@ export default function DayExpectedSidebar({
                 : "bg-emerald-50 border-emerald-200";
 
     const countClass =
-        status === "critical"
-            ? "text-red-600"
-            : status === "warning"
-                ? "text-orange-700"
-                : "text-emerald-600";
+        status === "critical" ? "text-red-600" : status === "warning" ? "text-orange-700" : "text-emerald-600";
 
     const subtitle =
         status === "ok"
