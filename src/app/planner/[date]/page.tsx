@@ -135,84 +135,89 @@ export default async function PlannerDayPage({
 
     return (
         <div className="min-h-screen bg-gray-50 p-8">
-            <div className="max-w-6xl mx-auto space-y-8">
-                {/* Header */}
-                <div className="flex items-center justify-between">
-                    <div>
-                        <h1 className="text-3xl font-bold text-gray-900">{dayName}</h1>
-                        <p className="text-gray-500">{displayDate.toLocaleDateString("en-GB")}</p>
-                    </div>
-
-                    <Link
-                        href={backHref}
-                        className="inline-flex items-center px-3 py-2 text-sm rounded border hover:bg-gray-50"
-                    >
-                        ← Back to Planner
-                    </Link>
+            {/* ✅ Month-view style shell: sidebar flush left, main content to the right */}
+            <div className="flex gap-8 items-start">
+                {/* Left sidebar (flush to page padding edge) */}
+                <div className="w-[320px] flex-shrink-0 sticky top-8 h-fit">
+                    <DayExpectedSidebar
+                        date={displayDate}
+                        clinicians={clinicianList}
+                        dayRules={dayRules}
+                        trainingStart={trainingStart}
+                        rooms={dayData.rooms}
+                    />
                 </div>
 
-                {/* Stats */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    <div className="bg-white rounded-lg border p-6 shadow-sm">
-                        <div className="text-base font-medium text-gray-700 tracking-tight">
-                            Rooms Used
+                {/* Main content (keep your existing centered width) */}
+                <div className="flex-1 max-w-6xl space-y-8">
+                    {/* Header */}
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <h1 className="text-3xl font-bold text-gray-900">{dayName}</h1>
+                            <p className="text-gray-500">
+                                {displayDate.toLocaleDateString("en-GB")}
+                            </p>
                         </div>
-                        <div className="text-3xl font-bold">{dayData.stats.roomsUsed}</div>
+
+                        <Link
+                            href={backHref}
+                            className="inline-flex items-center px-3 py-2 text-sm rounded border hover:bg-gray-50"
+                        >
+                            ← Back to Planner
+                        </Link>
                     </div>
 
-                    {/* Split cell: Total ST / Total CL Value */}
-                    <div className="bg-white rounded-lg border shadow-sm overflow-hidden">
-                        <div className="grid grid-cols-2">
-                            <div className="p-6">
-                                <div className="text-base font-medium text-gray-700 tracking-tight">
-                                    Total ST
+                    {/* Stats */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <div className="bg-white rounded-lg border p-6 shadow-sm">
+                            <div className="text-base font-medium text-gray-700 tracking-tight">
+                                Rooms Used
+                            </div>
+                            <div className="text-3xl font-bold">{dayData.stats.roomsUsed}</div>
+                        </div>
+
+                        <div className="bg-white rounded-lg border shadow-sm overflow-hidden">
+                            <div className="grid grid-cols-2">
+                                <div className="p-6">
+                                    <div className="text-base font-medium text-gray-700 tracking-tight">
+                                        Total ST
+                                    </div>
+                                    <div className="text-3xl font-bold text-gray-900">
+                                        {totals.totalStValue.toFixed(2)}
+                                    </div>
                                 </div>
-                                <div className="text-3xl font-bold text-gray-900">
-                                    {totals.totalStValue.toFixed(2)}
+
+                                <div className="p-6 border-l">
+                                    <div className="text-base font-medium text-gray-700 tracking-tight">
+                                        Total CL
+                                    </div>
+                                    <div className="text-3xl font-bold text-gray-900">
+                                        {totals.totalClValue.toFixed(2)}
+                                    </div>
                                 </div>
                             </div>
+                        </div>
 
-                            <div className="p-6 border-l">
-                                <div className="text-base font-medium text-gray-700 tracking-tight">
-                                    Total CL
-                                </div>
-                                <div className="text-3xl font-bold text-gray-900">
-                                    {totals.totalClValue.toFixed(2)}
-                                </div>
+                        <div className="bg-white rounded-lg border p-6 shadow-sm">
+                            <div className="text-base font-medium text-gray-700 tracking-tight">
+                                Available Rooms
+                            </div>
+                            <div className="text-3xl font-bold">
+                                {dayData.rooms.length - dayData.stats.roomsUsed}
                             </div>
                         </div>
                     </div>
 
-                    <div className="bg-white rounded-lg border p-6 shadow-sm">
-                        <div className="text-base font-medium text-gray-700 tracking-tight">
-                            Available Rooms
-                        </div>
-                        <div className="text-3xl font-bold">
-                            {dayData.rooms.length - dayData.stats.roomsUsed}
-                        </div>
-                    </div>
-                </div>
+                    <section>
+                        <h2 className="text-xl font-semibold mb-4">Room Overview</h2>
 
-                <section>
-                    <h2 className="text-xl font-semibold mb-4">Room Overview</h2>
-
-                    <div className="flex gap-6">
-                        <div className="flex-1">
-                            <DayRoomsClient
-                                initialRooms={dayData.rooms}
-                                date={date}
-                                clinicians={clinicianList}
-                            />
-                        </div>
-
-                        <DayExpectedSidebar
-                            date={displayDate}
+                        <DayRoomsClient
+                            initialRooms={dayData.rooms}
+                            date={date}
                             clinicians={clinicianList}
-                            dayRules={dayRules}
-                            trainingStart={trainingStart}
                         />
-                    </div>
-                </section>
+                    </section>
+                </div>
             </div>
         </div>
     );

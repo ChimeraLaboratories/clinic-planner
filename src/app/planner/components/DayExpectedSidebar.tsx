@@ -2,94 +2,98 @@
 
 import type { Clinician } from "../types/planner";
 
-// Local shape based on /planner/api/planner dayRules payload
-type DayRuleLike = {
-    clinician_id: number | string;
-    weekday: number; // 0-6 (JS Date)
-    pattern_code?: "A" | "B" | "EVERY" | string | null;
-    activity_code?: "OO" | "CLO" | string | null;
-};
-
-function getWeekPattern(date: Date, trainingStart: Date) {
-    const diffDays = (date.getTime() - trainingStart.getTime()) / (1000 * 60 * 60 * 24);
-    const weekIndex = Math.floor(diffDays / 7);
-    return weekIndex % 2 === 0 ? "A" : "B";
-}
-
-function ruleApplies(rule: DayRuleLike, weekPattern: string) {
-    const p = String(rule.pattern_code ?? "EVERY").toUpperCase();
-    if (!p || p === "EVERY") return true;
-    return p === weekPattern;
-}
-
 export default function DayExpectedSidebar({
                                                date,
                                                clinicians,
                                                dayRules,
                                                trainingStart,
-                                           }: {
-    date: Date;
-    clinicians: Clinician[];
-    dayRules: DayRuleLike[];
-    trainingStart: Date;
-}) {
-    const weekday = date.getDay(); // 0-6
-    const weekPattern = getWeekPattern(date, trainingStart);
+                                               rooms,
+                                           }: any) {
 
-    const expected = (dayRules ?? []).filter(
-        (r) => Number(r.weekday) === weekday && ruleApplies(r, weekPattern)
+    const assignedClinicianIds = new Set(
+        rooms.flatMap((r: any) =>
+            (r.sessions ?? []).map((s: any) => s.clinician_id)
+        )
     );
 
-    const oo: string[] = [];
-    const clo: string[] = [];
+    const expectedOO: any[] = [];
+    const expectedCLO: any[] = [];
 
-    for (const rule of expected) {
-        const clinician = clinicians.find((c) => Number(c.id) === Number(rule.clinician_id));
+    for (const r of dayRules ?? []) {
+        const clinician = clinicians.find((c: any) => c.id === r.clinician_id);
         if (!clinician) continue;
 
-        const name = String(clinician.display_name ?? clinician.full_name ?? "").trim();
-        if (!name) continue;
-
-        const activity = String(rule.activity_code ?? "").toUpperCase();
-
-        if (activity === "OO") oo.push(name);
-        if (activity === "CLO") clo.push(name);
+        if (r.activity_code === "OO") expectedOO.push(clinician);
+        if (r.activity_code === "CLO") expectedCLO.push(clinician);
     }
 
+    const missingOO = expectedOO.filter(c => !assignedClinicianIds.has(c.id));
+    const missingCLO = expectedCLO.filter(c => !assignedClinicianIds.has(c.id));
+
+    const allAssigned = missingOO.length === 0 && missingCLO.length === 0;
+
     return (
-        <aside className="w-64 border-l bg-gray-50 p-4">
-            <div className="text-sm font-semibold text-gray-700 mb-1">Expected</div>
-            <div className="text-xs text-gray-500 mb-3">
-                Week pattern: <span className="font-semibold text-gray-700">{weekPattern}</span>
+        <div
+            className={`rounded-2xl border p-5 shadow-sm transition
+      ${
+                allAssigned
+                    ? "bg-green-50 border-green-200"
+                    : "bg-white border-slate-200"
+            }`}
+        >
+            <div className="flex items-center justify-between mb-3">
+                <div className="text-xs font-semibold tracking-wide text-slate-500 uppercase">
+                    Expected Clinicians
+                </div>
+
+                {allAssigned && (
+                    <div className="flex h-5 w-5 items-center justify-center rounded-full bg-emerald-600">
+                        <svg viewBox="0 0 20 20" fill="none" className="h-4 w-4">
+                            <path
+                                d="M16.25 5.75L8.5 13.5L3.75 8.75"
+                                stroke="white"
+                                strokeWidth="2.5"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                            />
+                        </svg>
+                    </div>
+                )}
             </div>
 
             <div className="space-y-4">
+
                 <div>
-                    <div className="text-xs font-semibold text-gray-500 mb-1">OO</div>
-                    {oo.length === 0 ? (
-                        <div className="text-sm text-gray-400">None expected</div>
+                    <div className="text-xs font-semibold text-slate-600 mb-1">OO</div>
+
+                    {expectedOO.length === 0 ? (
+                        <div className="text-sm text-slate-400">None expected</div>
                     ) : (
-                        oo.map((name) => (
-                            <div key={`oo-${name}`} className="text-sm text-gray-800">
-                                {name}
+                        expectedOO.map((c: any) => (
+                            <div key={c.id} className="text-sm">
+                                {assignedClinicianIds.has(c.id) ? "✓ " : "• "}
+                                {c.display_name}
                             </div>
                         ))
                     )}
                 </div>
 
                 <div>
-                    <div className="text-xs font-semibold text-gray-500 mb-1">CLO</div>
-                    {clo.length === 0 ? (
-                        <div className="text-sm text-gray-400">None expected</div>
+                    <div className="text-xs font-semibold text-slate-600 mb-1">CLO</div>
+
+                    {expectedCLO.length === 0 ? (
+                        <div className="text-sm text-slate-400">None expected</div>
                     ) : (
-                        clo.map((name) => (
-                            <div key={`clo-${name}`} className="text-sm text-gray-800">
-                                {name}
+                        expectedCLO.map((c: any) => (
+                            <div key={c.id} className="text-sm">
+                                {assignedClinicianIds.has(c.id) ? "✓ " : "• "}
+                                {c.display_name}
                             </div>
                         ))
                     )}
                 </div>
+
             </div>
-        </aside>
+        </div>
     );
 }
