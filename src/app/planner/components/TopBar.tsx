@@ -64,7 +64,7 @@ export default function TopBar({
 
     return (
         <header className="sticky top-0 z-40 w-full border-b border-slate-200 bg-white/80 backdrop-blur-md">
-            <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
+            <div className="relative flex max-w-full items-center justify-between px-6 py-4">
                 {/* LEFT — Logo + Brand */}
                 <div className="flex items-center gap-3">
                     <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-blue-600 to-indigo-600 shadow-md">
@@ -122,8 +122,8 @@ export default function TopBar({
                     </div>
                 </div>
 
-                {/* CENTER — Month Navigation */}
-                <div className="flex items-center gap-3">
+                {/* CENTER — Month Navigation (true centered) */}
+                <div className="absolute left-1/2 -translate-x-1/2 flex items-center gap-3">
                     <button
                         onClick={onPrevMonth}
                         className="h-9 w-9 rounded-lg border border-slate-200 bg-white text-slate-600 shadow-sm transition hover:bg-slate-50"
@@ -160,20 +160,22 @@ export default function TopBar({
                     </button>
                 </div>
 
-                {/* 🔄 Live Sync Indicator */}
-                {syncState && syncState !== "idle" && (
-                    <div
-                        className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold border ${
-                            syncState === "syncing"
-                                ? "bg-blue-50 text-blue-700 border-blue-200"
-                                : syncState === "synced"
-                                    ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-                                    : "bg-red-50 text-red-700 border-red-200"
-                        }`}
-                        title={
-                            lastSyncedAt ? `Last synced at ${formatLastSynced(lastSyncedAt)}` : undefined
-                        }
-                    >
+                {/* RIGHT — Sync + Actions */}
+                <div className="flex items-center gap-4">
+                    {/* 🔄 Live Sync Indicator */}
+                    {syncState && syncState !== "idle" && (
+                        <div
+                            className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold border ${
+                                syncState === "syncing"
+                                    ? "bg-blue-50 text-blue-700 border-blue-200"
+                                    : syncState === "synced"
+                                        ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                                        : "bg-red-50 text-red-700 border-red-200"
+                            }`}
+                            title={
+                                lastSyncedAt ? `Last synced at ${formatLastSynced(lastSyncedAt)}` : undefined
+                            }
+                        >
             <span
                 className={`h-2 w-2 rounded-full ${
                     syncState === "syncing"
@@ -183,16 +185,14 @@ export default function TopBar({
                             : "bg-red-600"
                 }`}
             />
-                        {syncState === "syncing"
-                            ? "Syncing…"
-                            : syncState === "synced"
-                                ? "Synced just now"
-                                : "Sync failed"}
-                    </div>
-                )}
+                            {syncState === "syncing"
+                                ? "Syncing…"
+                                : syncState === "synced"
+                                    ? "Synced just now"
+                                    : "Sync failed"}
+                        </div>
+                    )}
 
-                {/* RIGHT — Actions */}
-                <div className="flex items-center gap-4">
                     <Link
                         href="/planner/clinicians"
                         className="inline-flex items-center rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50"
@@ -211,9 +211,9 @@ export default function TopBar({
 
                     {/* 👤 User Dropdown */}
                     <div className="relative" ref={menuRef}>
-                        <button
-                            onClick={() => setMenuOpen((v) => !v)}
-                            className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50"
+                        <button disabled
+                                onClick={() => setMenuOpen((v) => !v)}
+                                className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50"
                         >
                             <div className="flex h-7 w-7 items-center justify-center rounded-full bg-blue-600 text-white text-xs font-semibold">
                                 CE
