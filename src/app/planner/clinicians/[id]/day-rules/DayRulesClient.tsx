@@ -74,7 +74,6 @@ const activityVisuals: Record<string, { row: string; badge: string; muted?: bool
 };
 
 const patternOptions: { value: Pattern; label: string; helper: string }[] = [
-    { value: "EVERY", label: "Every week", helper: "Applies every week" },
     { value: "W1", label: "Week A", helper: "Odd ISO weeks" },
     { value: "W2", label: "Week B", helper: "Even ISO weeks" },
 ];
