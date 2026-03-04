@@ -1,6 +1,7 @@
 "use client";
 
 import type { Clinician } from "../types/planner";
+import {parseYmdLocal} from "@/app/planner/utils/date";
 
 type DayRuleLike = {
     clinician_id: number | string;
@@ -135,6 +136,8 @@ function classifyActivity(activityCodeRaw: any): "OO" | "CLO" | null {
     const notWorking = new Set([
         "D/O",
         "DO",
+        "DAY OFF",
+        "DAY_OFF",
         "OFF",
         "HOL",
         "HOLIDAY",
@@ -142,7 +145,9 @@ function classifyActivity(activityCodeRaw: any): "OO" | "CLO" | null {
         "ANNUAL_LEAVE",
         "SICK",
         "SL",
-        "SG"
+        "SG",
+        "ADMIN",
+        "SF",
     ]);
     if (notWorking.has(a)) return null;
 
@@ -166,8 +171,13 @@ export default function DayExpectedSidebar({
     trainingStartISO: string;
     rooms: any[];
 }) {
-    const date = new Date(dateISO);
-    const trainingStart = new Date(trainingStartISO);
+    const date = parseYmdLocal(dateISO);
+    const trainingStart = parseYmdLocal(trainingStartISO);
+
+    if (!Number.isFinite(date.getTime()) || !Number.isFinite(trainingStart.getTime())) {
+        console.log("[ExpectedSidebar] invalid date inputs", { dateISO, trainingStartISO });
+        return null; // or a small placeholder UI
+    }
 
     const weekPattern = getWeekPattern(date, trainingStart);
 
@@ -198,6 +208,16 @@ export default function DayExpectedSidebar({
         if (!weekdayMatchesRule(date, r)) return false;
         return ruleAppliesPattern(r, weekPattern);
     });
+
+    console.log(
+        "[ExpectedSidebar] todaysRules activities",
+        todaysRules.map(r => ({
+            clinician_id: r.clinician_id,
+            activity: r.activity_code,
+            pattern: r.pattern_code,
+            weekday: r.weekday ?? r.uk_day
+        }))
+    );
 
     const expectedOOIds = new Set<number>();
     const expectedCLOIds = new Set<number>();

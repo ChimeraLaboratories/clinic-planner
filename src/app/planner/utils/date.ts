@@ -156,3 +156,18 @@ export function formatMonthTitle(d: Date) {
         year: "numeric",
     });
 }
+
+// Parse "YYYY-MM-DD" safely as a LOCAL date (midday to avoid DST/UTC drift)
+export function parseYmdLocal(input: string): Date {
+    const ymd = String(input ?? "").slice(0, 10); // allow "YYYY-MM-DDTHH:MM:SS..."
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(ymd)) return new Date(NaN);
+
+    const [y, m, d] = ymd.split("-").map(Number);
+    const dt = new Date(y, m - 1, d);     // LOCAL date
+    dt.setHours(12, 0, 0, 0);             // pin midday to avoid DST edge cases
+    return dt;
+}
+
+export function weekdayFromYmd(input: string): number {
+    return parseYmdLocal(input).getDay(); // Sun=0..Sat=6 (if valid)
+}
