@@ -47,15 +47,12 @@ function normalizeTotals(raw: any) {
     let totalClValue = 0;
 
     for (const s of sessions) {
-        // match month grid: ignore cancelled
         if (String(s?.status ?? "").trim().toUpperCase() === "CANCELLED") continue;
 
         const t = String(s.session_type ?? s.type ?? s.clinic_code ?? "")
             .trim()
             .toUpperCase();
 
-        // ✅ SINGLE SOURCE OF TRUTH: use API-computed `value`
-        // (this is derived from clinician_capacity join in /api/planner)
         const rawVal = s.value ?? s.session_value ?? s.clinic_value ?? 0;
 
         const v = typeof rawVal === "number" ? rawVal : parseFloat(String(rawVal));
@@ -77,26 +74,22 @@ export default async function PlannerDayPage({
 }) {
     const { date } = await params;
     const sp = (await searchParams) ?? {};
-    const monthParam = sp?.m; // expected "YYYY-MM"
+    const monthParam = sp?.m;
 
-    // 1) validate date param early
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return notFound();
 
-    // 2) build absolute URL (server component)
     const h = await headers();
     const host = h.get("host");
     if (!host) return notFound();
 
     const protocol = process.env.NODE_ENV === "development" ? "http" : "https";
 
-    // ✅ A) Day endpoint for Room Overview (rooms + sessions already attached)
     const dayRes = await fetch(`${protocol}://${host}/planner/api/day?date=${date}`, {
         cache: "no-store",
     });
     if (!dayRes.ok) return notFound();
     const dayData: DayApiResponse = await dayRes.json();
 
-    // ✅ B) Month-view endpoint for totals (single-day range) + dayRules
     let totals = { totalStValue: 0, totalClValue: 0 };
     let dayRules: any[] = [];
 
@@ -118,13 +111,11 @@ export default async function PlannerDayPage({
         dayRules = [];
     }
 
-    // clinicians list for the modal dropdown
     const cRes = await fetch(`${protocol}://${host}/planner/api/clinicians`, {
         cache: "no-store",
     });
     const clinicianList = cRes.ok ? await cRes.json() : [];
 
-    // Header display
     const displayDate = new Date(`${date}T00:00:00`);
     const dayName = displayDate.toLocaleDateString("en-GB", { weekday: "long" });
 
@@ -135,22 +126,20 @@ export default async function PlannerDayPage({
 
     return (
         <div className="min-h-screen bg-gray-50 p-8">
-            {/* ✅ Month-view style shell: sidebar flush left, main content to the right */}
+            {/* ✅ Sidebar is outside any max-width container so it can sit on the left edge */}
             <div className="flex gap-8 items-start">
-                {/* Left sidebar (flush to page padding edge) */}
                 <div className="w-[320px] flex-shrink-0 sticky top-8 h-fit">
                     <DayExpectedSidebar
-                        date={displayDate}
+                        dateISO={`${date}T00:00:00`}
                         clinicians={clinicianList}
                         dayRules={dayRules}
-                        trainingStart={trainingStart}
+                        trainingStartISO={"2026-01-05T00:00:00"}
                         rooms={dayData.rooms}
                     />
                 </div>
 
-                {/* Main content (keep your existing centered width) */}
+                {/* Main content */}
                 <div className="flex-1 max-w-6xl space-y-8">
-                    {/* Header */}
                     <div className="flex items-center justify-between">
                         <div>
                             <h1 className="text-3xl font-bold text-gray-900">{dayName}</h1>
@@ -167,7 +156,6 @@ export default async function PlannerDayPage({
                         </Link>
                     </div>
 
-                    {/* Stats */}
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                         <div className="bg-white rounded-lg border p-6 shadow-sm">
                             <div className="text-base font-medium text-gray-700 tracking-tight">
@@ -210,7 +198,6 @@ export default async function PlannerDayPage({
 
                     <section>
                         <h2 className="text-xl font-semibold mb-4">Room Overview</h2>
-
                         <DayRoomsClient
                             initialRooms={dayData.rooms}
                             date={date}

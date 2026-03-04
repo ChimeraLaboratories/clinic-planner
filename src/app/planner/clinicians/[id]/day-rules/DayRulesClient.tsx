@@ -73,9 +73,11 @@ const activityVisuals: Record<string, { row: string; badge: string; muted?: bool
     },
 };
 
+// ✅ include EVERY so initial render is valid
 const patternOptions: { value: Pattern; label: string; helper: string }[] = [
-    { value: "W1", label: "Week A", helper: "Odd ISO weeks" },
-    { value: "W2", label: "Week B", helper: "Even ISO weeks" },
+    { value: "EVERY", label: "Every week", helper: "Same rules every week" },
+    { value: "W1", label: "Week A", helper: "Alternate week set 1" },
+    { value: "W2", label: "Week B", helper: "Alternate week set 2" },
 ];
 
 function patternLabel(p: Pattern) {
@@ -121,7 +123,6 @@ function normalizeWeekly(input: DayRuleRow[], selectedPattern: Pattern) {
             note: r?.note ?? null,
             effective_from: r?.effective_from ?? null,
             effective_to: r?.effective_to ?? null,
-            // keep pattern_code consistent with what we're editing
             pattern_code: String(r?.pattern_code ?? selectedPattern),
         } satisfies DayRuleRow;
     });
@@ -132,7 +133,6 @@ export default function DayRulesClient({ clinicianId }: { clinicianId: number })
     const [effectiveFrom, setEffectiveFrom] = useState<string>(() => toLocalISODate(new Date()));
     const [layout, setLayout] = useState<"table" | "cards">("table");
 
-    // ✅ Option A: one pattern selector for the whole weekly set
     const [pattern, setPattern] = useState<Pattern>("EVERY");
 
     const [loading, setLoading] = useState(true);
@@ -166,16 +166,15 @@ export default function DayRulesClient({ clinicianId }: { clinicianId: number })
 
         try {
             const res = await fetch(
-                `/planner/api/clinicians/${clinicianId}/day-rules?date=${encodeURIComponent(viewAsOfDate)}&pattern=${encodeURIComponent(
-                    pattern
-                )}`,
+                `/planner/api/clinicians/${clinicianId}/day-rules?date=${encodeURIComponent(
+                    viewAsOfDate
+                )}&pattern=${encodeURIComponent(pattern)}`,
                 { cache: "no-store" }
             );
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
             const json = (await res.json()) as ApiResponse;
 
-            // We drive pattern from UI. Ignore json.pattern to avoid reload loops.
             const normalized = normalizeWeekly(json.weekly ?? [], pattern);
             setWeekly(normalized);
 
@@ -210,7 +209,6 @@ export default function DayRulesClient({ clinicianId }: { clinicianId: number })
 
                 const next = { ...r, ...patch };
 
-                // ✅ Auto behaviour when switching to Day Off
                 if (patch.activity_code !== undefined && isDayOff(patch.activity_code)) {
                     next.start_time = null;
                     next.end_time = null;
@@ -228,7 +226,7 @@ export default function DayRulesClient({ clinicianId }: { clinicianId: number })
         try {
             const payload = {
                 effectiveFrom,
-                pattern, // ✅ Option A: save weekly set under this pattern
+                pattern,
                 rules: weekly.map((r) => ({
                     weekday: r.weekday,
                     activity_code: r.activity_code,
@@ -249,7 +247,6 @@ export default function DayRulesClient({ clinicianId }: { clinicianId: number })
                 throw new Error(msg?.error ?? `Failed to save (HTTP ${res.status})`);
             }
 
-            // After save, re-load using the effectiveFrom date so you see what you just created
             setViewAsOfDate(effectiveFrom);
         } catch (e: any) {
             setError(e?.message ?? "Failed to save");
@@ -342,7 +339,12 @@ export default function DayRulesClient({ clinicianId }: { clinicianId: number })
                 {error && <div className="mt-4 rounded border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</div>}
 
                 <div className="mt-4">
-                    {layout === "table" ? (
+                    {/* ✅ Don’t flash UNSET while loading */}
+                    {loading ? (
+                        <div className="rounded-lg border bg-gray-50 p-4 text-sm text-gray-600">
+                            Loading day rules…
+                        </div>
+                    ) : layout === "table" ? (
                         <div className="overflow-x-auto">
                             <table className="min-w-full text-sm">
                                 <thead className="bg-gray-50 text-gray-600">
@@ -377,18 +379,19 @@ export default function DayRulesClient({ clinicianId }: { clinicianId: number })
                                         >
                                             <td className="p-3">
                                                 <div className="flex items-center gap-3">
-                            <span className={["text-sm", off ? "font-bold" : "font-semibold"].join(" ")}>
-                              {dayName}
-                            </span>
+                                                        <span className={["text-sm", off ? "font-bold" : "font-semibold"].join(" ")}>
+                                                            {dayName}
+                                                        </span>
 
                                                     <span
                                                         className={[
                                                             "px-2 py-1 rounded-md text-xs",
-                                                            visual?.badge ?? "bg-gray-100 text-gray-700 border border-gray-200 font-medium",
+                                                            visual?.badge ??
+                                                            "bg-gray-100 text-gray-700 border border-gray-200 font-medium",
                                                         ].join(" ")}
                                                     >
-                              {activityLabel(r?.activity_code)}
-                            </span>
+                                                            {activityLabel(r?.activity_code)}
+                                                        </span>
 
                                                     {off && <span className="text-xs text-gray-500">(times disabled)</span>}
                                                 </div>
@@ -399,7 +402,7 @@ export default function DayRulesClient({ clinicianId }: { clinicianId: number })
                                                     className="rounded border px-2 py-1"
                                                     value={r?.activity_code ?? "TESTING"}
                                                     onChange={(e) => updateWeekday(weekday, { activity_code: e.target.value })}
-                                                    disabled={loading || saving || !r}
+                                                    disabled={saving || !r}
                                                 >
                                                     {activityOptions.map((opt) => (
                                                         <option key={opt.value} value={opt.value}>
@@ -412,35 +415,44 @@ export default function DayRulesClient({ clinicianId }: { clinicianId: number })
                                             <td className="p-3">
                                                 <input
                                                     type="time"
-                                                    className={["rounded border px-2 py-1", off ? "bg-gray-50 text-gray-400" : ""].join(" ")}
+                                                    className={["rounded border px-2 py-1", off ? "bg-gray-50 text-gray-400" : ""].join(
+                                                        " "
+                                                    )}
                                                     value={(r?.start_time ?? "").slice(0, 5)}
                                                     onChange={(e) =>
-                                                        updateWeekday(weekday, { start_time: e.target.value ? `${e.target.value}:00` : null })
+                                                        updateWeekday(weekday, {
+                                                            start_time: e.target.value ? `${e.target.value}:00` : null,
+                                                        })
                                                     }
-                                                    disabled={loading || saving || !r || off}
+                                                    disabled={saving || !r || off}
                                                 />
                                             </td>
 
                                             <td className="p-3">
                                                 <input
                                                     type="time"
-                                                    className={["rounded border px-2 py-1", off ? "bg-gray-50 text-gray-400" : ""].join(" ")}
+                                                    className={["rounded border px-2 py-1", off ? "bg-gray-50 text-gray-400" : ""].join(
+                                                        " "
+                                                    )}
                                                     value={(r?.end_time ?? "").slice(0, 5)}
                                                     onChange={(e) =>
-                                                        updateWeekday(weekday, { end_time: e.target.value ? `${e.target.value}:00` : null })
+                                                        updateWeekday(weekday, {
+                                                            end_time: e.target.value ? `${e.target.value}:00` : null,
+                                                        })
                                                     }
-                                                    disabled={loading || saving || !r || off}
+                                                    disabled={saving || !r || off}
                                                 />
                                             </td>
 
                                             <td className="p-3">
                                                 <input
-                                                    className={["w-full min-w-[180px] rounded border px-2 py-1", off ? "bg-gray-50" : ""].join(
-                                                        " "
-                                                    )}
+                                                    className={[
+                                                        "w-full min-w-[180px] rounded border px-2 py-1",
+                                                        off ? "bg-gray-50" : "",
+                                                    ].join(" ")}
                                                     value={r?.note ?? ""}
                                                     onChange={(e) => updateWeekday(weekday, { note: e.target.value || null })}
-                                                    disabled={loading || saving || !r}
+                                                    disabled={saving || !r}
                                                     placeholder="Optional"
                                                 />
                                             </td>
@@ -479,14 +491,15 @@ export default function DayRulesClient({ clinicianId }: { clinicianId: number })
                                                 </div>
 
                                                 <div className="mt-2">
-                          <span
-                              className={[
-                                  "inline-flex px-2 py-1 rounded-md text-xs",
-                                  visual?.badge ?? "bg-gray-100 text-gray-700 border border-gray-200 font-medium",
-                              ].join(" ")}
-                          >
-                            {activityLabel(r?.activity_code)}
-                          </span>
+                                                    <span
+                                                        className={[
+                                                            "inline-flex px-2 py-1 rounded-md text-xs",
+                                                            visual?.badge ??
+                                                            "bg-gray-100 text-gray-700 border border-gray-200 font-medium",
+                                                        ].join(" ")}
+                                                    >
+                                                        {activityLabel(r?.activity_code)}
+                                                    </span>
 
                                                     {off && <span className="ml-2 text-xs text-gray-500">(times disabled)</span>}
                                                 </div>
@@ -496,7 +509,7 @@ export default function DayRulesClient({ clinicianId }: { clinicianId: number })
                                                 className="rounded border px-2 py-1 text-sm"
                                                 value={r?.activity_code ?? "TESTING"}
                                                 onChange={(e) => updateWeekday(weekday, { activity_code: e.target.value })}
-                                                disabled={loading || saving || !r}
+                                                disabled={saving || !r}
                                             >
                                                 {activityOptions.map((opt) => (
                                                     <option key={opt.value} value={opt.value}>
@@ -511,14 +524,17 @@ export default function DayRulesClient({ clinicianId }: { clinicianId: number })
                                                 <div className="text-xs text-gray-500 mb-1">Start</div>
                                                 <input
                                                     type="time"
-                                                    className={["w-full rounded border px-2 py-1", off ? "bg-gray-50 text-gray-400" : ""].join(
-                                                        " "
-                                                    )}
+                                                    className={[
+                                                        "w-full rounded border px-2 py-1",
+                                                        off ? "bg-gray-50 text-gray-400" : "",
+                                                    ].join(" ")}
                                                     value={(r?.start_time ?? "").slice(0, 5)}
                                                     onChange={(e) =>
-                                                        updateWeekday(weekday, { start_time: e.target.value ? `${e.target.value}:00` : null })
+                                                        updateWeekday(weekday, {
+                                                            start_time: e.target.value ? `${e.target.value}:00` : null,
+                                                        })
                                                     }
-                                                    disabled={loading || saving || !r || off}
+                                                    disabled={saving || !r || off}
                                                 />
                                             </div>
 
@@ -526,14 +542,17 @@ export default function DayRulesClient({ clinicianId }: { clinicianId: number })
                                                 <div className="text-xs text-gray-500 mb-1">End</div>
                                                 <input
                                                     type="time"
-                                                    className={["w-full rounded border px-2 py-1", off ? "bg-gray-50 text-gray-400" : ""].join(
-                                                        " "
-                                                    )}
+                                                    className={[
+                                                        "w-full rounded border px-2 py-1",
+                                                        off ? "bg-gray-50 text-gray-400" : "",
+                                                    ].join(" ")}
                                                     value={(r?.end_time ?? "").slice(0, 5)}
                                                     onChange={(e) =>
-                                                        updateWeekday(weekday, { end_time: e.target.value ? `${e.target.value}:00` : null })
+                                                        updateWeekday(weekday, {
+                                                            end_time: e.target.value ? `${e.target.value}:00` : null,
+                                                        })
                                                     }
-                                                    disabled={loading || saving || !r || off}
+                                                    disabled={saving || !r || off}
                                                 />
                                             </div>
                                         </div>
@@ -544,7 +563,7 @@ export default function DayRulesClient({ clinicianId }: { clinicianId: number })
                                                 className={["w-full rounded border px-2 py-1", off ? "bg-gray-50" : ""].join(" ")}
                                                 value={r?.note ?? ""}
                                                 onChange={(e) => updateWeekday(weekday, { note: e.target.value || null })}
-                                                disabled={loading || saving || !r}
+                                                disabled={saving || !r}
                                                 placeholder="Optional"
                                             />
                                         </div>
