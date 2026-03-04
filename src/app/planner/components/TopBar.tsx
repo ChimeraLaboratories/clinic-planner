@@ -2,19 +2,12 @@
 
 import { formatMonthTitle } from "../utils/date";
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useRef, useState } from "react";
+import AddHolidayModal from "./AddHolidayModal";
 
 function formatLastSynced(d: Date | null | undefined) {
     if (!d) return "";
     return d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
-}
-
-function ymd(d: Date) {
-    const yyyy = d.getFullYear();
-    const mm = String(d.getMonth() + 1).padStart(2, "0");
-    const dd = String(d.getDate()).padStart(2, "0");
-    return `${yyyy}-${mm}-${dd}`;
 }
 
 type ClinicianLite = {
@@ -32,7 +25,6 @@ export default function TopBar({
                                    syncState,
                                    lastSyncedAt,
 
-                                   // ✅ NEW: provide clinicians so user can pick the OO (names don't include "OO")
                                    clinicians,
                                    onRefresh,
                                }: {
@@ -47,31 +39,16 @@ export default function TopBar({
     clinicians: ClinicianLite[];
     onRefresh?: () => void | Promise<void>;
 }) {
-    const router = useRouter();
     const today = new Date();
 
     const isCurrentMonth =
-        today.getMonth() === anchorMonth.getMonth() && today.getFullYear() === anchorMonth.getFullYear();
+        today.getMonth() === anchorMonth.getMonth() &&
+        today.getFullYear() === anchorMonth.getFullYear();
 
     const [menuOpen, setMenuOpen] = useState(false);
     const menuRef = useRef<HTMLDivElement | null>(null);
 
-    // ✅ Holiday modal state
     const [holidayOpen, setHolidayOpen] = useState(false);
-    const [holidayClinicianId, setHolidayClinicianId] = useState<string>("");
-    const [holidayDate, setHolidayDate] = useState<string>(() => ymd(new Date()));
-    const [holidayNote, setHolidayNote] = useState<string>("");
-    const [holidayBusy, setHolidayBusy] = useState(false);
-    const [holidayMsg, setHolidayMsg] = useState<string>("");
-
-    const clinicianOptions = useMemo(() => {
-        const list = (clinicians ?? []).map((c) => ({
-            id: Number(c.id),
-            label: String(c.display_name ?? c.full_name ?? `Clinician ${c.id}`),
-        }));
-        // stable sort by label
-        return list.sort((a, b) => a.label.localeCompare(b.label));
-    }, [clinicians]);
 
     useEffect(() => {
         function handleClickOutside(e: MouseEvent) {
@@ -84,107 +61,6 @@ export default function TopBar({
         document.addEventListener("mousedown", handleClickOutside);
         return () => document.removeEventListener("mousedown", handleClickOutside);
     }, []);
-
-    async function refreshAfterWrite() {
-        try {
-            if (onRefresh) await onRefresh();
-            else router.refresh();
-        } catch {
-            router.refresh();
-        }
-    }
-
-    function openHolidayModal() {
-        setHolidayMsg("");
-        setHolidayDate(ymd(new Date()));
-        setHolidayNote("");
-
-        // default to first option if none selected
-        if (holidayClinicianId === "" && clinicianOptions.length > 0) {
-            setHolidayClinicianId(String(clinicianOptions[0].id));
-        }
-
-        setHolidayOpen(true);
-    }
-
-    async function addHoliday() {
-        const clinicianId = Number(holidayClinicianId);
-        if (!Number.isFinite(clinicianId) || clinicianId <= 0) {
-            setHolidayMsg("Please select a clinician.");
-            return;
-        }
-        if (!holidayDate || holidayDate.length !== 10) {
-            setHolidayMsg("Please pick a valid date.");
-            return;
-        }
-
-        setHolidayBusy(true);
-        setHolidayMsg("");
-
-        try {
-            const res = await fetch(`/planner/api/clinicians/${clinicianId}/holidays`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ date: holidayDate, note: holidayNote || null }),
-            });
-
-            const text = await res.text(); // ✅ read raw response once
-
-            if (!res.ok) {
-                // try JSON, fallback to plain text / HTML
-                let msg = `HTTP ${res.status}`;
-                try {
-                    const j = JSON.parse(text);
-                    msg = j?.error ?? msg;
-                } catch {
-                    if (text) msg = text;
-                }
-                throw new Error(msg);
-            }
-
-            setHolidayMsg("Holiday saved.");
-            await refreshAfterWrite();
-            setHolidayOpen(false);
-        } catch (e: any) {
-            setHolidayMsg(e?.message ?? "Failed to add holiday");
-        } finally {
-            setHolidayBusy(false);
-        }
-    }
-
-    async function removeHoliday() {
-        const clinicianId = Number(holidayClinicianId);
-        if (!Number.isFinite(clinicianId) || clinicianId <= 0) {
-            setHolidayMsg("Please select a clinician.");
-            return;
-        }
-        if (!holidayDate || holidayDate.length !== 10) {
-            setHolidayMsg("Please pick a valid date.");
-            return;
-        }
-
-        setHolidayBusy(true);
-        setHolidayMsg("");
-
-        try {
-            const res = await fetch(
-                `/planner/api/clinicians/${clinicianId}/holidays?date=${encodeURIComponent(holidayDate)}`,
-                { method: "DELETE" }
-            );
-
-            if (!res.ok) {
-                const j = await res.json().catch(() => ({}));
-                throw new Error(j?.error || "Failed to remove holiday");
-            }
-
-            setHolidayMsg("Holiday removed.");
-            await refreshAfterWrite();
-        } catch (e: any) {
-            setHolidayMsg(e?.message ?? "Failed to remove holiday");
-        } finally {
-            setHolidayBusy(false);
-        }
-    }
 
     return (
         <header className="sticky top-0 z-40 w-full border-b border-slate-200 bg-white/80 backdrop-blur-md">
@@ -220,13 +96,17 @@ export default function TopBar({
                       </span>
                     )}
 
-                      {env === "PROD" && <span className="inline-flex h-2 w-2 rounded-full bg-red-600" />}
+                      {env === "PROD" && (
+                          <span className="inline-flex h-2 w-2 rounded-full bg-red-600" />
+                      )}
 
                       {env}
                   </span>
 
                                     <div className="tooltip-content">
-                                        <div className="font-semibold text-slate-800">Environment: {env}</div>
+                                        <div className="font-semibold text-slate-800">
+                                            Environment: {env}
+                                        </div>
                                         <div className="mt-1 text-slate-600">
                                             {env === "PROD"
                                                 ? "Live system. Changes affect real schedules."
@@ -253,7 +133,10 @@ export default function TopBar({
                     </button>
 
                     <div className="flex h-9 items-center overflow-hidden rounded-lg border border-slate-200 bg-white px-5 shadow-sm">
-            <span key={formatMonthTitle(anchorMonth)} className="animate-fadeInUp text-sm font-semibold text-slate-800">
+            <span
+                key={formatMonthTitle(anchorMonth)}
+                className="animate-fadeInUp text-sm font-semibold text-slate-800"
+            >
               {formatMonthTitle(anchorMonth)}
             </span>
                     </div>
@@ -288,7 +171,9 @@ export default function TopBar({
                                     ? "bg-emerald-50 text-emerald-700 border-emerald-200"
                                     : "bg-red-50 text-red-700 border-red-200"
                         }`}
-                        title={lastSyncedAt ? `Last synced at ${formatLastSynced(lastSyncedAt)}` : undefined}
+                        title={
+                            lastSyncedAt ? `Last synced at ${formatLastSynced(lastSyncedAt)}` : undefined
+                        }
                     >
             <span
                 className={`h-2 w-2 rounded-full ${
@@ -299,7 +184,11 @@ export default function TopBar({
                             : "bg-red-600"
                 }`}
             />
-                        {syncState === "syncing" ? "Syncing…" : syncState === "synced" ? "Synced just now" : "Sync failed"}
+                        {syncState === "syncing"
+                            ? "Syncing…"
+                            : syncState === "synced"
+                                ? "Synced just now"
+                                : "Sync failed"}
                     </div>
                 )}
 
@@ -312,10 +201,9 @@ export default function TopBar({
                         Clinician Management
                     </Link>
 
-                    {/* ✅ Single Holiday button */}
                     <button
                         type="button"
-                        onClick={openHolidayModal}
+                        onClick={() => setHolidayOpen(true)}
                         className="inline-flex items-center rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-slate-700"
                         title="Add/remove a holiday"
                     >
@@ -336,7 +224,10 @@ export default function TopBar({
 
                         {menuOpen && (
                             <div className="absolute right-0 mt-2 w-52 rounded-xl border border-slate-200 bg-white shadow-lg overflow-hidden">
-                                <Link href="/settings" className="block px-4 py-2 text-sm text-slate-700 hover:bg-slate-50">
+                                <Link
+                                    href="/settings"
+                                    className="block px-4 py-2 text-sm text-slate-700 hover:bg-slate-50"
+                                >
                                     Settings
                                 </Link>
 
@@ -355,97 +246,12 @@ export default function TopBar({
                 </div>
             </div>
 
-            {/* ✅ Holiday modal */}
-            {holidayOpen && (
-                <div className="fixed inset-0 z-50">
-                    <div
-                        className="absolute inset-0 bg-black/30"
-                        onClick={() => !holidayBusy && setHolidayOpen(false)}
-                    />
-                    <div className="absolute left-1/2 top-24 w-[560px] max-w-[calc(100vw-24px)] -translate-x-1/2 rounded-2xl border border-slate-200 bg-white shadow-xl">
-                        <div className="p-5 border-b border-slate-200">
-                            <div className="text-lg font-semibold text-slate-900">Add Holiday</div>
-                            <div className="mt-1 text-sm text-slate-600">Choose a clinician and date.</div>
-                        </div>
-
-                        <div className="p-5 space-y-4">
-                            <div className="grid grid-cols-1 gap-2">
-                                <label className="text-xs font-semibold tracking-wide uppercase text-slate-600">
-                                    Clinician
-                                </label>
-                                <select
-                                    value={holidayClinicianId}
-                                    onChange={(e) => setHolidayClinicianId(e.target.value)}
-                                    className="h-10 rounded-lg border border-slate-200 px-3 text-sm bg-white"
-                                    disabled={holidayBusy}
-                                >
-                                    <option value="">Select clinician…</option>
-                                    {clinicianOptions.map((c) => (
-                                        <option key={c.id} value={c.id}>
-                                            {c.label}
-                                        </option>
-                                    ))}
-                                </select>
-                            </div>
-
-                            <div className="grid grid-cols-1 gap-2">
-                                <label className="text-xs font-semibold tracking-wide uppercase text-slate-600">Date</label>
-                                <input
-                                    type="date"
-                                    value={holidayDate}
-                                    onChange={(e) => setHolidayDate(e.target.value)}
-                                    className="h-10 rounded-lg border border-slate-200 px-3 text-sm"
-                                    disabled={holidayBusy}
-                                />
-                            </div>
-
-                            <div className="grid grid-cols-1 gap-2">
-                                <label className="text-xs font-semibold tracking-wide uppercase text-slate-600">Note (optional)</label>
-                                <input
-                                    type="text"
-                                    value={holidayNote}
-                                    onChange={(e) => setHolidayNote(e.target.value)}
-                                    className="h-10 rounded-lg border border-slate-200 px-3 text-sm"
-                                    placeholder="e.g. Annual leave"
-                                    disabled={holidayBusy}
-                                />
-                            </div>
-
-                            {holidayMsg && <div className="text-sm font-medium text-slate-700">{holidayMsg}</div>}
-                        </div>
-
-                        <div className="p-5 border-t border-slate-200 flex items-center justify-between gap-3">
-                            <button
-                                type="button"
-                                onClick={() => setHolidayOpen(false)}
-                                disabled={holidayBusy}
-                                className="h-10 rounded-lg border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60"
-                            >
-                                Close
-                            </button>
-
-                            <div className="flex items-center gap-2">
-                                <button
-                                    type="button"
-                                    onClick={removeHoliday}
-                                    disabled={holidayBusy}
-                                    className="h-10 rounded-lg border border-red-200 bg-red-50 px-4 text-sm font-semibold text-red-700 hover:bg-red-100 disabled:opacity-60"
-                                >
-                                    Remove
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={addHoliday}
-                                    disabled={holidayBusy}
-                                    className="h-10 rounded-lg bg-slate-900 px-4 text-sm font-semibold text-white hover:bg-slate-700 disabled:opacity-60"
-                                >
-                                    {holidayBusy ? "Saving…" : "Add / Update"}
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            )}
+            <AddHolidayModal
+                open={holidayOpen}
+                onClose={() => setHolidayOpen(false)}
+                clinicians={clinicians}
+                onRefresh={onRefresh}
+            />
         </header>
     );
 }
