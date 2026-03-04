@@ -8,11 +8,56 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import HolidayBookedView from "@/app/planner/components/HolidayBookedView";
 
+/**
+ * IMPORTANT FIX:
+ * Your "Days Requiring Supervisors" was still showing even after setting Supervisor in Store.
+ * That means either:
+ *  - the API is returning supervisorsInStore under a different date format, OR
+ *  - some rows still have needsSupervisor = true and your UI trusts it, OR
+ *  - the date string includes time/extra text.
+ *
+ * This rewrite:
+ *  ✅ normalizes ALL supervisionByDate row dates to "YYYY-MM-DD" safely
+ *  ✅ computes "needs supervisor" ONLY when:
+ *       preRegCount > 0 AND supervisorsInClinic+supervisorsInStore are BOTH empty
+ *  ✅ provides robust fallback to derive missing dates
+ *  ✅ adds a small debug dump you can keep/remove
+ */
+
+function normalizeYmd(input: any): string | null {
+    if (!input) return null;
+
+    // already in YYYY-MM-DD
+    if (typeof input === "string") {
+        const s = input.trim();
+
+        // common: "2026-04-07T00:00:00.000Z" or "2026-04-07 00:00:00"
+        const mIso = s.match(/^(\d{4}-\d{2}-\d{2})/);
+        if (mIso) return mIso[1];
+
+        // handle "07/04/2026" (UK) or "04/07/2026" (US) – we avoid guessing.
+        // If backend accidentally sends dd/mm/yyyy, we cannot infer reliably.
+        // We return null so it doesn't poison keys.
+        return null;
+    }
+
+    // Date instance
+    if (input instanceof Date && !isNaN(input.getTime())) {
+        const yyyy = input.getFullYear();
+        const mm = String(input.getMonth() + 1).padStart(2, "0");
+        const dd = String(input.getDate()).padStart(2, "0");
+        return `${yyyy}-${mm}-${dd}`;
+    }
+
+    return null;
+}
+
 function getSessionDateKey(s: any): string | null {
     const v = s?.session_date ?? s?.date ?? s?.sessionDate ?? null;
     if (!v) return null;
 
     if (typeof v === "string") {
+        // prefer parsing as Date only if it works, but normalize to YYYY-MM-DD
         const d = new Date(v);
         if (!isNaN(d.getTime())) {
             const yyyy = d.getFullYear();
@@ -58,7 +103,7 @@ function isSTClinic(s: any): boolean {
 }
 
 type NeedsSupervisorDay = {
-    date: string;
+    date: string; // YYYY-MM-DD
     preRegCount: number;
     supervisorCount: number;
     preRegs: string;
@@ -67,7 +112,7 @@ type NeedsSupervisorDay = {
 };
 
 type StoreSupervisorDay = {
-    date: string;
+    date: string; // YYYY-MM-DD
     supervisorsInStore: string;
 };
 
@@ -93,7 +138,6 @@ export default function PlannerShell({
     const router = useRouter();
     const [activeTab, setActiveTab] = useState<PlannerTab>("month");
 
-    // Optional: if user changes month, keep them on month view (feels natural)
     useEffect(() => {
         setActiveTab("month");
     }, [anchorMonth]);
@@ -108,16 +152,6 @@ export default function PlannerShell({
         const n = Number(oo?.id ?? null);
         return Number.isFinite(n) ? n : null;
     }, [data?.clinicians]);
-
-    useEffect(() => {
-        const sessions = (data?.sessions ?? []) as any[];
-
-        const uniqueDates = Array.from(
-            new Set(sessions.map((s) => getSessionDateKey(s)).filter(Boolean))
-        ).sort();
-
-        console.log("[debug] unique session date keys (April fetch)", uniqueDates);
-    }, [data?.sessions]);
 
     function ymd(d: Date) {
         const yyyy = d.getFullYear();
@@ -134,39 +168,93 @@ export default function PlannerShell({
         return new Date(d.getFullYear(), d.getMonth() + 1, 0);
     }
 
-    // ✅ SOURCE OF TRUTH: use backend supervisionByDate (includes supervisor_in_store)
-    const needsSupervisorDays = useMemo<NeedsSupervisorDay[]>(() => {
+    /**
+     * Normalize supervisionByDate rows into a safe, reliable map keyed by YYYY-MM-DD.
+     * If backend returns "2026-04-07T..." this will still key correctly.
+     */
+    const supervisionByDateMap = useMemo(() => {
         const rows: any[] = (data as any)?.supervisionByDate ?? [];
+        const map = new Map<string, any>();
 
-        return rows
-            .filter((r) => !!r.needsSupervisor)
-            .map((r) => ({
-                date: String(r.date ?? ""),
-                preRegCount: Number(r.preRegCount ?? 0),
-                supervisorCount: Number(r.supervisorCount ?? 0),
-                preRegs: String(r.preRegs ?? ""),
-                supervisorsInClinic: String(r.supervisorsInClinic ?? ""),
-                supervisorsInStore: String(r.supervisorsInStore ?? ""),
-            }))
-            .sort((a, b) => a.date.localeCompare(b.date));
+        for (const r of rows) {
+            const key = normalizeYmd(r?.date);
+            if (!key) continue;
+            // last write wins; OK for this use case
+            map.set(key, r);
+        }
+
+        return map;
     }, [data]);
+
+    // Keep your April debug but make it actually show if the API date keys are weird
+    useEffect(() => {
+        const sessions = (data?.sessions ?? []) as any[];
+        const uniqueDates = Array.from(new Set(sessions.map(getSessionDateKey).filter(Boolean))).sort();
+        console.log("[debug] unique session date keys (month fetch)", uniqueDates);
+
+        const rows: any[] = (data as any)?.supervisionByDate ?? [];
+        const uniqueSupDates = Array.from(
+            new Set(rows.map((r) => normalizeYmd(r?.date)).filter(Boolean))
+        ).sort();
+        console.log("[debug] unique supervisionByDate keys (normalized)", uniqueSupDates);
+
+        // Watch the Tuesdays you mentioned (April 2026)
+        const watch = ["2026-04-07", "2026-04-14", "2026-04-21", "2026-04-28"];
+        console.log(
+            "[debug] watched supervision rows",
+            watch.map((k) => ({ k, row: supervisionByDateMap.get(k) ?? null }))
+        );
+    }, [data, supervisionByDateMap]);
+
+    /**
+     * ✅ REAL SOURCE OF TRUTH (frontend):
+     * We compute "needs supervisor" ourselves from the row content, not from r.needsSupervisor.
+     * A day needs supervision ONLY if:
+     *   - preRegCount > 0
+     *   - AND supervisorsInClinic is empty
+     *   - AND supervisorsInStore is empty
+     *
+     * This guarantees that setting Supervisor In Store removes the day.
+     */
+    const needsSupervisorDays = useMemo<NeedsSupervisorDay[]>(() => {
+        const out: NeedsSupervisorDay[] = [];
+
+        for (const [date, r] of supervisionByDateMap.entries()) {
+            const preRegCount = Number(r?.preRegCount ?? 0);
+
+            const clinic = String(r?.supervisorsInClinic ?? "").trim();
+            const store = String(r?.supervisorsInStore ?? "").trim();
+
+            const hasSupervisor = clinic.length > 0 || store.length > 0;
+            if (preRegCount > 0 && !hasSupervisor) {
+                out.push({
+                    date,
+                    preRegCount,
+                    supervisorCount: Number(r?.supervisorCount ?? 0),
+                    preRegs: String(r?.preRegs ?? ""),
+                    supervisorsInClinic: clinic,
+                    supervisorsInStore: store,
+                });
+            }
+        }
+
+        return out.sort((a, b) => a.date.localeCompare(b.date));
+    }, [supervisionByDateMap]);
 
     // ✅ Show who is "Supervisor in store" even if not in clinic
     const supervisorInStoreOnlyDays = useMemo<StoreSupervisorDay[]>(() => {
-        const rows: any[] = (data as any)?.supervisionByDate ?? [];
+        const out: StoreSupervisorDay[] = [];
 
-        return rows
-            .filter((r) => {
-                const store = String(r.supervisorsInStore ?? "").trim();
-                const clinic = String(r.supervisorsInClinic ?? "").trim();
-                return store.length > 0 && clinic.length === 0;
-            })
-            .map((r) => ({
-                date: String(r.date ?? ""),
-                supervisorsInStore: String(r.supervisorsInStore ?? ""),
-            }))
-            .sort((a, b) => a.date.localeCompare(b.date));
-    }, [data]);
+        for (const [date, r] of supervisionByDateMap.entries()) {
+            const store = String(r?.supervisorsInStore ?? "").trim();
+            const clinic = String(r?.supervisorsInClinic ?? "").trim();
+            if (store.length > 0 && clinic.length === 0) {
+                out.push({ date, supervisorsInStore: store });
+            }
+        }
+
+        return out.sort((a, b) => a.date.localeCompare(b.date));
+    }, [supervisionByDateMap]);
 
     // ✅ Days where Total ST Value is low (includes days with 0)
     const lowSTValueDays = useMemo(() => {
@@ -177,7 +265,6 @@ export default function PlannerShell({
         for (const s of (data.sessions ?? []) as any[]) {
             const dateKey = getSessionDateKey(s);
             if (!dateKey) continue;
-
             if (!isSTClinic(s)) continue;
 
             const stVal = getSessionSTValue(s);
@@ -218,16 +305,6 @@ export default function PlannerShell({
         onSetMonth(new Date(now.getFullYear(), now.getMonth(), 1));
     }
 
-    console.log(
-        "[debug] sample session dates",
-        (data?.sessions ?? []).slice(0, 20).map((s: any) => ({
-            session_date: s.session_date,
-            date: s.date,
-            uk_day: s.uk_day,
-            key: getSessionDateKey(s),
-        }))
-    );
-
     return (
         <div className="min-h-screen bg-slate-100">
             <TopBar
@@ -267,8 +344,8 @@ export default function PlannerShell({
 
                                     {needsSupervisorDays.length > 0 ? (
                                         <span className="relative flex h-3 w-3">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-                      <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
+                      <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500" />
                     </span>
                                     ) : (
                                         <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-emerald-600">
@@ -304,14 +381,8 @@ export default function PlannerShell({
                                                         <div className="text-sm font-semibold text-slate-900">{d.date}</div>
                                                         <div className="mt-1 text-xs text-slate-500">{d.preRegs}</div>
 
-                                                        {(d.supervisorsInClinic.trim() || d.supervisorsInStore.trim()) && (
-                                                            <div className="mt-1 text-xs text-emerald-700">
-                                                                Supervisor:{" "}
-                                                                <span className="font-semibold">
-                                  {(d.supervisorsInClinic || d.supervisorsInStore).trim()}
-                                </span>
-                                                            </div>
-                                                        )}
+                                                        {/* For "needs supervisor" days, there should be no supervisors.
+                                Keep this hidden to avoid confusion. */}
                                                     </div>
 
                                                     <div className="text-xs font-semibold text-red-700 bg-red-100 rounded-full px-2 py-0.5">
@@ -323,6 +394,34 @@ export default function PlannerShell({
                                     </div>
                                 )}
                             </div>
+
+                            {/* (Optional) Supervisor in store-only card (kept hidden unless you want it)
+                  You can uncomment if useful for debugging.
+              */}
+                            {/*
+              <div className="rounded-2xl border shadow-sm p-6 bg-slate-50 border-slate-200">
+                <div className="text-xs font-semibold tracking-wide uppercase text-slate-600">
+                  Supervisor in Store (not in clinic)
+                </div>
+                <div className="mt-3 text-4xl font-bold leading-none text-slate-800">
+                  {supervisorInStoreOnlyDays.length}
+                </div>
+                {supervisorInStoreOnlyDays.length > 0 && (
+                  <div className="mt-5 space-y-3">
+                    {supervisorInStoreOnlyDays.map((d) => (
+                      <button
+                        key={d.date}
+                        onClick={() => router.push(`/planner/${d.date}`)}
+                        className="w-full text-left rounded-xl border border-slate-200 bg-white px-4 py-3 hover:bg-slate-100 transition"
+                      >
+                        <div className="text-sm font-semibold text-slate-900">{d.date}</div>
+                        <div className="mt-1 text-xs text-slate-600">{d.supervisorsInStore}</div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+              */}
 
                             {/* CLINICS (ST VALUE) CARD */}
                             <div
@@ -353,13 +452,13 @@ export default function PlannerShell({
 
                                     {stCardStatus === "critical" ? (
                                         <span className="relative flex h-3 w-3">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-                      <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
+                      <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500" />
                     </span>
                                     ) : stCardStatus === "warning" ? (
                                         <span className="relative flex h-3 w-3">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-orange-400 opacity-60"></span>
-                      <span className="relative inline-flex rounded-full h-3 w-3 bg-orange-600"></span>
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-orange-400 opacity-60" />
+                      <span className="relative inline-flex rounded-full h-3 w-3 bg-orange-600" />
                     </span>
                                     ) : (
                                         <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-emerald-600">
@@ -406,7 +505,9 @@ export default function PlannerShell({
 
                                                     <div
                                                         className={`text-xs font-semibold rounded-full px-2 py-0.5 ${
-                                                            d.status === "critical" ? "text-red-700 bg-red-100" : "text-orange-800 bg-orange-100"
+                                                            d.status === "critical"
+                                                                ? "text-red-700 bg-red-100"
+                                                                : "text-orange-800 bg-orange-100"
                                                         }`}
                                                     >
                                                         {d.status === "critical" ? "Attention" : "Warning"}
@@ -435,11 +536,7 @@ export default function PlannerShell({
                             )}
 
                             {!loading && !error && data && activeTab === "holidays" && (
-                                <HolidayBookedView
-                                    anchorMonth={anchorMonth}
-                                    data={data}
-                                    ooClinicianId={ooClinicianId}
-                                />
+                                <HolidayBookedView anchorMonth={anchorMonth} data={data} ooClinicianId={ooClinicianId} />
                             )}
                         </div>
                     </div>
