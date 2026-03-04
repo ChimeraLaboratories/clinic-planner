@@ -115,9 +115,9 @@ export default function DayCell({
 
                     <div
                         className={`flex justify-between rounded px-1 py-0.5 ${
-                            valueCL > 2
+                            valueCL >= 1
                                 ? "text-slate-800"
-                                : valueCL >= 1
+                                : valueCL > 0 && valueCL < 1
                                     ? "bg-orange-100 text-slate-900 font-medium"
                                     : "bg-red-100 text-red-700 font-medium"
                         }`}

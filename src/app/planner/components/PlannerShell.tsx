@@ -10,34 +10,26 @@ import HolidayBookedView from "@/app/planner/components/HolidayBookedView";
 
 /**
  * IMPORTANT FIX:
- * Your "Days Requiring Supervisors" was still showing even after setting Supervisor in Store.
- * That means either:
- *  - the API is returning supervisorsInStore under a different date format, OR
- *  - some rows still have needsSupervisor = true and your UI trusts it, OR
- *  - the date string includes time/extra text.
+ * - Normalizes supervisionByDate dates to YYYY-MM-DD
+ * - Computes "needs supervisor" from actual supervisors present (clinic OR in-store)
  *
- * This rewrite:
- *  ✅ normalizes ALL supervisionByDate row dates to "YYYY-MM-DD" safely
- *  ✅ computes "needs supervisor" ONLY when:
- *       preRegCount > 0 AND supervisorsInClinic+supervisorsInStore are BOTH empty
- *  ✅ provides robust fallback to derive missing dates
- *  ✅ adds a small debug dump you can keep/remove
+ * ADDITION (per your request):
+ * ✅ Adds a NEW sidebar box identical to "Days with Low ST Value" but for CL:
+ *    "Days with Low CL Value" — computed from CL session values
  */
 
 function normalizeYmd(input: any): string | null {
     if (!input) return null;
 
-    // already in YYYY-MM-DD
+    // already in YYYY-MM-DD (or ISO-ish)
     if (typeof input === "string") {
         const s = input.trim();
 
-        // common: "2026-04-07T00:00:00.000Z" or "2026-04-07 00:00:00"
+        // "2026-04-07T00:00:00.000Z" or "2026-04-07 00:00:00"
         const mIso = s.match(/^(\d{4}-\d{2}-\d{2})/);
         if (mIso) return mIso[1];
 
-        // handle "07/04/2026" (UK) or "04/07/2026" (US) – we avoid guessing.
-        // If backend accidentally sends dd/mm/yyyy, we cannot infer reliably.
-        // We return null so it doesn't poison keys.
+        // avoid guessing dd/mm/yyyy
         return null;
     }
 
@@ -57,7 +49,6 @@ function getSessionDateKey(s: any): string | null {
     if (!v) return null;
 
     if (typeof v === "string") {
-        // prefer parsing as Date only if it works, but normalize to YYYY-MM-DD
         const d = new Date(v);
         if (!isNaN(d.getTime())) {
             const yyyy = d.getFullYear();
@@ -79,20 +70,10 @@ function getSessionDateKey(s: any): string | null {
     return null;
 }
 
-function getSessionSTValue(s: any): number {
-    const code = String(s?.session_type ?? s?.type ?? s?.clinic_code ?? "")
-        .trim()
-        .toUpperCase();
-
-    if (!code.startsWith("ST")) return 0;
-
-    const rawValue = s?.st_value ?? s?.value ?? s?.clinic_value ?? 0;
-    const n = Number(rawValue);
-    return Number.isFinite(n) ? n : 0;
-}
-
 function getSessionClinicCode(s: any): string {
-    return String(s?.session_type ?? s?.type ?? s?.clinic_code ?? s?.clinicCode ?? "")
+    return String(
+        s?.session_type ?? s?.type ?? s?.clinic_code ?? s?.clinicCode ?? ""
+    )
         .trim()
         .toUpperCase();
 }
@@ -100,6 +81,29 @@ function getSessionClinicCode(s: any): string {
 function isSTClinic(s: any): boolean {
     const code = getSessionClinicCode(s);
     return code === "ST" || code.startsWith("ST");
+}
+
+function isCLClinic(s: any): boolean {
+    const code = getSessionClinicCode(s);
+    return code === "CL" || code.startsWith("CL");
+}
+
+function getSessionSTValue(s: any): number {
+    const code = getSessionClinicCode(s);
+    if (!(code === "ST" || code.startsWith("ST"))) return 0;
+
+    const rawValue = s?.st_value ?? s?.value ?? s?.clinic_value ?? 0;
+    const n = Number(rawValue);
+    return Number.isFinite(n) ? n : 0;
+}
+
+function getSessionCLValue(s: any): number {
+    const code = getSessionClinicCode(s);
+    if (!(code === "CL" || code.startsWith("CL"))) return 0;
+
+    const rawValue = s?.cl_value ?? s?.value ?? s?.clinic_value ?? 0;
+    const n = Number(rawValue);
+    return Number.isFinite(n) ? n : 0;
 }
 
 type NeedsSupervisorDay = {
@@ -169,8 +173,7 @@ export default function PlannerShell({
     }
 
     /**
-     * Normalize supervisionByDate rows into a safe, reliable map keyed by YYYY-MM-DD.
-     * If backend returns "2026-04-07T..." this will still key correctly.
+     * Normalize supervisionByDate rows into a safe map keyed by YYYY-MM-DD.
      */
     const supervisionByDateMap = useMemo(() => {
         const rows: any[] = (data as any)?.supervisionByDate ?? [];
@@ -179,26 +182,25 @@ export default function PlannerShell({
         for (const r of rows) {
             const key = normalizeYmd(r?.date);
             if (!key) continue;
-            // last write wins; OK for this use case
             map.set(key, r);
         }
 
         return map;
     }, [data]);
 
-    // Keep your April debug but make it actually show if the API date keys are weird
     useEffect(() => {
         const sessions = (data?.sessions ?? []) as any[];
-        const uniqueDates = Array.from(new Set(sessions.map(getSessionDateKey).filter(Boolean))).sort();
+        const uniqueDates = Array.from(
+            new Set(sessions.map(getSessionDateKey).filter(Boolean) as string[])
+        ).sort();
         console.log("[debug] unique session date keys (month fetch)", uniqueDates);
 
         const rows: any[] = (data as any)?.supervisionByDate ?? [];
         const uniqueSupDates = Array.from(
-            new Set(rows.map((r) => normalizeYmd(r?.date)).filter(Boolean))
+            new Set(rows.map((r) => normalizeYmd(r?.date)).filter(Boolean) as string[])
         ).sort();
         console.log("[debug] unique supervisionByDate keys (normalized)", uniqueSupDates);
 
-        // Watch the Tuesdays you mentioned (April 2026)
         const watch = ["2026-04-07", "2026-04-14", "2026-04-21", "2026-04-28"];
         console.log(
             "[debug] watched supervision rows",
@@ -207,14 +209,7 @@ export default function PlannerShell({
     }, [data, supervisionByDateMap]);
 
     /**
-     * ✅ REAL SOURCE OF TRUTH (frontend):
-     * We compute "needs supervisor" ourselves from the row content, not from r.needsSupervisor.
-     * A day needs supervision ONLY if:
-     *   - preRegCount > 0
-     *   - AND supervisorsInClinic is empty
-     *   - AND supervisorsInStore is empty
-     *
-     * This guarantees that setting Supervisor In Store removes the day.
+     * Compute "needs supervisor" ourselves (do not trust backend flag).
      */
     const needsSupervisorDays = useMemo<NeedsSupervisorDay[]>(() => {
         const out: NeedsSupervisorDay[] = [];
@@ -241,7 +236,7 @@ export default function PlannerShell({
         return out.sort((a, b) => a.date.localeCompare(b.date));
     }, [supervisionByDateMap]);
 
-    // ✅ Show who is "Supervisor in store" even if not in clinic
+    // (Optional debug/utility)
     const supervisorInStoreOnlyDays = useMemo<StoreSupervisorDay[]>(() => {
         const out: StoreSupervisorDay[] = [];
 
@@ -284,7 +279,7 @@ export default function PlannerShell({
             out.push({
                 date: key,
                 totalST,
-                status: totalST <= 5 ? "critical" : totalST > 5 && totalST < 6 ? "warning" : "ok",
+                status: totalST <= 5 ? "critical" : totalST > 5 && totalST <= 6 ? "warning" : "ok",
             });
 
             cur.setDate(cur.getDate() + 1);
@@ -297,6 +292,50 @@ export default function PlannerShell({
         lowSTValueDays.some((d) => d.status === "critical")
             ? "critical"
             : lowSTValueDays.length > 0
+                ? "warning"
+                : "ok";
+
+    // ✅ NEW: Days where Total CL Value is low (includes days with 0)
+    const lowCLValueDays = useMemo(() => {
+        if (!data) return [];
+
+        const perDay = new Map<string, number>();
+
+        for (const s of (data.sessions ?? []) as any[]) {
+            const dateKey = getSessionDateKey(s);
+            if (!dateKey) continue;
+            if (!isCLClinic(s)) continue;
+
+            const clVal = getSessionCLValue(s);
+            perDay.set(dateKey, (perDay.get(dateKey) ?? 0) + clVal);
+        }
+
+        const start = monthStart(anchorMonth);
+        const end = monthEnd(anchorMonth);
+
+        const out: { date: string; totalCL: number; status: "critical" | "warning" | "ok" }[] = [];
+
+        const cur = new Date(start);
+        while (cur <= end) {
+            const key = ymd(cur);
+            const totalCL = perDay.get(key) ?? 0;
+
+            out.push({
+                date: key,
+                totalCL,
+                status: totalCL === 0 ? "critical" : "ok",
+            });
+
+            cur.setDate(cur.getDate() + 1);
+        }
+
+        return out.filter((d) => d.status !== "ok").sort((a, b) => a.date.localeCompare(b.date));
+    }, [data, anchorMonth]);
+
+    const clCardStatus =
+        lowCLValueDays.some((d) => d.status === "critical")
+            ? "critical"
+            : lowCLValueDays.length > 0
                 ? "warning"
                 : "ok";
 
@@ -380,9 +419,6 @@ export default function PlannerShell({
                                                     <div className="min-w-0">
                                                         <div className="text-sm font-semibold text-slate-900">{d.date}</div>
                                                         <div className="mt-1 text-xs text-slate-500">{d.preRegs}</div>
-
-                                                        {/* For "needs supervisor" days, there should be no supervisors.
-                                Keep this hidden to avoid confusion. */}
                                                     </div>
 
                                                     <div className="text-xs font-semibold text-red-700 bg-red-100 rounded-full px-2 py-0.5">
@@ -394,34 +430,6 @@ export default function PlannerShell({
                                     </div>
                                 )}
                             </div>
-
-                            {/* (Optional) Supervisor in store-only card (kept hidden unless you want it)
-                  You can uncomment if useful for debugging.
-              */}
-                            {/*
-              <div className="rounded-2xl border shadow-sm p-6 bg-slate-50 border-slate-200">
-                <div className="text-xs font-semibold tracking-wide uppercase text-slate-600">
-                  Supervisor in Store (not in clinic)
-                </div>
-                <div className="mt-3 text-4xl font-bold leading-none text-slate-800">
-                  {supervisorInStoreOnlyDays.length}
-                </div>
-                {supervisorInStoreOnlyDays.length > 0 && (
-                  <div className="mt-5 space-y-3">
-                    {supervisorInStoreOnlyDays.map((d) => (
-                      <button
-                        key={d.date}
-                        onClick={() => router.push(`/planner/${d.date}`)}
-                        className="w-full text-left rounded-xl border border-slate-200 bg-white px-4 py-3 hover:bg-slate-100 transition"
-                      >
-                        <div className="text-sm font-semibold text-slate-900">{d.date}</div>
-                        <div className="mt-1 text-xs text-slate-600">{d.supervisorsInStore}</div>
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-              */}
 
                             {/* CLINICS (ST VALUE) CARD */}
                             <div
@@ -477,9 +485,9 @@ export default function PlannerShell({
 
                                 <div className="mt-3 text-sm text-slate-700">
                                     {stCardStatus === "critical"
-                                        ? "Some days have Total ST Value below 6."
+                                        ? "Some days have Total ST Value below 5."
                                         : stCardStatus === "warning"
-                                            ? "Some days have Total ST Value at 6."
+                                            ? "Some days have Total ST Value between 5 and 6."
                                             : "All days meet ST value target."}
                                 </div>
 
@@ -518,6 +526,103 @@ export default function PlannerShell({
                                     </div>
                                 )}
                             </div>
+
+                            {/* ✅ NEW: CLINICS (CL VALUE) CARD — identical styling */}
+                            <div
+                                className={`rounded-2xl border shadow-sm p-6 transition-all ${
+                                    clCardStatus === "critical"
+                                        ? "bg-red-50 border-red-200"
+                                        : clCardStatus === "warning"
+                                            ? "bg-orange-50 border-orange-200"
+                                            : "bg-emerald-50 border-emerald-200"
+                                }`}
+                            >
+                                <div className="text-xs font-semibold tracking-wide uppercase text-slate-600">
+                                    Days with Low CL Value
+                                </div>
+
+                                <div className="mt-3 flex items-center gap-3">
+                                    <div
+                                        className={`text-4xl font-bold leading-none ${
+                                            clCardStatus === "critical"
+                                                ? "text-red-600"
+                                                : clCardStatus === "warning"
+                                                    ? "text-orange-700"
+                                                    : "text-emerald-600"
+                                        }`}
+                                    >
+                                        {lowCLValueDays.length}
+                                    </div>
+
+                                    {clCardStatus === "critical" ? (
+                                        <span className="relative flex h-3 w-3">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
+                      <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500" />
+                    </span>
+                                    ) : clCardStatus === "warning" ? (
+                                        <span className="relative flex h-3 w-3">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-orange-400 opacity-60" />
+                      <span className="relative inline-flex rounded-full h-3 w-3 bg-orange-600" />
+                    </span>
+                                    ) : (
+                                        <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-emerald-600">
+                      <svg viewBox="0 0 20 20" fill="none" className="h-4 w-4">
+                        <path
+                            d="M16.25 5.75L8.5 13.5L3.75 8.75"
+                            stroke="white"
+                            strokeWidth="2.5"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                        />
+                      </svg>
+                    </span>
+                                    )}
+                                </div>
+
+                                <div className="mt-3 text-sm text-slate-700">
+                                    {clCardStatus === "critical"
+                                        ? "Some days have Total CL Value of 0."
+                                            : "All days meet CL value target."}
+                                </div>
+
+                                {lowCLValueDays.length > 0 && (
+                                    <div className="mt-5 space-y-3">
+                                        {lowCLValueDays.map((d) => (
+                                            <button
+                                                key={d.date}
+                                                onClick={() => router.push(`/planner/${d.date}`)}
+                                                className={`w-full text-left rounded-xl border bg-white px-4 py-3 transition ${
+                                                    d.status === "critical"
+                                                        ? "border-red-200 hover:bg-red-50"
+                                                        : "border-orange-200 hover:bg-orange-50"
+                                                }`}
+                                            >
+                                                <div className="flex items-center justify-between">
+                                                    <div>
+                                                        <div className="text-sm font-semibold text-slate-900">{d.date}</div>
+                                                        <div className="mt-1 text-xs text-slate-500">
+                                                            Total CL Value: {d.totalCL.toFixed(2)}
+                                                        </div>
+                                                    </div>
+
+                                                    <div
+                                                        className={`text-xs font-semibold rounded-full px-2 py-0.5 ${
+                                                            d.status === "critical"
+                                                                ? "text-red-700 bg-red-100"
+                                                                : "text-orange-800 bg-orange-100"
+                                                        }`}
+                                                    >
+                                                        {d.status === "critical" ? "Attention" : "Warning"}
+                                                    </div>
+                                                </div>
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* (Optional) kept here for reference; not rendered */}
+                            {/* supervisorInStoreOnlyDays: {supervisorInStoreOnlyDays.length} */}
                         </div>
                     </aside>
 
