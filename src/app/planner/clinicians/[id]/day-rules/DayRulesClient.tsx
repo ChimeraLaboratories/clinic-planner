@@ -36,7 +36,10 @@ const activityOptions = [
     { value: "UNSET", label: "— Not Set —" },
 ];
 
-const activityVisuals: Record<string, { row: string; badge: string; muted?: boolean }> = {
+const activityVisuals: Record<
+    string,
+    { row: string; badge: string; muted?: boolean }
+> = {
     TESTING: {
         row: "bg-green-50 border-l-4 border-green-400",
         badge: "bg-green-100 text-green-800 border border-green-300 font-semibold",
@@ -73,7 +76,6 @@ const activityVisuals: Record<string, { row: string; badge: string; muted?: bool
     },
 };
 
-// ✅ include EVERY so initial render is valid
 const patternOptions: { value: Pattern; label: string; helper: string }[] = [
     { value: "W1", label: "Week A", helper: "Alternate week set 1" },
     { value: "W2", label: "Week B", helper: "Alternate week set 2" },
@@ -126,17 +128,17 @@ function normalizeWeekly(input: DayRuleRow[], selectedPattern: Pattern) {
 }
 
 export default function DayRulesClient({ clinicianId }: { clinicianId: number }) {
-    const [viewAsOfDate, setViewAsOfDate] = useState<string>(() => toLocalISODate(new Date()));
-    const [effectiveFrom, setEffectiveFrom] = useState<string>(() => toLocalISODate(new Date()));
+    const [viewAsOfDate, setViewAsOfDate] = useState(() => toLocalISODate(new Date()));
+    const [effectiveFrom, setEffectiveFrom] = useState(() => toLocalISODate(new Date()));
     const [layout, setLayout] = useState<"table" | "cards">("table");
-
     const [pattern, setPattern] = useState<Pattern>("W1");
 
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
+
     const [weekly, setWeekly] = useState<DayRuleRow[]>([]);
-    const [originalWeeklyJson, setOriginalWeeklyJson] = useState<string>("");
+    const [originalWeeklyJson, setOriginalWeeklyJson] = useState("");
 
     const weekdayMap = useMemo(() => {
         const m = new Map<number, DayRuleRow>();
@@ -163,17 +165,23 @@ export default function DayRulesClient({ clinicianId }: { clinicianId: number })
 
         try {
             const res = await fetch(
-                `/planner/api/clinicians/${clinicianId}/day-rules?date=${encodeURIComponent(
-                    viewAsOfDate
-                )}&pattern=${encodeURIComponent(pattern)}`,
+                `/planner/api/clinicians/${clinicianId}/day-rules?date=${encodeURIComponent(viewAsOfDate)}&pattern=${encodeURIComponent(
+                    pattern
+                )}`,
                 { cache: "no-store" }
             );
+
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
             const json = (await res.json()) as ApiResponse;
-
             const normalized = normalizeWeekly(json.weekly ?? [], pattern);
+
             setWeekly(normalized);
+
+            // ✅ When editing, default "effective from" to the currently-loaded ruleset effective_from
+            const currentEffectiveFrom =
+                normalized.find((r) => r.effective_from)?.effective_from ?? null;
+            if (currentEffectiveFrom) setEffectiveFrom(currentEffectiveFrom);
 
             const snap = JSON.stringify(
                 normalized.map(({ weekday, activity_code, start_time, end_time, note }) => ({
@@ -203,8 +211,7 @@ export default function DayRulesClient({ clinicianId }: { clinicianId: number })
         setWeekly((prev) =>
             prev.map((r) => {
                 if (r.weekday !== weekday) return r;
-
-                const next = { ...r, ...patch };
+                const next: DayRuleRow = { ...r, ...patch } as any;
 
                 if (patch.activity_code !== undefined && isDayOff(patch.activity_code)) {
                     next.start_time = null;
@@ -222,9 +229,11 @@ export default function DayRulesClient({ clinicianId }: { clinicianId: number })
 
         try {
             const payload = {
+                mode: "UPDATE_EXISTING",
                 effectiveFrom,
                 pattern,
                 rules: weekly.map((r) => ({
+                    id: r.id,
                     weekday: r.weekday,
                     activity_code: r.activity_code,
                     start_time: r.start_time,
@@ -244,7 +253,8 @@ export default function DayRulesClient({ clinicianId }: { clinicianId: number })
                 throw new Error(msg?.error ?? `Failed to save (HTTP ${res.status})`);
             }
 
-            setViewAsOfDate(effectiveFrom);
+            // Refresh view and reset dirty state
+            await load();
         } catch (e: any) {
             setError(e?.message ?? "Failed to save");
         } finally {
@@ -254,332 +264,277 @@ export default function DayRulesClient({ clinicianId }: { clinicianId: number })
 
     return (
         <div className="space-y-4">
-            <div className="rounded-lg border bg-white p-5 shadow-sm">
-                <div className="flex flex-wrap items-end justify-between gap-3">
-                    <div>
-                        <div className="text-sm text-gray-500">Weekly Day Rules</div>
-                        <div className="text-lg font-semibold">Sun → Sat</div>
-
-                        <div className="mt-1 text-xs text-gray-500">
-                            Pattern: <span className="font-semibold text-gray-700">{patternLabel(pattern)}</span>
-                        </div>
-                    </div>
-
-                    <div className="flex flex-wrap items-end gap-3">
-                        <div>
-                            <label className="block text-xs text-gray-500 mb-1">Pattern</label>
-                            <select
-                                value={pattern}
-                                onChange={(e) => setPattern(normalizePattern(e.target.value))}
-                                className="rounded border px-3 py-2 text-sm"
-                                disabled={saving}
-                                title="Choose alternate-week ruleset to view/edit"
-                            >
-                                {patternOptions.map((p) => (
-                                    <option key={p.value} value={p.value}>
-                                        {p.label} — {p.helper}
-                                    </option>
-                                ))}
-                            </select>
-                        </div>
-
-                        <div>
-                            <label className="block text-xs text-gray-500 mb-1">View as of</label>
-                            <input
-                                type="date"
-                                value={viewAsOfDate}
-                                onChange={(e) => setViewAsOfDate(e.target.value)}
-                                className="rounded border px-3 py-2 text-sm"
-                                disabled={saving}
-                            />
-                        </div>
-
-                        <div>
-                            <label className="block text-xs text-gray-500 mb-1">Save effective from</label>
-                            <input
-                                type="date"
-                                value={effectiveFrom}
-                                onChange={(e) => setEffectiveFrom(e.target.value)}
-                                className="rounded border px-3 py-2 text-sm"
-                                disabled={saving}
-                            />
-                        </div>
-
-                        <button
-                            onClick={load}
-                            className="rounded border px-3 py-2 text-sm hover:bg-gray-50 disabled:opacity-50"
-                            disabled={loading || saving}
-                        >
-                            {loading ? "Loading…" : "Refresh"}
-                        </button>
-
-                        <button
-                            onClick={() => setLayout((v) => (v === "table" ? "cards" : "table"))}
-                            className="rounded border px-3 py-2 text-sm hover:bg-gray-50 disabled:opacity-50"
-                            disabled={loading || saving}
-                            title="Toggle layout"
-                        >
-                            {layout === "table" ? "Cards view" : "Table view"}
-                        </button>
-
-                        <button
-                            onClick={save}
-                            className="rounded border px-3 py-2 text-sm hover:bg-gray-50 disabled:opacity-50"
-                            disabled={loading || saving || !isDirty}
-                            title={!isDirty ? "No changes to save" : "Save new effective rules"}
-                        >
-                            {saving ? "Saving…" : "Save"}
-                        </button>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+                <div>
+                    <div className="text-lg font-semibold">Weekly Day Rules</div>
+                    <div className="text-sm text-gray-500">Sun → Sat</div>
+                    <div className="text-sm">
+                        <span className="text-gray-500">Pattern:</span>{" "}
+                        <span className="font-medium">{patternLabel(pattern)}</span>
                     </div>
                 </div>
 
-                {error && <div className="mt-4 rounded border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</div>}
+                <div className="flex flex-wrap items-end gap-2">
+                    <label className="flex flex-col gap-1 text-xs text-gray-500">
+                        Pattern
+                        <select
+                            value={pattern}
+                            onChange={(e) => setPattern(normalizePattern(e.target.value))}
+                            className="rounded border px-3 py-2 text-sm"
+                            disabled={saving}
+                            title="Choose alternate-week ruleset to view/edit"
+                        >
+                            {patternOptions.map((p) => (
+                                <option key={p.value} value={p.value}>
+                                    {p.label} — {p.helper}
+                                </option>
+                            ))}
+                        </select>
+                    </label>
 
-                <div className="mt-4">
-                    {/* ✅ Don’t flash UNSET while loading */}
-                    {loading ? (
-                        <div className="rounded-lg border bg-gray-50 p-4 text-sm text-gray-600">
-                            Loading day rules…
-                        </div>
-                    ) : layout === "table" ? (
-                        <div className="overflow-x-auto">
-                            <table className="min-w-full text-sm">
-                                <thead className="bg-gray-50 text-gray-600">
-                                <tr>
-                                    <th className="text-left p-3">Day</th>
-                                    <th className="text-left p-3">Activity</th>
-                                    <th className="text-left p-3">Start</th>
-                                    <th className="text-left p-3">End</th>
-                                    <th className="text-left p-3">Note</th>
-                                    <th className="text-left p-3">Current effective</th>
-                                </tr>
-                                </thead>
+                    <label className="flex flex-col gap-1 text-xs text-gray-500">
+                        View as of
+                        <input
+                            type="date"
+                            value={viewAsOfDate}
+                            onChange={(e) => setViewAsOfDate(e.target.value)}
+                            className="rounded border px-3 py-2 text-sm"
+                            disabled={saving}
+                        />
+                    </label>
 
-                                <tbody>
-                                {weekdayNames.map((dayName, weekday) => {
-                                    const r = weekdayMap.get(weekday);
-                                    const code = activityOptions.some((a) => a.value === r?.activity_code)
-                                        ? (r?.activity_code as string)
-                                        : "UNSET";
-                                    const visual = activityVisuals[code];
-                                    const off = isDayOff(r?.activity_code);
+                    <label className="flex flex-col gap-1 text-xs text-gray-500">
+                        Effective from
+                        <input
+                            type="date"
+                            value={effectiveFrom}
+                            onChange={(e) => setEffectiveFrom(e.target.value)}
+                            className="rounded border px-3 py-2 text-sm"
+                            disabled={saving}
+                        />
+                    </label>
 
-                                    return (
-                                        <tr
-                                            key={weekday}
-                                            className={[
-                                                "border-t transition-all duration-150",
-                                                "hover:-translate-y-[1px] hover:shadow-sm hover:bg-white",
-                                                visual?.row ?? "",
-                                                visual?.muted ? "opacity-80" : "",
-                                            ].join(" ")}
+                    <button
+                        onClick={load}
+                        className="rounded border px-3 py-2 text-sm hover:bg-gray-50 disabled:opacity-50"
+                        disabled={loading || saving}
+                    >
+                        {loading ? "Loading…" : "Refresh"}
+                    </button>
+
+                    <button
+                        onClick={() => setLayout((v) => (v === "table" ? "cards" : "table"))}
+                        className="rounded border px-3 py-2 text-sm hover:bg-gray-50 disabled:opacity-50"
+                        disabled={loading || saving}
+                        title="Toggle layout"
+                    >
+                        {layout === "table" ? "Cards view" : "Table view"}
+                    </button>
+
+                    <button
+                        onClick={save}
+                        className="rounded bg-black px-4 py-2 text-sm text-white disabled:opacity-50"
+                        disabled={saving || loading || !isDirty}
+                        title={!isDirty ? "No changes to save" : "Save changes"}
+                    >
+                        {saving ? "Saving…" : "Save"}
+                    </button>
+                </div>
+            </div>
+
+            {error && (
+                <div className="rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
+                    {error}
+                </div>
+            )}
+
+            {/* ✅ Don’t flash UNSET while loading */}
+            {loading ? (
+                <div className="rounded border bg-white p-4 text-sm text-gray-600">Loading day rules…</div>
+            ) : layout === "table" ? (
+                <div className="overflow-x-auto rounded border bg-white">
+                    <table className="min-w-full text-sm">
+                        <thead className="bg-gray-50 text-left text-xs uppercase text-gray-500">
+                        <tr>
+                            <th className="px-3 py-2">Day</th>
+                            <th className="px-3 py-2">Activity</th>
+                            <th className="px-3 py-2">Start</th>
+                            <th className="px-3 py-2">End</th>
+                            <th className="px-3 py-2">Note</th>
+                            <th className="px-3 py-2">Current effective</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        {weekdayNames.map((dayName, weekday) => {
+                            const r = weekdayMap.get(weekday);
+                            const code = activityOptions.some((a) => a.value === r?.activity_code)
+                                ? (r?.activity_code as string)
+                                : "UNSET";
+                            const visual = activityVisuals[code] ?? activityVisuals.UNSET;
+                            const off = isDayOff(r?.activity_code);
+
+                            return (
+                                <tr key={weekday} className={`${visual.row} border-t`}>
+                                    <td className="px-3 py-2 font-medium">{dayName}</td>
+
+                                    <td className="px-3 py-2">
+                      <span className={`inline-flex items-center rounded px-2 py-1 text-xs ${visual.badge}`}>
+                        {activityLabel(r?.activity_code)}
+                      </span>
+                                    </td>
+
+                                    <td className="px-3 py-2">
+                                        <select
+                                            value={r?.activity_code ?? "UNSET"}
+                                            onChange={(e) => updateWeekday(weekday, { activity_code: e.target.value })}
+                                            className="w-full rounded border px-2 py-1 text-sm"
+                                            disabled={saving || !r}
                                         >
-                                            <td className="p-3">
-                                                <div className="flex items-center gap-3">
-                                                        <span className={["text-sm", off ? "font-bold" : "font-semibold"].join(" ")}>
-                                                            {dayName}
-                                                        </span>
+                                            {activityOptions.map((opt) => (
+                                                <option key={opt.value} value={opt.value}>
+                                                    {opt.label}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </td>
 
-                                                    <span
-                                                        className={[
-                                                            "px-2 py-1 rounded-md text-xs",
-                                                            visual?.badge ??
-                                                            "bg-gray-100 text-gray-700 border border-gray-200 font-medium",
-                                                        ].join(" ")}
-                                                    >
-                                                            {activityLabel(r?.activity_code)}
-                                                        </span>
+                                    <td className="px-3 py-2">
+                                        <input
+                                            type="time"
+                                            value={r?.start_time ? r.start_time.slice(0, 5) : ""}
+                                            onChange={(e) =>
+                                                updateWeekday(weekday, {
+                                                    start_time: e.target.value ? `${e.target.value}:00` : null,
+                                                })
+                                            }
+                                            className="w-full rounded border px-2 py-1 text-sm"
+                                            disabled={saving || !r || off}
+                                        />
+                                        {off && <div className="mt-1 text-xs text-gray-500">(times disabled)</div>}
+                                    </td>
 
-                                                    {off && <span className="text-xs text-gray-500">(times disabled)</span>}
-                                                </div>
-                                            </td>
+                                    <td className="px-3 py-2">
+                                        <input
+                                            type="time"
+                                            value={r?.end_time ? r.end_time.slice(0, 5) : ""}
+                                            onChange={(e) =>
+                                                updateWeekday(weekday, {
+                                                    end_time: e.target.value ? `${e.target.value}:00` : null,
+                                                })
+                                            }
+                                            className="w-full rounded border px-2 py-1 text-sm"
+                                            disabled={saving || !r || off}
+                                        />
+                                    </td>
 
-                                            <td className="p-3">
-                                                <select
-                                                    className="rounded border px-2 py-1"
-                                                    value={r?.activity_code ?? "TESTING"}
-                                                    onChange={(e) => updateWeekday(weekday, { activity_code: e.target.value })}
-                                                    disabled={saving || !r}
-                                                >
-                                                    {activityOptions.map((opt) => (
-                                                        <option key={opt.value} value={opt.value}>
-                                                            {opt.label}
-                                                        </option>
-                                                    ))}
-                                                </select>
-                                            </td>
+                                    <td className="px-3 py-2">
+                                        <input
+                                            value={r?.note ?? ""}
+                                            onChange={(e) => updateWeekday(weekday, { note: e.target.value || null })}
+                                            className="w-full rounded border px-2 py-1 text-sm"
+                                            disabled={saving || !r}
+                                            placeholder="Optional"
+                                        />
+                                    </td>
 
-                                            <td className="p-3">
-                                                <input
-                                                    type="time"
-                                                    className={["rounded border px-2 py-1", off ? "bg-gray-50 text-gray-400" : ""].join(
-                                                        " "
-                                                    )}
-                                                    value={(r?.start_time ?? "").slice(0, 5)}
-                                                    onChange={(e) =>
-                                                        updateWeekday(weekday, {
-                                                            start_time: e.target.value ? `${e.target.value}:00` : null,
-                                                        })
-                                                    }
-                                                    disabled={saving || !r || off}
-                                                />
-                                            </td>
+                                    <td className="px-3 py-2 text-xs text-gray-700">
+                                        {r?.effective_from ?? "-"}
+                                        {r?.effective_to ? ` → ${r.effective_to}` : ""}
+                                    </td>
+                                </tr>
+                            );
+                        })}
+                        </tbody>
+                    </table>
+                </div>
+            ) : (
+                <div className="grid gap-3 md:grid-cols-2">
+                    {weekdayNames.map((dayName, weekday) => {
+                        const r = weekdayMap.get(weekday);
+                        const visual = activityVisuals[r?.activity_code ?? "UNSET"] ?? activityVisuals.UNSET;
+                        const off = isDayOff(r?.activity_code);
 
-                                            <td className="p-3">
-                                                <input
-                                                    type="time"
-                                                    className={["rounded border px-2 py-1", off ? "bg-gray-50 text-gray-400" : ""].join(
-                                                        " "
-                                                    )}
-                                                    value={(r?.end_time ?? "").slice(0, 5)}
-                                                    onChange={(e) =>
-                                                        updateWeekday(weekday, {
-                                                            end_time: e.target.value ? `${e.target.value}:00` : null,
-                                                        })
-                                                    }
-                                                    disabled={saving || !r || off}
-                                                />
-                                            </td>
+                        return (
+                            <div key={weekday} className={`rounded border bg-white p-4 ${visual.row}`}>
+                                <div className="flex items-start justify-between">
+                                    <div className="font-semibold">{dayName}</div>
+                                    <span className={`inline-flex items-center rounded px-2 py-1 text-xs ${visual.badge}`}>
+                    {activityLabel(r?.activity_code)}
+                  </span>
+                                </div>
 
-                                            <td className="p-3">
-                                                <input
-                                                    className={[
-                                                        "w-full min-w-[180px] rounded border px-2 py-1",
-                                                        off ? "bg-gray-50" : "",
-                                                    ].join(" ")}
-                                                    value={r?.note ?? ""}
-                                                    onChange={(e) => updateWeekday(weekday, { note: e.target.value || null })}
-                                                    disabled={saving || !r}
-                                                    placeholder="Optional"
-                                                />
-                                            </td>
+                                <div className="mt-3 grid gap-2">
+                                    <label className="text-xs text-gray-500">
+                                        Activity
+                                        <select
+                                            value={r?.activity_code ?? "UNSET"}
+                                            onChange={(e) => updateWeekday(weekday, { activity_code: e.target.value })}
+                                            className="mt-1 w-full rounded border px-2 py-1 text-sm"
+                                            disabled={saving || !r}
+                                        >
+                                            {activityOptions.map((opt) => (
+                                                <option key={opt.value} value={opt.value}>
+                                                    {opt.label}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </label>
 
-                                            <td className="p-3 text-xs text-gray-600">
-                                                {r?.effective_from ?? "-"}
-                                                {r?.effective_to ? ` → ${r.effective_to}` : ""}
-                                            </td>
-                                        </tr>
-                                    );
-                                })}
-                                </tbody>
-                            </table>
-                        </div>
-                    ) : (
-                        <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
-                            {weekdayNames.map((dayName, weekday) => {
-                                const r = weekdayMap.get(weekday);
-                                const visual = activityVisuals[r?.activity_code ?? ""];
-                                const off = isDayOff(r?.activity_code);
+                                    <label className="text-xs text-gray-500">
+                                        Start
+                                        <input
+                                            type="time"
+                                            value={r?.start_time ? r.start_time.slice(0, 5) : ""}
+                                            onChange={(e) =>
+                                                updateWeekday(weekday, {
+                                                    start_time: e.target.value ? `${e.target.value}:00` : null,
+                                                })
+                                            }
+                                            className="mt-1 w-full rounded border px-2 py-1 text-sm"
+                                            disabled={saving || !r || off}
+                                        />
+                                    </label>
 
-                                return (
-                                    <div
-                                        key={weekday}
-                                        className={[
-                                            "rounded-lg border bg-white p-4 shadow-sm transition-all duration-150",
-                                            "hover:-translate-y-[1px] hover:shadow-md",
-                                            visual?.row ?? "",
-                                            visual?.muted ? "opacity-80" : "",
-                                        ].join(" ")}
-                                    >
-                                        <div className="flex items-start justify-between gap-3">
-                                            <div>
-                                                <div className={["text-base", off ? "font-bold" : "font-semibold"].join(" ")}>
-                                                    {dayName}
-                                                </div>
+                                    <label className="text-xs text-gray-500">
+                                        End
+                                        <input
+                                            type="time"
+                                            value={r?.end_time ? r.end_time.slice(0, 5) : ""}
+                                            onChange={(e) =>
+                                                updateWeekday(weekday, {
+                                                    end_time: e.target.value ? `${e.target.value}:00` : null,
+                                                })
+                                            }
+                                            className="mt-1 w-full rounded border px-2 py-1 text-sm"
+                                            disabled={saving || !r || off}
+                                        />
+                                        {off && <div className="mt-1 text-xs text-gray-500">(times disabled)</div>}
+                                    </label>
 
-                                                <div className="mt-2">
-                                                    <span
-                                                        className={[
-                                                            "inline-flex px-2 py-1 rounded-md text-xs",
-                                                            visual?.badge ??
-                                                            "bg-gray-100 text-gray-700 border border-gray-200 font-medium",
-                                                        ].join(" ")}
-                                                    >
-                                                        {activityLabel(r?.activity_code)}
-                                                    </span>
+                                    <label className="text-xs text-gray-500">
+                                        Note
+                                        <input
+                                            value={r?.note ?? ""}
+                                            onChange={(e) => updateWeekday(weekday, { note: e.target.value || null })}
+                                            className="mt-1 w-full rounded border px-2 py-1 text-sm"
+                                            disabled={saving || !r}
+                                            placeholder="Optional"
+                                        />
+                                    </label>
 
-                                                    {off && <span className="ml-2 text-xs text-gray-500">(times disabled)</span>}
-                                                </div>
-                                            </div>
-
-                                            <select
-                                                className="rounded border px-2 py-1 text-sm"
-                                                value={r?.activity_code ?? "TESTING"}
-                                                onChange={(e) => updateWeekday(weekday, { activity_code: e.target.value })}
-                                                disabled={saving || !r}
-                                            >
-                                                {activityOptions.map((opt) => (
-                                                    <option key={opt.value} value={opt.value}>
-                                                        {opt.label}
-                                                    </option>
-                                                ))}
-                                            </select>
-                                        </div>
-
-                                        <div className="mt-4 grid grid-cols-2 gap-3">
-                                            <div>
-                                                <div className="text-xs text-gray-500 mb-1">Start</div>
-                                                <input
-                                                    type="time"
-                                                    className={[
-                                                        "w-full rounded border px-2 py-1",
-                                                        off ? "bg-gray-50 text-gray-400" : "",
-                                                    ].join(" ")}
-                                                    value={(r?.start_time ?? "").slice(0, 5)}
-                                                    onChange={(e) =>
-                                                        updateWeekday(weekday, {
-                                                            start_time: e.target.value ? `${e.target.value}:00` : null,
-                                                        })
-                                                    }
-                                                    disabled={saving || !r || off}
-                                                />
-                                            </div>
-
-                                            <div>
-                                                <div className="text-xs text-gray-500 mb-1">End</div>
-                                                <input
-                                                    type="time"
-                                                    className={[
-                                                        "w-full rounded border px-2 py-1",
-                                                        off ? "bg-gray-50 text-gray-400" : "",
-                                                    ].join(" ")}
-                                                    value={(r?.end_time ?? "").slice(0, 5)}
-                                                    onChange={(e) =>
-                                                        updateWeekday(weekday, {
-                                                            end_time: e.target.value ? `${e.target.value}:00` : null,
-                                                        })
-                                                    }
-                                                    disabled={saving || !r || off}
-                                                />
-                                            </div>
-                                        </div>
-
-                                        <div className="mt-3">
-                                            <div className="text-xs text-gray-500 mb-1">Note</div>
-                                            <input
-                                                className={["w-full rounded border px-2 py-1", off ? "bg-gray-50" : ""].join(" ")}
-                                                value={r?.note ?? ""}
-                                                onChange={(e) => updateWeekday(weekday, { note: e.target.value || null })}
-                                                disabled={saving || !r}
-                                                placeholder="Optional"
-                                            />
-                                        </div>
-
-                                        <div className="mt-3 text-xs text-gray-600">
-                                            {r?.effective_from ?? "-"}
-                                            {r?.effective_to ? ` → ${r?.effective_to}` : ""}
-                                        </div>
+                                    <div className="text-xs text-gray-600">
+                                        {r?.effective_from ?? "-"}
+                                        {r?.effective_to ? ` → ${r?.effective_to}` : ""}
                                     </div>
-                                );
-                            })}
-                        </div>
-                    )}
+                                </div>
+                            </div>
+                        );
+                    })}
                 </div>
+            )}
 
-                <div className="mt-4 text-xs text-gray-500">
-                    Saving creates a new weekly ruleset effective from the selected date (history preserved) for the selected
-                    pattern.
-                </div>
+            <div className="text-xs text-gray-500">
+                Saving updates the existing weekly ruleset rows for the selected pattern (no duplicate rows created).
             </div>
         </div>
     );

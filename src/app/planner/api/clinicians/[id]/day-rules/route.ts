@@ -29,13 +29,14 @@ function computeIsAvailableShift(activity_code: string | null | undefined): numb
 }
 
 /**
- * GET /planner/api/clinicians/:id/day-rules?date=YYYY-MM-DD&pattern=EVERY|W1|W2
+ * GET /planner/api/clinicians/:id/day-rules?date=YYYY-MM-DD&pattern=W1|W2
  * Returns the weekly set (one per weekday) for that pattern effective at the given date.
  */
 export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }) {
     try {
         const { id } = await ctx.params;
         const clinicianId = Number(id);
+
         if (!Number.isFinite(clinicianId)) {
             return NextResponse.json({ error: "Invalid clinician id" }, { status: 400 });
         }
@@ -44,9 +45,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
         const dateParam = url.searchParams.get("date");
         const patternParam = url.searchParams.get("pattern");
 
-        const date =
-            dateParam && isValidISODate(dateParam) ? dateParam : new Date().toISOString().slice(0, 10);
-
+        const date = dateParam && isValidISODate(dateParam) ? dateParam : new Date().toISOString().slice(0, 10);
         const pattern: Pattern = normalizePattern(patternParam);
 
         // One effective rule per weekday (0-6) FOR THE REQUESTED PATTERN
@@ -63,8 +62,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
                   AND (effective_to IS NULL OR effective_to >= ?)
                 GROUP BY weekday
             ) pick
-                          ON pick.weekday = r.weekday
-                              AND pick.max_from = r.effective_from
+                          ON pick.weekday = r.weekday AND pick.max_from = r.effective_from
             WHERE r.clinician_id = ?
               AND r.is_active = 1
               AND r.pattern_code = ?
@@ -91,22 +89,29 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
             };
         });
 
-        return NextResponse.json({
-            clinician_id: clinicianId,
-            date,
-            pattern,
-            weekly,
-        });
+        return NextResponse.json({ clinician_id: clinicianId, date, pattern, weekly });
     } catch (e: any) {
         console.error("[day-rules GET] error:", e);
         return NextResponse.json({ error: "Server error" }, { status: 500 });
     }
 }
+
+type IncomingRule = {
+    id?: number | null;
+    weekday: number;
+    activity_code: string;
+    start_time: string | null;
+    end_time: string | null;
+    note: string | null;
+};
+
 export async function PUT(req: Request, ctx: { params: Promise<{ id: string }> }) {
     let conn: any;
+
     try {
         const { id } = await ctx.params;
         const clinicianId = Number(id);
+
         if (!Number.isFinite(clinicianId)) {
             return NextResponse.json({ error: "Invalid clinician id" }, { status: 400 });
         }
@@ -114,8 +119,9 @@ export async function PUT(req: Request, ctx: { params: Promise<{ id: string }> }
         const body = await req.json().catch(() => null);
         if (!body) return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
 
+        const mode = String(body.mode ?? "").trim().toUpperCase(); // "UPDATE_EXISTING" | (blank => legacy insert-new)
         const effectiveFrom = String(body.effectiveFrom ?? "");
-        const rules = body.rules as any[];
+        const rules = body.rules as IncomingRule[];
         const pattern: Pattern = normalizePattern(body.pattern ?? "W1");
 
         if (!isValidISODate(effectiveFrom)) {
@@ -130,6 +136,7 @@ export async function PUT(req: Request, ctx: { params: Promise<{ id: string }> }
         const seen = new Set<number>();
         for (const r of rules) {
             const weekday = Number(r.weekday);
+
             if (!Number.isFinite(weekday) || weekday < 0 || weekday > 6) {
                 return NextResponse.json({ error: "weekday must be 0-6" }, { status: 400 });
             }
@@ -143,37 +150,115 @@ export async function PUT(req: Request, ctx: { params: Promise<{ id: string }> }
                 return NextResponse.json({ error: "activity_code is required for each weekday" }, { status: 400 });
             }
 
-            if (!isValidTimeOrNull(r.start_time ?? null) || !isValidTimeOrNull(r.end_time ?? null)) {
+            if (!isValidTimeOrNull((r as any).start_time ?? null) || !isValidTimeOrNull((r as any).end_time ?? null)) {
                 return NextResponse.json({ error: "start_time/end_time must be HH:MM:SS or null" }, { status: 400 });
             }
 
-            const note = r.note ?? null;
+            const note = (r as any).note ?? null;
             if (note !== null && typeof note !== "string") {
                 return NextResponse.json({ error: "note must be string or null" }, { status: 400 });
             }
-
-            // If client sends pattern_code per row, we ignore it and use body.pattern to keep set consistent.
-            // (Optional: you can validate they match and error if not.)
         }
 
         conn = await db.getConnection();
         await conn.beginTransaction();
 
-        // Close overlapping existing rules for THIS pattern only
+        // ✅ NEW BEHAVIOUR: update existing rows (no new rows created) when mode=UPDATE_EXISTING
+        if (mode === "UPDATE_EXISTING") {
+            for (const r of rules) {
+                const weekday = Number(r.weekday);
+                const activity = String(r.activity_code).trim();
+                const is_available_shift = computeIsAvailableShift(activity);
+
+                // If we have an id, update that exact row.
+                if (r.id !== null && r.id !== undefined) {
+                    await conn.query(
+                        `
+              UPDATE clinician_day_rule
+              SET activity_code = ?,
+                  start_time = ?,
+                  end_time = ?,
+                  note = ?,
+                  is_available_shift = ?
+              WHERE id = ?
+                AND clinician_id = ?
+                AND pattern_code = ?
+                AND is_active = 1
+              LIMIT 1
+            `,
+                        [activity, r.start_time ?? null, r.end_time ?? null, r.note ?? null, is_available_shift, Number(r.id), clinicianId, pattern]
+                    );
+                    continue;
+                }
+
+                // If no id (e.g. was UNSET / no row in DB), try to find an existing row for this effective_from then update it,
+                // otherwise insert a new row for that weekday/effective_from.
+                const [existing] = await conn.query(
+                    `
+            SELECT id
+            FROM clinician_day_rule
+            WHERE clinician_id = ?
+              AND weekday = ?
+              AND pattern_code = ?
+              AND effective_from = ?
+              AND is_active = 1
+            ORDER BY id DESC
+            LIMIT 1
+          `,
+                    [clinicianId, weekday, pattern, effectiveFrom]
+                );
+
+                const existingId = (existing as any[])?.[0]?.id ? Number((existing as any[])?.[0]?.id) : null;
+
+                if (existingId) {
+                    await conn.query(
+                        `
+              UPDATE clinician_day_rule
+              SET activity_code = ?,
+                  start_time = ?,
+                  end_time = ?,
+                  note = ?,
+                  is_available_shift = ?
+              WHERE id = ?
+                AND clinician_id = ?
+                AND pattern_code = ?
+                AND is_active = 1
+              LIMIT 1
+            `,
+                        [activity, r.start_time ?? null, r.end_time ?? null, r.note ?? null, is_available_shift, existingId, clinicianId, pattern]
+                    );
+                } else {
+                    await conn.query(
+                        `
+              INSERT INTO clinician_day_rule
+                (clinician_id, weekday, pattern_code, activity_code, start_time, end_time, effective_from, effective_to, note, is_available_shift, is_active)
+              VALUES
+                (?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, 1)
+            `,
+                        [clinicianId, weekday, pattern, activity, r.start_time ?? null, r.end_time ?? null, effectiveFrom, r.note ?? null, is_available_shift]
+                    );
+                }
+            }
+
+            await conn.commit();
+            conn.release?.();
+            return NextResponse.json({ ok: true });
+        }
+
+        // ✅ LEGACY BEHAVIOUR (unchanged): create a new weekly set effective from date (history preserved)
         await conn.query(
             `
-                UPDATE clinician_day_rule
-                SET effective_to = DATE_SUB(?, INTERVAL 1 DAY)
-                WHERE clinician_id = ?
-                  AND is_active = 1
-                  AND pattern_code = ?
-                  AND effective_from < ?
-                  AND (effective_to IS NULL OR effective_to >= ?)
-            `,
+        UPDATE clinician_day_rule
+        SET effective_to = DATE_SUB(?, INTERVAL 1 DAY)
+        WHERE clinician_id = ?
+          AND is_active = 1
+          AND pattern_code = ?
+          AND effective_from < ?
+          AND (effective_to IS NULL OR effective_to >= ?)
+      `,
             [effectiveFrom, clinicianId, pattern, effectiveFrom, effectiveFrom]
         );
 
-        // Insert the new weekly set for THIS pattern
         const values: any[] = [];
         const rowsSql: string[] = [];
 
@@ -185,7 +270,7 @@ export async function PUT(req: Request, ctx: { params: Promise<{ id: string }> }
             values.push(
                 clinicianId,
                 Number(r.weekday),
-                pattern,                 // ✅ use the selected pattern
+                pattern,
                 activity,
                 r.start_time ?? null,
                 r.end_time ?? null,
@@ -206,7 +291,6 @@ export async function PUT(req: Request, ctx: { params: Promise<{ id: string }> }
 
         await conn.commit();
         conn.release?.();
-
         return NextResponse.json({ ok: true });
     } catch (e: any) {
         try {
@@ -218,7 +302,10 @@ export async function PUT(req: Request, ctx: { params: Promise<{ id: string }> }
 
         if (String(e?.code) === "ER_DUP_ENTRY") {
             return NextResponse.json(
-                { error: "Rules already exist for this clinician, pattern, and effective-from date. Pick a different effective date." },
+                {
+                    error:
+                        "Rules already exist for this clinician, pattern, and effective-from date. Pick a different effective date.",
+                },
                 { status: 409 }
             );
         }
