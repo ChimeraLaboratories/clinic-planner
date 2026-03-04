@@ -36,8 +36,12 @@ function findClinician(clinicians: any[], id: number) {
  */
 function weekdayMatchesRule(date: Date, rule: any): boolean {
     const jsDay = date.getDay();
-
-    const raw = rule?.weekday ?? rule?.uk_day ?? rule?.day_of_week ?? rule?.dayOfWeek ?? rule?.dow;
+    const raw =
+        rule?.weekday ??
+        rule?.uk_day ??
+        rule?.day_of_week ??
+        rule?.dayOfWeek ??
+        rule?.dow;
 
     const n = Number(raw);
     if (Number.isFinite(n) && n >= 0 && n <= 6) return n === jsDay;
@@ -86,6 +90,7 @@ function extractAssignedClinicianIds(rooms: any[]): Set<number> {
 function clinicianLabel(c: any) {
     const name = String(c?.display_name ?? c?.full_name ?? "").trim();
     if (name) return name;
+
     const id = clinicianIdOf(c);
     return Number.isFinite(id) ? `Clinician ${id}` : "Clinician";
 }
@@ -110,16 +115,34 @@ function classifyActivity(activityCodeRaw: any): "OO" | "CLO" | null {
         "ADMIN",
         "SF",
     ]);
+
     if (notWorking.has(a)) return null;
 
     if (a === "CL" || a.startsWith("CL_") || a.includes("CLO")) return "CLO";
+
     return "OO";
 }
 
-function bestRuleForClinician(cid: number, rulesForDay: DayRuleLike[], weekPattern: string): DayRuleLike | null {
-    const mine = (rulesForDay ?? []).filter((r) => Number(r?.clinician_id) === cid);
+function isGroundFloorActivity(activityCodeRaw: any): boolean {
+    const a = String(activityCodeRaw ?? "").trim().toUpperCase();
+    if (!a) return false;
 
-    const exact = mine.find((r) => String(r?.pattern_code ?? "").trim().toUpperCase() === weekPattern);
+    // user asked specifically "GF" — support common variants safely
+    return a === "GF" || a === "GF_DAY" || a.startsWith("GF_");
+}
+
+function bestRuleForClinician(
+    cid: number,
+    rulesForDay: DayRuleLike[],
+    weekPattern: string
+): DayRuleLike | null {
+    const mine = (rulesForDay ?? []).filter(
+        (r) => Number(r?.clinician_id) === cid
+    );
+
+    const exact = mine.find(
+        (r) => String(r?.pattern_code ?? "").trim().toUpperCase() === weekPattern
+    );
     if (exact) return exact;
 
     const every = mine.find((r) => {
@@ -133,47 +156,34 @@ function bestRuleForClinician(cid: number, rulesForDay: DayRuleLike[], weekPatte
 function StatusDot({ status }: { status: "ok" | "warning" | "critical" }) {
     if (status === "critical") {
         return (
-            <span className="relative flex h-3 w-3">
-        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
-        <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500" />
-      </span>
+            <span className="inline-flex h-2 w-2 rounded-full bg-red-500 shadow" />
         );
     }
-
     if (status === "warning") {
         return (
-            <span className="relative flex h-3 w-3">
-        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-orange-400 opacity-60" />
-        <span className="relative inline-flex rounded-full h-3 w-3 bg-orange-600" />
-      </span>
+            <span className="inline-flex h-2 w-2 rounded-full bg-orange-500 shadow" />
         );
     }
-
     return (
-        <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-emerald-600">
-      <svg viewBox="0 0 20 20" fill="none" className="h-4 w-4">
-        <path
-            d="M16.25 5.75L8.5 13.5L3.75 8.75"
-            stroke="white"
-            strokeWidth="2.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-        />
-      </svg>
-    </span>
+        <span className="inline-flex h-2 w-2 rounded-full bg-emerald-500 shadow" />
     );
 }
 
-function holidayIdsForDate(holidays: HolidayLike[] | undefined, dateISO: string): Set<number> {
+function holidayIdsForDate(
+    holidays: HolidayLike[] | undefined,
+    dateISO: string
+): Set<number> {
     const ids = new Set<number>();
     const key = String(dateISO).slice(0, 10);
 
     for (const h of holidays ?? []) {
         const d = String((h as any)?.date ?? "").slice(0, 10);
         if (d !== key) continue;
+
         const cid = Number((h as any)?.clinician_id ?? (h as any)?.clinicianId);
         if (Number.isFinite(cid) && cid > 0) ids.add(cid);
     }
+
     return ids;
 }
 
@@ -191,7 +201,6 @@ export default function DayExpectedSidebar({
     holidays?: HolidayLike[];
 }) {
     const date = parseYmdLocal(dateISO);
-
     if (!Number.isFinite(date.getTime())) {
         console.log("[DayExpectedSidebar] invalid date input", { dateISO });
         return null;
@@ -203,13 +212,20 @@ export default function DayExpectedSidebar({
     const assignedClinicianIds = extractAssignedClinicianIds(rooms);
     const holidayClinicianIds = holidayIdsForDate(holidays, dateISO);
 
-    // Rules for selected weekday + pattern/EVERY
-    const rulesForSelectedWeekday = (dayRules ?? []).filter((r) => weekdayMatchesRule(date, r));
-    const rulesForThisDay = rulesForSelectedWeekday.filter((r) => ruleAppliesPattern(r, weekPattern));
+    // Rules for selected weekday + pattern
+    const rulesForSelectedWeekday = (dayRules ?? []).filter((r) =>
+        weekdayMatchesRule(date, r)
+    );
+    const rulesForThisDay = rulesForSelectedWeekday.filter((r) =>
+        ruleAppliesPattern(r, weekPattern)
+    );
 
     // Build "remaining" (exclude assigned clinicians AND holiday clinicians)
     const remainingOOIds = new Set<number>();
     const remainingCLOIds = new Set<number>();
+
+    // ✅ track who is expected on Ground Floor (GF)
+    const groundFloorById = new Map<number, boolean>();
 
     for (const c of clinicians as any[]) {
         const cid = clinicianIdOf(c);
@@ -222,18 +238,28 @@ export default function DayExpectedSidebar({
         if (assignedClinicianIds.has(cid)) continue;
 
         const rule = bestRuleForClinician(cid, rulesForThisDay, weekPattern);
-        const bucket = classifyActivity(rule?.activity_code);
 
+        if (isGroundFloorActivity(rule?.activity_code)) {
+            groundFloorById.set(cid, true);
+        }
+
+        const bucket = classifyActivity(rule?.activity_code);
         if (bucket === "OO") remainingOOIds.add(cid);
         if (bucket === "CLO") remainingCLOIds.add(cid);
     }
 
     const remainingOO = Array.from(remainingOOIds).map((id) => {
-        return findClinician(clinicians as any[], id) ?? { id, display_name: `Clinician ${id}` };
+        return findClinician(clinicians as any[], id) ?? {
+            id,
+            display_name: `Clinician ${id}`,
+        };
     });
 
     const remainingCLO = Array.from(remainingCLOIds).map((id) => {
-        return findClinician(clinicians as any[], id) ?? { id, display_name: `Clinician ${id}` };
+        return findClinician(clinicians as any[], id) ?? {
+            id,
+            display_name: `Clinician ${id}`,
+        };
     });
 
     const remainingTotal = remainingOO.length + remainingCLO.length;
@@ -249,7 +275,11 @@ export default function DayExpectedSidebar({
                 : "bg-emerald-50 border-emerald-200";
 
     const countClass =
-        status === "critical" ? "text-red-600" : status === "warning" ? "text-orange-700" : "text-emerald-600";
+        status === "critical"
+            ? "text-red-600"
+            : status === "warning"
+                ? "text-orange-700"
+                : "text-emerald-600";
 
     const subtitle =
         status === "ok"
@@ -257,6 +287,23 @@ export default function DayExpectedSidebar({
             : status === "warning"
                 ? "A small number of expected clinicians remain unassigned."
                 : "Expected clinicians remain unassigned for today.";
+
+    const renderClinicianLine = (c: any) => {
+        const id = clinicianIdOf(c);
+        const gf = Number.isFinite(id) ? groundFloorById.get(id) === true : false;
+
+        return (
+            <span className="flex items-center gap-2">
+            <span>{clinicianLabel(c)}</span>
+
+                {gf && (
+                    <span className="rounded-full bg-blue-100 text-blue-700 text-xs font-semibold px-2 py-0.5">
+                    Ground Floor
+                </span>
+                )}
+        </span>
+        );
+    };
 
     return (
         <div className={`rounded-2xl border shadow-sm p-6 transition-all ${cardClass}`}>
@@ -277,64 +324,72 @@ export default function DayExpectedSidebar({
             </div>
 
             {remainingTotal > 0 && (
-                <div className="mt-5 space-y-4">
+                <div className="mt-4 space-y-3">
                     {/* OO LIST */}
-                    <div className="rounded-xl border bg-white px-4 py-3">
+                    <div className="rounded-lg border border-slate-200 bg-white p-3">
                         <div className="flex items-center justify-between">
-                            <div className="text-sm font-semibold text-slate-900">OO</div>
-                            <div
-                                className={`text-xs font-semibold rounded-full px-2 py-0.5 ${
-                                    remainingOO.length > 0 ? "text-red-700 bg-red-100" : "text-emerald-700 bg-emerald-100"
+                            <div className="text-xs font-semibold tracking-wide text-slate-800">
+                                OO
+                            </div>
+                            <span
+                                className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
+                                    remainingOO.length > 0
+                                        ? "text-red-700 bg-red-100"
+                                        : "text-emerald-700 bg-emerald-100"
                                 }`}
                             >
-                                {remainingOO.length > 0 ? "Remaining" : "Complete"}
-                            </div>
+                {remainingOO.length > 0 ? "Remaining" : "Complete"}
+              </span>
                         </div>
 
                         {remainingOO.length === 0 ? (
-                            <div className="mt-2 text-xs text-slate-500">None remaining</div>
+                            <div className="mt-2 text-sm text-slate-600">None remaining</div>
                         ) : (
-                            <div className="mt-3 space-y-2">
+                            <ul className="mt-2 space-y-1 text-sm text-slate-900">
                                 {remainingOO.map((c: any) => {
                                     const id = clinicianIdOf(c);
                                     return (
-                                        <div key={`oo-${id}`} className="flex items-center gap-2 text-sm text-slate-800">
-                                            <span className="text-slate-400">•</span>
-                                            <span className="min-w-0 truncate">{clinicianLabel(c)}</span>
-                                        </div>
+                                        <li key={`oo-${id}`} className="flex gap-2">
+                                            <span className="text-slate-500">•</span>
+                                            <span>{renderClinicianLine(c)}</span>
+                                        </li>
                                     );
                                 })}
-                            </div>
+                            </ul>
                         )}
                     </div>
 
                     {/* CLO LIST */}
-                    <div className="rounded-xl border bg-white px-4 py-3">
+                    <div className="rounded-lg border border-slate-200 bg-white p-3">
                         <div className="flex items-center justify-between">
-                            <div className="text-sm font-semibold text-slate-900">CLO</div>
-                            <div
-                                className={`text-xs font-semibold rounded-full px-2 py-0.5 ${
-                                    remainingCLO.length > 0 ? "text-red-700 bg-red-100" : "text-emerald-700 bg-emerald-100"
+                            <div className="text-xs font-semibold tracking-wide text-slate-800">
+                                CLO
+                            </div>
+                            <span
+                                className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
+                                    remainingCLO.length > 0
+                                        ? "text-red-700 bg-red-100"
+                                        : "text-emerald-700 bg-emerald-100"
                                 }`}
                             >
-                                {remainingCLO.length > 0 ? "Remaining" : "Complete"}
-                            </div>
+                {remainingCLO.length > 0 ? "Remaining" : "Complete"}
+              </span>
                         </div>
 
                         {remainingCLO.length === 0 ? (
-                            <div className="mt-2 text-xs text-slate-500">None remaining</div>
+                            <div className="mt-2 text-sm text-slate-600">None remaining</div>
                         ) : (
-                            <div className="mt-3 space-y-2">
+                            <ul className="mt-2 space-y-1 text-sm text-slate-900">
                                 {remainingCLO.map((c: any) => {
                                     const id = clinicianIdOf(c);
                                     return (
-                                        <div key={`clo-${id}`} className="flex items-center gap-2 text-sm text-slate-800">
-                                            <span className="text-slate-400">•</span>
-                                            <span className="min-w-0 truncate">{clinicianLabel(c)}</span>
-                                        </div>
+                                        <li key={`clo-${id}`} className="flex gap-2">
+                                            <span className="text-slate-500">•</span>
+                                            <span>{renderClinicianLine(c)}</span>
+                                        </li>
                                     );
                                 })}
-                            </div>
+                            </ul>
                         )}
                     </div>
                 </div>
