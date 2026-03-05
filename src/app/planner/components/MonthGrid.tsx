@@ -122,6 +122,9 @@ export default function MonthGrid({
 
     const trainingKeys = useMemo(() => buildTrainingKeys(anchorMonth), [anchorMonth]);
 
+    // ✅ NEW: key for today's date (local), used to highlight current day
+    const todayKey = useMemo(() => ymdLocal(new Date()), []);
+
     const roomsById = useMemo(() => {
         const m = new Map<number, string>();
         for (const r of (data?.rooms ?? []) as any[]) m.set(Number(r.id), String(r.name));
@@ -292,6 +295,8 @@ export default function MonthGrid({
                             cliniciansById={cliniciansById}
                             onSelect={(key) => router.push(`/planner/${key}?m=${monthParam}`)}
                             isTrainingWeekend={inMonth && trainingKeys.has(toISODate(d))}
+                            // ✅ NEW: highlight current day
+                            isToday={inMonth && dateKey === todayKey}
                             // ✅ NEW: show flag on month cell when not all expected clinicians are assigned
                             missingExpectedCount={inMonth ? (missingExpectedCountByDay[dateKey] ?? 0) : 0}
                             // ✅ existing

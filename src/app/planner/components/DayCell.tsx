@@ -40,6 +40,7 @@ export default function DayCell({
                                     cliniciansById, // kept (unused currently)
                                     onSelect,
                                     isTrainingWeekend,
+                                    isToday,
                                     onAddOoHoliday,
                                     missingExpectedCount,
                                 }: {
@@ -52,6 +53,7 @@ export default function DayCell({
     dateKey: string;
     onSelect: (dateKey: string) => void;
     isTrainingWeekend?: boolean;
+    isToday?: boolean;
     onAddOoHoliday?: (dateKey: string) => void;
     missingExpectedCount?: number;
 }) {
@@ -77,12 +79,20 @@ export default function DayCell({
             } ${
                 isTrainingWeekend && inMonth
                     ? "border-purple-300 bg-gradient-to-br from-purple-50 to-white ring-2 ring-purple-400 dark:border-purple-900/60 dark:from-purple-950/30 dark:to-slate-900 dark:ring-purple-500/30"
-                    : "border-slate-200 dark:border-slate-800"
+                    : isToday && inMonth
+                        ? "border-blue-300 ring-2 ring-blue-400 dark:border-blue-900/60 dark:ring-blue-500/30"
+                        : "border-slate-200 dark:border-slate-800"
             }`}
         >
             {/* ✅ Header row: date left, badges right (no overlap) */}
             <div className="flex items-start justify-between gap-2">
-                <div className="text-xs text-slate-700 dark:text-slate-200 font-medium leading-none pt-0.5">
+                <div
+                    className={`text-xs font-medium leading-none pt-0.5 ${
+                        isToday && inMonth && !isTrainingWeekend
+                            ? "text-blue-700 dark:text-blue-200"
+                            : "text-slate-700 dark:text-slate-200"
+                    }`}
+                >
                     {inMonth ? date.getDate() : ""}
                 </div>
 
@@ -107,6 +117,16 @@ export default function DayCell({
                         >
                             <span className="w-1.5 h-1.5 bg-white rounded-full opacity-80"></span>
                             TRAINING
+                        </div>
+                    )}
+
+                    {inMonth && isToday && !isTrainingWeekend && (
+                        <div
+                            className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-blue-600 text-white font-semibold shadow-sm whitespace-nowrap dark:shadow-none"
+                            title="Today"
+                        >
+                            <span className="w-1.5 h-1.5 bg-white rounded-full opacity-80"></span>
+                            TODAY
                         </div>
                     )}
                 </div>
