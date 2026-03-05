@@ -4,6 +4,7 @@ import { formatMonthTitle } from "../utils/date";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import AddHolidayModal from "./AddHolidayModal";
+import Image from "next/image"
 
 function formatLastSynced(d: Date | null | undefined) {
     if (!d) return "";
@@ -89,28 +90,51 @@ export default function TopBar({
             <div className="relative mx-auto flex h-16 max-w-[1400px] items-center justify-between px-4">
                 {/* LEFT — Logo + Brand */}
                 <div className="flex items-center gap-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-blue-600 to-indigo-600 shadow-md" />
+
+                    {/* Logo */}
+                    <div className="relative h-9 w-9 object-contain drop-shadow-sm">
+
+                        {/* Logo */}
+                        <div className="group relative flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-blue-600 to-indigo-600 shadow-md ring-1 ring-white/10 overflow-hidden">
+
+                            {/* soft glow */}
+                            <div className="pointer-events-none absolute -inset-2 rounded-2xl bg-indigo-500/20 blur-xl opacity-0 transition-opacity duration-200 group-hover:opacity-100" />
+
+                            {/* glass highlight (top only, reduced) */}
+                            <div className="pointer-events-none absolute top-0 left-0 h-1/3 w-full bg-gradient-to-b from-white/20 to-transparent" />
+
+                            {/* logo */}
+                            <img
+                                src="/logo.png"
+                                alt="Clinic Planner Logo"
+                                className="relative h-8 w-8 object-contain"
+                            />
+
+                        </div>
+
+                    </div>
+
                     <div className="flex flex-col leading-tight">
                         <div className="flex items-center gap-2">
                             <div className="font-semibold text-slate-900 dark:text-slate-100">Clinic Planner</div>
 
                             {env && (
                                 <div className="tooltip">
-                  <span
-                      className={`inline-flex items-center gap-2 rounded-full px-2.5 py-0.5 text-[11px] font-semibold tracking-wide border ${
-                          env === "PROD"
-                              ? "bg-red-50 text-red-700 border-red-200 env-glow-prod dark:bg-red-950/40 dark:text-red-200 dark:border-red-900/60"
-                              : env === "QA"
-                                  ? "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/35 dark:text-amber-200 dark:border-amber-900/60"
-                                  : env === "STAGE"
-                                      ? "bg-indigo-50 text-indigo-700 border-indigo-200 dark:bg-indigo-950/35 dark:text-indigo-200 dark:border-indigo-900/60"
-                                      : "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/35 dark:text-emerald-200 dark:border-emerald-900/60"
-                      }`}
-                  >
-                    {env === "QA" && <span className="relative inline-flex h-2 w-2 rounded-full bg-amber-600" />}
-                      {env === "PROD" && <span className="inline-flex h-2 w-2 rounded-full bg-red-600" />}
-                      {env}
-                  </span>
+          <span
+              className={`inline-flex items-center gap-2 rounded-full px-2.5 py-0.5 text-[11px] font-semibold tracking-wide border ${
+                  env === "PROD"
+                      ? "bg-red-50 text-red-700 border-red-200 env-glow-prod dark:bg-red-950/40 dark:text-red-200 dark:border-red-900/60"
+                      : env === "QA"
+                          ? "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/35 dark:text-amber-200 dark:border-amber-900/60"
+                          : env === "STAGE"
+                              ? "bg-indigo-50 text-indigo-700 border-indigo-200 dark:bg-indigo-950/35 dark:text-indigo-200 dark:border-indigo-900/60"
+                              : "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/35 dark:text-emerald-200 dark:border-emerald-900/60"
+              }`}
+          >
+            {env === "QA" && <span className="relative inline-flex h-2 w-2 rounded-full bg-amber-600" />}
+              {env === "PROD" && <span className="inline-flex h-2 w-2 rounded-full bg-red-600" />}
+              {env}
+          </span>
 
                                     <div className="tooltip-content">
                                         <div className="font-semibold text-slate-800 dark:text-slate-100">Environment: {env}</div>
