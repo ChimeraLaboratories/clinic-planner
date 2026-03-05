@@ -3,6 +3,10 @@ import "./globals.css";
 export const metadata = {
     title: "Clinic Planner",
     description: "Clinic Planning System",
+    icons: {
+        icon: "/favicon.ico",
+        apple: "/icon-192.png",
+    },
 };
 
 const themeInitScript = `
