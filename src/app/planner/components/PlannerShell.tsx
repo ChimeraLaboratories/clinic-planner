@@ -193,19 +193,11 @@ export default function PlannerShell({
         const uniqueDates = Array.from(
             new Set(sessions.map(getSessionDateKey).filter(Boolean) as string[])
         ).sort();
-        console.log("[debug] unique session date keys (month fetch)", uniqueDates);
 
         const rows: any[] = (data as any)?.supervisionByDate ?? [];
         const uniqueSupDates = Array.from(
             new Set(rows.map((r) => normalizeYmd(r?.date)).filter(Boolean) as string[])
         ).sort();
-        console.log("[debug] unique supervisionByDate keys (normalized)", uniqueSupDates);
-
-        const watch = ["2026-04-07", "2026-04-14", "2026-04-21", "2026-04-28"];
-        console.log(
-            "[debug] watched supervision rows",
-            watch.map((k) => ({ k, row: supervisionByDateMap.get(k) ?? null }))
-        );
     }, [data, supervisionByDateMap]);
 
     /**

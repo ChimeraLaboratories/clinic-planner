@@ -46,23 +46,14 @@ export function usePlannerData(from: string, to: string, pollMs = 10000) {
             setError(null);
             setSyncState("syncing");
 
-            console.log("[usePlannerData] fetching", normalized);
-
             const res = await fetch(
                 `/planner/api/planner?from=${normalized.from}&to=${normalized.to}`,
                 { cache: "no-store" }
             );
 
-            console.log("[usePlannerData] status", res.status);
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
             const json = (await res.json()) as PlannerResponse;
-
-            console.log("[usePlannerData] payload sizes", {
-                rooms: json?.rooms?.length,
-                clinicians: json?.clinicians?.length,
-                sessions: json?.sessions?.length,
-            });
 
             setData(json);
             setLastSyncedAt(new Date());
