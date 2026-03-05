@@ -57,6 +57,7 @@ export type PlannerResponse = {
     clinicians: Clinician[];
     sessions: Session[];
     supervisionByDate: SupervisionByDateRow[];
+    holidays: any[];
     stats: {
         totalStValue: number;
         totalClValue: number;

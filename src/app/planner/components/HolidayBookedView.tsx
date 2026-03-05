@@ -34,9 +34,11 @@ function inRange(d: string, from: string, to: string) {
 export default function HolidayBookedView({
                                               anchorMonth,
                                               data,
+                                              ooClinicianId,
                                           }: {
     anchorMonth: Date;
     data: PlannerResponse;
+    ooClinicianId: number | null;
 }) {
     const [query, setQuery] = useState("");
 
