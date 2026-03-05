@@ -4,7 +4,6 @@ import { formatMonthTitle } from "../utils/date";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import AddHolidayModal from "./AddHolidayModal";
-import Image from "next/image";
 
 function formatLastSynced(d: Date | null | undefined) {
     if (!d) return "";
@@ -46,6 +45,67 @@ function setTheme(next: "light" | "dark") {
     try {
         localStorage.setItem("theme", next);
     } catch {}
+}
+
+/**
+ * ✅ IMPORTANT:
+ * Your previous "syncing" UI only rendered TEXT *and* only when syncState was set.
+ * If the parent never sets syncState (common), you see nothing.
+ *
+ * This badge ALWAYS renders, and:
+ * - shows Syncing… when syncState === "syncing"
+ * - shows Sync failed when syncState === "error"
+ * - otherwise shows Synced (and time if lastSyncedAt exists)
+ */
+function SyncBadge({
+                       syncState,
+                       lastSyncedAt,
+                   }: {
+    syncState?: "idle" | "syncing" | "synced" | "error";
+    lastSyncedAt?: Date | null;
+}) {
+    const state = syncState ?? (lastSyncedAt ? "synced" : "idle");
+
+    const isSyncing = state === "syncing";
+    const isError = state === "error";
+    const isSynced = state === "synced" || state === "idle";
+
+    const label = isSyncing ? "Syncing…" : isError ? "Sync failed" : "Synced";
+    const time = !isSyncing && !isError ? formatLastSynced(lastSyncedAt ?? null) : "";
+
+    return (
+        <div
+            className={[
+                "inline-flex items-center gap-2 rounded-full border px-2.5 py-0.5 text-[11px] font-semibold",
+                isSyncing
+                    ? "border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-900/60 dark:bg-blue-950/35 dark:text-blue-200"
+                    : isError
+                        ? "border-red-200 bg-red-50 text-red-700 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-200"
+                        : "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900/60 dark:bg-emerald-950/35 dark:text-emerald-200",
+            ].join(" ")}
+            aria-label="Sync status"
+            title={
+                isSyncing
+                    ? "Syncing…"
+                    : isError
+                        ? "Sync failed"
+                        : time
+                            ? `Last synced ${time}`
+                            : "Synced"
+            }
+        >
+            <span
+                className={[
+                    "inline-flex h-2 w-2 rounded-full",
+                    isSyncing ? "animate-pulse bg-blue-600" : isError ? "bg-red-600" : "bg-emerald-600",
+                ].join(" ")}
+            />
+            <span>{label}</span>
+            {time ? (
+                <span className="font-medium opacity-80">• {time}</span>
+            ) : null}
+        </div>
+    );
 }
 
 export default function TopBar({
@@ -149,7 +209,7 @@ export default function TopBar({
             let shift = 0;
 
             if (rect.left < padding) shift = padding - rect.left;
-            if (rect.right > window.innerWidth - padding) shift = (window.innerWidth - padding) - rect.right;
+            if (rect.right > window.innerWidth - padding) shift = window.innerWidth - padding - rect.right;
 
             setTipShift(shift);
         });
@@ -179,7 +239,11 @@ export default function TopBar({
                             <div className="pointer-events-none absolute -inset-2 rounded-2xl bg-indigo-500/20 blur-xl opacity-0 transition-opacity duration-200 group-hover:opacity-100" />
                             <div className="pointer-events-none absolute top-0 left-0 h-1/3 w-full bg-gradient-to-b from-white/20 to-transparent" />
 
-                            <img src="/logo.png" alt="Clinic Planner Logo" className="relative h-8 w-8 object-contain" />
+                            <img
+                                src="/logo.png"
+                                alt="Clinic Planner Logo"
+                                className="relative h-8 w-8 object-contain"
+                            />
                         </div>
                     </div>
 
@@ -188,6 +252,9 @@ export default function TopBar({
                             <div className="font-semibold text-slate-900 dark:text-slate-100 truncate">
                                 Clinic Planner
                             </div>
+
+                            {/* ✅ Always-visible sync badge (this is the main fix) */}
+                            <SyncBadge syncState={syncState} lastSyncedAt={lastSyncedAt} />
 
                             {envToShow && (
                                 <div className="tooltip relative">
@@ -278,6 +345,7 @@ export default function TopBar({
                             )}
                         </div>
 
+                        {/* Keep this line if you still want the “subtitle” style text; it will now always show something */}
                         <div className="text-xs text-slate-500 dark:text-slate-400">
                             {syncState === "syncing"
                                 ? "Syncing…"
@@ -285,7 +353,9 @@ export default function TopBar({
                                     ? `Last synced ${formatLastSynced(lastSyncedAt)}`
                                     : syncState === "error"
                                         ? "Sync failed"
-                                        : ""}
+                                        : lastSyncedAt
+                                            ? `Last synced ${formatLastSynced(lastSyncedAt)}`
+                                            : "Synced"}
                         </div>
                     </div>
                 </div>
