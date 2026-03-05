@@ -254,7 +254,7 @@ export default function TopBar({
                             </div>
 
                             {/* ✅ Always-visible sync badge (this is the main fix) */}
-                            <SyncBadge syncState={syncState} lastSyncedAt={lastSyncedAt} />
+{/*                            <SyncBadge syncState={syncState} lastSyncedAt={lastSyncedAt} />*/}
 
                             {envToShow && (
                                 <div className="tooltip relative">
@@ -346,7 +346,7 @@ export default function TopBar({
                         </div>
 
                         {/* Keep this line if you still want the “subtitle” style text; it will now always show something */}
-                        <div className="text-xs text-slate-500 dark:text-slate-400">
+{/*                        <div className="text-xs text-slate-500 dark:text-slate-400">
                             {syncState === "syncing"
                                 ? "Syncing…"
                                 : syncState === "synced"
@@ -356,7 +356,7 @@ export default function TopBar({
                                         : lastSyncedAt
                                             ? `Last synced ${formatLastSynced(lastSyncedAt)}`
                                             : "Synced"}
-                        </div>
+                        </div>*/}
                     </div>
                 </div>
 
