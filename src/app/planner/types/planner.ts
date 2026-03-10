@@ -22,6 +22,7 @@ export type Session = {
     slot: "AM" | "PM" | "FULL";
     status: "DRAFT" | "PUBLISHED" | "CANCELLED";
     notes?: string | null;
+    is_overtime?: boolean;
 
     // backend may add this computed
     value?: number;

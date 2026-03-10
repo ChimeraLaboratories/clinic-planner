@@ -33,7 +33,7 @@ function parseYMDToLocalDate(ymd: string) {
 
 function clinicianLabel(c: any) {
     return (
-        String(c?.full_name ?? c?.name ?? "").trim() ||
+        String(c?.full_name ?? c?.display_name ?? c?.name ?? "").trim() ||
         `Clinician ${String(c?.id ?? "")}`
     );
 }
@@ -61,13 +61,12 @@ export default function CreateSessionModal({
     const [errorOpen, setErrorOpen] = useState(false);
     const [errorMessage, setErrorMessage] = useState("");
 
-    // ✅ clinician now mandatory: use null instead of "" (cleaner)
     const [clinician_id, setClinicianId] = useState<number | null>(null);
-
     const [session_type, setSessionType] = useState<SessionType>("ST");
-    const status: Status = "DRAFT"; // fixed now
+    const status: Status = "DRAFT";
     const [notes, setNotes] = useState("");
     const [saving, setSaving] = useState(false);
+    const [isOvertime, setIsOvertime] = useState(false);
 
     const selectedClinician = useMemo(() => {
         if (clinician_id == null) return null;
@@ -76,19 +75,26 @@ export default function CreateSessionModal({
 
     const isCLO = (selectedClinician?.role_code ?? 0) === 2;
 
-    // ✅ Alternate-week + weekday eligibility filtering
+    const allCliniciansSorted = useMemo(() => {
+        return [...clinicians].sort((a, b) =>
+            clinicianLabel(a).localeCompare(clinicianLabel(b))
+        );
+    }, [clinicians]);
+
+    // When overtime is checked, ignore day rules and show everyone.
     const eligibleClinicians = useMemo(() => {
+        if (isOvertime) return allCliniciansSorted;
+
         const rules = dayRules ?? [];
 
-        // If rules are not loaded, don't block selection (old behaviour)
+        // If rules are not loaded, don't block selection
         if (rules.length === 0) {
-            return [...clinicians].sort((a, b) => clinicianLabel(a).localeCompare(clinicianLabel(b)));
+            return allCliniciansSorted;
         }
 
         const dateObj = parseYMDToLocalDate(session_date);
         const weekday = dateObj.getDay(); // 0..6
 
-        // index rules by clinician
         const byClinician = new Map<number, DayRule[]>();
         for (const r of rules as any[]) {
             const cid = Number((r as any).clinician_id);
@@ -105,22 +111,19 @@ export default function CreateSessionModal({
 
             const ok = cRules.some((r: any) => {
                 if (Number(r.weekday) !== weekday) return false;
-
-                // must be an "available shift"
                 if (Number(r.is_available_shift ?? 0) !== 1) return false;
-
-                // must match alternate-week pattern
                 return matchesPattern(r.pattern_code, dateObj);
             });
 
             if (ok) out.push(c as Clinician);
         }
 
-        return out.sort((a, b) => clinicianLabel(a).localeCompare(clinicianLabel(b)));
-    }, [clinicians, dayRules, session_date]);
+        return out.sort((a, b) =>
+            clinicianLabel(a).localeCompare(clinicianLabel(b))
+        );
+    }, [allCliniciansSorted, clinicians, dayRules, session_date, isOvertime]);
 
     async function save() {
-        // ✅ validation: clinician required
         if (clinician_id == null) {
             setErrorMessage("Please select a clinician.");
             setErrorOpen(true);
@@ -138,6 +141,7 @@ export default function CreateSessionModal({
                 slot,
                 status,
                 notes,
+                is_overtime: isOvertime ? 1 : 0,
             };
 
             const res = await fetch("/planner/api/sessions", {
@@ -169,15 +173,17 @@ export default function CreateSessionModal({
     return (
         <>
             <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-                {/* backdrop */}
-                <div className="absolute inset-0 bg-black/40 dark:bg-black/60" onClick={onClose} />
+                <div
+                    className="absolute inset-0 bg-black/40 dark:bg-black/60"
+                    onClick={onClose}
+                />
 
-                {/* modal */}
                 <div className="relative w-full max-w-lg rounded-2xl bg-white dark:bg-slate-950 shadow-xl ring-1 ring-black/5 dark:ring-white/10">
-                    {/* header */}
                     <div className="flex items-start justify-between border-b border-slate-200 dark:border-slate-800 px-6 py-4">
                         <div>
-                            <div className="text-base font-semibold text-slate-900 dark:text-slate-100">Create session</div>
+                            <div className="text-base font-semibold text-slate-900 dark:text-slate-100">
+                                Create session
+                            </div>
                             <div className="mt-1 text-sm text-slate-500 dark:text-slate-400">
                                 Assign a clinician and set the session type.
                             </div>
@@ -191,10 +197,8 @@ export default function CreateSessionModal({
                         </button>
                     </div>
 
-                    {/* body */}
                     <div className="px-6 py-5">
                         <div className="grid gap-4">
-                            {/* Clinician */}
                             <label className="text-sm font-medium text-slate-700 dark:text-slate-200">
                                 Clinician <span className="text-red-600 dark:text-red-400">*</span>
                                 <select
@@ -213,7 +217,6 @@ export default function CreateSessionModal({
                                         else if (selected?.role_code === 1) setSessionType("ST");
                                     }}
                                 >
-                                    {/* ✅ no Unassigned option */}
                                     <option value="" disabled>
                                         Select clinician…
                                     </option>
@@ -226,17 +229,41 @@ export default function CreateSessionModal({
                                 </select>
 
                                 <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                                    Selecting a CLO automatically sets Type to{" "}
-                                    <span className="font-semibold">CL</span>.
+                                    {isOvertime ? (
+                                        <>Overtime is enabled, so day rules are ignored.</>
+                                    ) : (
+                                        <>
+                                            Selecting a CLO automatically sets Type to{" "}
+                                            <span className="font-semibold">CL</span>.
+                                        </>
+                                    )}
                                 </div>
                             </label>
 
-                            {/* Type */}
+                            <label className="flex items-start gap-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/40 px-4 py-3">
+                                <input
+                                    type="checkbox"
+                                    checked={isOvertime}
+                                    onChange={(e) => setIsOvertime(e.target.checked)}
+                                    className="mt-0.5 h-4 w-4 rounded border-slate-300 dark:border-slate-700"
+                                />
+                                <div>
+                                    <div className="text-sm font-semibold text-slate-800 dark:text-slate-100">
+                                        Overtime?
+                                    </div>
+                                    <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                                        Allows this session to ignore clinician day rules.
+                                    </div>
+                                </div>
+                            </label>
+
                             <label className="text-sm font-medium text-slate-700 dark:text-slate-200">
                                 Type
                                 <select
                                     className={`mt-2 w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-3 text-slate-900 dark:text-slate-100 shadow-sm outline-none transition focus:border-slate-400 dark:focus:border-slate-600 focus:ring-4 focus:ring-slate-100 dark:focus:ring-slate-800 ${
-                                        isCLO ? "cursor-not-allowed bg-slate-50 dark:bg-slate-900/60 text-slate-500 dark:text-slate-400" : ""
+                                        isCLO
+                                            ? "cursor-not-allowed bg-slate-50 dark:bg-slate-900/60 text-slate-500 dark:text-slate-400"
+                                            : ""
                                     }`}
                                     value={session_type}
                                     onChange={(e) => setSessionType(e.target.value as SessionType)}
@@ -248,9 +275,11 @@ export default function CreateSessionModal({
                                 </select>
                             </label>
 
-                            {/* Notes */}
                             <label className="text-sm font-medium text-slate-700 dark:text-slate-200">
-                                Notes <span className="text-slate-400 dark:text-slate-500 font-normal">(optional)</span>
+                                Notes{" "}
+                                <span className="text-slate-400 dark:text-slate-500 font-normal">
+                                    (optional)
+                                </span>
                                 <input
                                     className="mt-2 w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-3 text-slate-900 dark:text-slate-100 shadow-sm outline-none transition placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:border-slate-400 dark:focus:border-slate-600 focus:ring-4 focus:ring-slate-100 dark:focus:ring-slate-800"
                                     value={notes}
@@ -261,7 +290,6 @@ export default function CreateSessionModal({
                         </div>
                     </div>
 
-                    {/* footer */}
                     <div className="flex items-center justify-end gap-3 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/40 px-6 py-4">
                         <button
                             onClick={onClose}
