@@ -78,14 +78,16 @@ function normalizePattern(input: any): Pattern {
 }
 
 function matchesPattern(rulePattern: string | null, targetPattern: Pattern): boolean {
-    const value = String(rulePattern ?? "").trim().toUpperCase();
-    const target = String(targetPattern).trim().toUpperCase();
+    const raw = String(rulePattern ?? "").trim();
 
-    if (!value || value === "ALL" || value === "ANY") {
+    if (!raw) return true;
+
+    const upper = raw.toUpperCase();
+    if (upper === "ALL" || upper === "ANY") {
         return true;
     }
 
-    return value === target;
+    return normalizePattern(raw) === normalizePattern(targetPattern);
 }
 
 function normalizeActivity(activityCode: string | null): string {
@@ -149,30 +151,20 @@ function getMatchingRuleForWeekdayPattern(
     clinicianId: number,
     weekday: number,
     pattern: Pattern,
-    asOfDate: string,
     dayRules: DayRuleRow[]
 ): DayRuleRow | null {
     const matches = dayRules.filter((rule) => {
         if (Number(rule.clinician_id) !== clinicianId) return false;
         if (Number(rule.weekday) !== weekday) return false;
         if (!matchesPattern(rule.pattern_code, pattern)) return false;
-
-        const from = String(rule.effective_from ?? "").slice(0, 10);
-        const to = rule.effective_to ? String(rule.effective_to).slice(0, 10) : null;
-
-        if (!from || from > asOfDate) return false;
-        if (to && to < asOfDate) return false;
-
         return true;
     });
 
-    if (matches.length === 0) {
-        return null;
-    }
+    if (matches.length === 0) return null;
 
     matches.sort((a, b) => {
-        const aTime = a.effective_from ? new Date(a.effective_from).getTime() : 0;
-        const bTime = b.effective_from ? new Date(b.effective_from).getTime() : 0;
+        const aTime = a.effective_from ? new Date(a.effective_from as any).getTime() : 0;
+        const bTime = b.effective_from ? new Date(b.effective_from as any).getTime() : 0;
         return bTime - aTime;
     });
 
@@ -383,7 +375,6 @@ export async function GET(
                 clinicianId,
                 weekday,
                 pattern,
-                asOfDate,
                 dayRules
             );
 
@@ -392,7 +383,6 @@ export async function GET(
                     Number(clinician.id),
                     weekday,
                     pattern,
-                    asOfDate,
                     dayRules
                 );
 
@@ -407,7 +397,6 @@ export async function GET(
                         Number(clinician.id),
                         weekday,
                         pattern,
-                        asOfDate,
                         dayRules
                     );
 
