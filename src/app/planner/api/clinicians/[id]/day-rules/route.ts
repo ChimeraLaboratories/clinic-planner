@@ -71,6 +71,14 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
 
         const [rows] = await db.query(sql, [clinicianId, pattern, date, date, clinicianId, pattern]);
 
+        const [rooms] = await db.query(
+            `
+                SELECT id, name
+                FROM rooms
+                ORDER BY name
+            `
+        );
+
         const byWeekday = new Map<number, any>();
         for (const r of rows as any[]) byWeekday.set(Number(r.weekday), r);
 
@@ -86,10 +94,12 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
                 effective_to: r?.effective_to ?? null,
                 pattern_code: r?.pattern_code ?? pattern,
                 id: r?.id ?? null,
+                room_id: r?.room_id ?? null,
+                room_allocation_mode: r?.room_allocation_mode ?? "AUTO",
             };
         });
 
-        return NextResponse.json({ clinician_id: clinicianId, date, pattern, weekly });
+        return NextResponse.json({ clinician_id: clinicianId, date, pattern, weekly, rooms });
     } catch (e: any) {
         console.error("[day-rules GET] error:", e);
         return NextResponse.json({ error: "Server error" }, { status: 500 });
@@ -103,6 +113,8 @@ type IncomingRule = {
     start_time: string | null;
     end_time: string | null;
     note: string | null;
+    room_id?: number | null;
+    room_allocation_mode?: "AUTO" | "FIXED";
 };
 
 export async function PUT(req: Request, ctx: { params: Promise<{ id: string }> }) {
@@ -169,24 +181,39 @@ export async function PUT(req: Request, ctx: { params: Promise<{ id: string }> }
                 const weekday = Number(r.weekday);
                 const activity = String(r.activity_code).trim();
                 const is_available_shift = computeIsAvailableShift(activity);
+                const room_id = r.room_id ?? null;
+                const room_allocation_mode = r.room_allocation_mode ?? "AUTO";
 
                 // If we have an id, update that exact row.
                 if (r.id !== null && r.id !== undefined) {
                     await conn.query(
                         `
-              UPDATE clinician_day_rule
-              SET activity_code = ?,
-                  start_time = ?,
-                  end_time = ?,
-                  note = ?,
-                  is_available_shift = ?
-              WHERE id = ?
-                AND clinician_id = ?
-                AND pattern_code = ?
-                AND is_active = 1
-              LIMIT 1
-            `,
-                        [activity, r.start_time ?? null, r.end_time ?? null, r.note ?? null, is_available_shift, Number(r.id), clinicianId, pattern]
+                            UPDATE clinician_day_rule
+                            SET activity_code = ?,
+                                start_time = ?,
+                                end_time = ?,
+                                note = ?,
+                                is_available_shift = ?,
+                                room_id = ?,
+                                room_allocation_mode = ?
+                            WHERE id = ?
+                              AND clinician_id = ?
+                              AND pattern_code = ?
+                              AND is_active = 1
+                                LIMIT 1
+                        `,
+                        [
+                            activity,
+                            r.start_time ?? null,
+                            r.end_time ?? null,
+                            r.note ?? null,
+                            is_available_shift,
+                            room_id,
+                            room_allocation_mode,
+                            Number(r.id),
+                            clinicianId,
+                            pattern,
+                        ]
                     );
                     continue;
                 }
@@ -195,16 +222,16 @@ export async function PUT(req: Request, ctx: { params: Promise<{ id: string }> }
                 // otherwise insert a new row for that weekday/effective_from.
                 const [existing] = await conn.query(
                     `
-            SELECT id
-            FROM clinician_day_rule
-            WHERE clinician_id = ?
-              AND weekday = ?
-              AND pattern_code = ?
-              AND effective_from = ?
-              AND is_active = 1
-            ORDER BY id DESC
-            LIMIT 1
-          `,
+                        SELECT id
+                        FROM clinician_day_rule
+                        WHERE clinician_id = ?
+                          AND weekday = ?
+                          AND pattern_code = ?
+                          AND effective_from = ?
+                          AND is_active = 1
+                        ORDER BY id DESC
+                            LIMIT 1
+                    `,
                     [clinicianId, weekday, pattern, effectiveFrom]
                 );
 
@@ -213,29 +240,54 @@ export async function PUT(req: Request, ctx: { params: Promise<{ id: string }> }
                 if (existingId) {
                     await conn.query(
                         `
-              UPDATE clinician_day_rule
-              SET activity_code = ?,
-                  start_time = ?,
-                  end_time = ?,
-                  note = ?,
-                  is_available_shift = ?
-              WHERE id = ?
-                AND clinician_id = ?
-                AND pattern_code = ?
-                AND is_active = 1
-              LIMIT 1
-            `,
-                        [activity, r.start_time ?? null, r.end_time ?? null, r.note ?? null, is_available_shift, existingId, clinicianId, pattern]
+                            UPDATE clinician_day_rule
+                            SET activity_code = ?,
+                                start_time = ?,
+                                end_time = ?,
+                                note = ?,
+                                is_available_shift = ?,
+                                room_id = ?,
+                                room_allocation_mode = ?
+                            WHERE id = ?
+                              AND clinician_id = ?
+                              AND pattern_code = ?
+                              AND is_active = 1
+                                LIMIT 1
+                        `,
+                        [
+                            activity,
+                            r.start_time ?? null,
+                            r.end_time ?? null,
+                            r.note ?? null,
+                            is_available_shift,
+                            room_id,
+                            room_allocation_mode,
+                            existingId,
+                            clinicianId,
+                            pattern,
+                        ]
                     );
                 } else {
                     await conn.query(
                         `
-              INSERT INTO clinician_day_rule
-                (clinician_id, weekday, pattern_code, activity_code, start_time, end_time, effective_from, effective_to, note, is_available_shift, is_active)
-              VALUES
-                (?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, 1)
-            `,
-                        [clinicianId, weekday, pattern, activity, r.start_time ?? null, r.end_time ?? null, effectiveFrom, r.note ?? null, is_available_shift]
+                            INSERT INTO clinician_day_rule
+                            (clinician_id, weekday, pattern_code, activity_code, start_time, end_time, effective_from, effective_to, note, is_available_shift, room_id, room_allocation_mode, is_active)
+                            VALUES
+                                (?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, ?, 1)
+                        `,
+                        [
+                            clinicianId,
+                            weekday,
+                            pattern,
+                            activity,
+                            r.start_time ?? null,
+                            r.end_time ?? null,
+                            effectiveFrom,
+                            r.note ?? null,
+                            is_available_shift,
+                            room_id,
+                            room_allocation_mode,
+                        ]
                     );
                 }
             }
@@ -248,14 +300,14 @@ export async function PUT(req: Request, ctx: { params: Promise<{ id: string }> }
         // ✅ LEGACY BEHAVIOUR (unchanged): create a new weekly set effective from date (history preserved)
         await conn.query(
             `
-        UPDATE clinician_day_rule
-        SET effective_to = DATE_SUB(?, INTERVAL 1 DAY)
-        WHERE clinician_id = ?
-          AND is_active = 1
-          AND pattern_code = ?
-          AND effective_from < ?
-          AND (effective_to IS NULL OR effective_to >= ?)
-      `,
+                UPDATE clinician_day_rule
+                SET effective_to = DATE_SUB(?, INTERVAL 1 DAY)
+                WHERE clinician_id = ?
+                  AND is_active = 1
+                  AND pattern_code = ?
+                  AND effective_from < ?
+                  AND (effective_to IS NULL OR effective_to >= ?)
+            `,
             [effectiveFrom, clinicianId, pattern, effectiveFrom, effectiveFrom]
         );
 
@@ -265,8 +317,10 @@ export async function PUT(req: Request, ctx: { params: Promise<{ id: string }> }
         for (const r of rules) {
             const activity = String(r.activity_code).trim();
             const is_available_shift = computeIsAvailableShift(activity);
+            const room_id = r.room_id ?? null;
+            const room_allocation_mode = r.room_allocation_mode ?? "AUTO";
 
-            rowsSql.push("(?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, 1)");
+            rowsSql.push("(?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, ?, 1)");
             values.push(
                 clinicianId,
                 Number(r.weekday),
@@ -276,14 +330,16 @@ export async function PUT(req: Request, ctx: { params: Promise<{ id: string }> }
                 r.end_time ?? null,
                 effectiveFrom,
                 r.note ?? null,
-                is_available_shift
+                is_available_shift,
+                room_id,
+                room_allocation_mode
             );
         }
 
         await conn.query(
             `
                 INSERT INTO clinician_day_rule
-                (clinician_id, weekday, pattern_code, activity_code, start_time, end_time, effective_from, effective_to, note, is_available_shift, is_active)
+                (clinician_id, weekday, pattern_code, activity_code, start_time, end_time, effective_from, effective_to, note, is_available_shift, room_id, room_allocation_mode, is_active)
                 VALUES ${rowsSql.join(",")}
             `,
             values

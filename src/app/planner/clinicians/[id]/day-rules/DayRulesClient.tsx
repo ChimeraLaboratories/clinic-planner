@@ -14,6 +14,8 @@ type DayRuleRow = {
     effective_from: string | null;
     effective_to: string | null;
     pattern_code: string; // returned by API (for debug/display)
+    room_id: number | null;
+    room_allocation_mode: "AUTO" | "FIXED";
 };
 
 type ApiResponse = {
@@ -21,6 +23,7 @@ type ApiResponse = {
     date: string;
     pattern?: Pattern;
     weekly: DayRuleRow[];
+    rooms?: { id: number; name: string }[];
 };
 
 type AllocationPreviewStatus =
@@ -186,6 +189,8 @@ function normalizeWeekly(input: DayRuleRow[], selectedPattern: Pattern) {
             effective_from: r?.effective_from ?? null,
             effective_to: r?.effective_to ?? null,
             pattern_code: String(r?.pattern_code ?? selectedPattern),
+            room_id: r?.room_id ?? null,
+            room_allocation_mode: r?.room_allocation_mode ?? "AUTO",
         } satisfies DayRuleRow;
     });
 }
@@ -201,6 +206,7 @@ export default function DayRulesClient({ clinicianId }: { clinicianId: number })
     const [error, setError] = useState<string | null>(null);
 
     const [weekly, setWeekly] = useState<DayRuleRow[]>([]);
+    const [rooms, setRooms] = useState<{ id: number; name: string }[]>([]);
     const [allocationPreviews, setAllocationPreviews] = useState<AllocationPreviewRow[]>([]);
     const [originalWeeklyJson, setOriginalWeeklyJson] = useState("");
 
@@ -218,12 +224,14 @@ export default function DayRulesClient({ clinicianId }: { clinicianId: number })
 
     const isDirty = useMemo(() => {
         const now = JSON.stringify(
-            weekly.map(({ weekday, activity_code, start_time, end_time, note }) => ({
+            weekly.map(({ weekday, activity_code, start_time, end_time, note, room_id, room_allocation_mode }) => ({
                 weekday,
                 activity_code,
                 start_time,
                 end_time,
                 note,
+                room_id,
+                room_allocation_mode,
             }))
         );
         return originalWeeklyJson !== "" && now !== originalWeeklyJson;
@@ -255,18 +263,21 @@ export default function DayRulesClient({ clinicianId }: { clinicianId: number })
             const normalized = normalizeWeekly(json.weekly ?? [], pattern);
 
             setWeekly(normalized);
+            setRooms(json.rooms ?? []);
 
             const currentEffectiveFrom =
                 normalized.find((r) => r.effective_from)?.effective_from ?? null;
             if (currentEffectiveFrom) setEffectiveFrom(currentEffectiveFrom);
 
             const snap = JSON.stringify(
-                normalized.map(({ weekday, activity_code, start_time, end_time, note }) => ({
+                normalized.map(({ weekday, activity_code, start_time, end_time, note, room_id, room_allocation_mode }) => ({
                     weekday,
                     activity_code,
                     start_time,
                     end_time,
                     note,
+                    room_id,
+                    room_allocation_mode,
                 }))
             );
             setOriginalWeeklyJson(snap);
@@ -281,6 +292,7 @@ export default function DayRulesClient({ clinicianId }: { clinicianId: number })
         } catch (e: any) {
             setError(e?.message ?? "Failed to load day rules");
             setWeekly([]);
+            setRooms([]);
             setAllocationPreviews([]);
             setOriginalWeeklyJson("");
         } finally {
@@ -325,6 +337,8 @@ export default function DayRulesClient({ clinicianId }: { clinicianId: number })
                     start_time: r.start_time,
                     end_time: r.end_time,
                     note: r.note,
+                    room_id: r.room_id,
+                    room_allocation_mode: r.room_allocation_mode,
                 })),
             };
 
@@ -339,7 +353,6 @@ export default function DayRulesClient({ clinicianId }: { clinicianId: number })
                 throw new Error(msg?.error ?? `Failed to save (HTTP ${res.status})`);
             }
 
-            // Refresh view and reset dirty state
             await load();
         } catch (e: any) {
             setError(e?.message ?? "Failed to save");
@@ -434,7 +447,6 @@ export default function DayRulesClient({ clinicianId }: { clinicianId: number })
                 </div>
             )}
 
-            {/* ✅ Don’t flash UNSET while loading */}
             {loading ? (
                 <div className="rounded border border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-950 p-4 text-sm text-gray-600 dark:text-slate-300">
                     Loading day rules…
@@ -448,6 +460,8 @@ export default function DayRulesClient({ clinicianId }: { clinicianId: number })
                             <th className="px-3 py-2">Current activity</th>
                             <th className="px-3 py-2">Change activity</th>
                             <th className="px-3 py-2">Allocation preview</th>
+                            <th className="px-3 py-2">Room mode</th>
+                            <th className="px-3 py-2">Room</th>
                             <th className="px-3 py-2">Start</th>
                             <th className="px-3 py-2">End</th>
                             <th className="px-3 py-2">Note</th>
@@ -498,6 +512,43 @@ export default function DayRulesClient({ clinicianId }: { clinicianId: number })
                                         >
                                             {allocationPreview?.label ?? "—"}
                                         </span>
+                                    </td>
+
+                                    <td className="px-3 py-2">
+                                        <select
+                                            value={r?.room_allocation_mode ?? "AUTO"}
+                                            onChange={(e) =>
+                                                updateWeekday(weekday, {
+                                                    room_allocation_mode: e.target.value as "AUTO" | "FIXED",
+                                                    room_id: e.target.value === "AUTO" ? null : r?.room_id ?? null,
+                                                } as Partial<DayRuleRow>)
+                                            }
+                                            className="w-full rounded border border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-2 py-1 text-sm text-gray-900 dark:text-slate-100"
+                                            disabled={saving || !r}
+                                        >
+                                            <option value="AUTO">Auto</option>
+                                            <option value="FIXED">Fixed</option>
+                                        </select>
+                                    </td>
+
+                                    <td className="px-3 py-2">
+                                        <select
+                                            value={r?.room_id ?? ""}
+                                            onChange={(e) =>
+                                                updateWeekday(weekday, {
+                                                    room_id: e.target.value ? Number(e.target.value) : null,
+                                                } as Partial<DayRuleRow>)
+                                            }
+                                            className="w-full rounded border border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-2 py-1 text-sm text-gray-900 dark:text-slate-100"
+                                            disabled={saving || !r || r.room_allocation_mode !== "FIXED"}
+                                        >
+                                            <option value="">— Select room —</option>
+                                            {rooms.map((room) => (
+                                                <option key={room.id} value={room.id}>
+                                                    {room.name}
+                                                </option>
+                                            ))}
+                                        </select>
                                     </td>
 
                                     <td className="px-3 py-2">
@@ -591,6 +642,45 @@ export default function DayRulesClient({ clinicianId }: { clinicianId: number })
                                             {activityOptions.map((opt) => (
                                                 <option key={opt.value} value={opt.value}>
                                                     {opt.label}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </label>
+
+                                    <label className="text-xs text-gray-500 dark:text-slate-400">
+                                        Room mode
+                                        <select
+                                            value={r?.room_allocation_mode ?? "AUTO"}
+                                            onChange={(e) =>
+                                                updateWeekday(weekday, {
+                                                    room_allocation_mode: e.target.value as "AUTO" | "FIXED",
+                                                    room_id: e.target.value === "AUTO" ? null : r?.room_id ?? null,
+                                                } as Partial<DayRuleRow>)
+                                            }
+                                            className="mt-1 w-full rounded border border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-2 py-1 text-sm text-gray-900 dark:text-slate-100"
+                                            disabled={saving || !r}
+                                        >
+                                            <option value="AUTO">Auto</option>
+                                            <option value="FIXED">Fixed</option>
+                                        </select>
+                                    </label>
+
+                                    <label className="text-xs text-gray-500 dark:text-slate-400">
+                                        Room
+                                        <select
+                                            value={r?.room_id ?? ""}
+                                            onChange={(e) =>
+                                                updateWeekday(weekday, {
+                                                    room_id: e.target.value ? Number(e.target.value) : null,
+                                                } as Partial<DayRuleRow>)
+                                            }
+                                            className="mt-1 w-full rounded border border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-2 py-1 text-sm text-gray-900 dark:text-slate-100"
+                                            disabled={saving || !r || r.room_allocation_mode !== "FIXED"}
+                                        >
+                                            <option value="">— Select room —</option>
+                                            {rooms.map((room) => (
+                                                <option key={room.id} value={room.id}>
+                                                    {room.name}
                                                 </option>
                                             ))}
                                         </select>
