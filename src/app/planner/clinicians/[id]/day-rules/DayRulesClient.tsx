@@ -14,6 +14,8 @@ type DayRuleRow = {
     effective_from: string | null;
     effective_to: string | null;
     pattern_code: string; // returned by API (for debug/display)
+    room_id: number | null;
+    room_allocation_mode: "AUTO" | "FIXED";
 };
 
 type ApiResponse = {
@@ -21,6 +23,33 @@ type ApiResponse = {
     date: string;
     pattern?: Pattern;
     weekly: DayRuleRow[];
+    rooms?: { id: number; name: string }[];
+};
+
+type AllocationPreviewStatus =
+    | "allocated"
+    | "ground-floor"
+    | "support-floor"
+    | "store-general"
+    | "admin"
+    | "non-working"
+    | "unallocated"
+    | "unset";
+
+type AllocationPreviewRow = {
+    weekday: number;
+    activity_code: string | null;
+    status: AllocationPreviewStatus;
+    roomId: number | null;
+    roomName: string | null;
+    label: string;
+};
+
+type AllocationPreviewResponse = {
+    clinician_id: number;
+    date: string;
+    pattern: Pattern;
+    previews: AllocationPreviewRow[];
 };
 
 const weekdayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"] as const;
@@ -107,6 +136,43 @@ function normalizePattern(raw: any): Pattern {
     return "W1";
 }
 
+function allocationPreviewBadgeClass(status: AllocationPreviewStatus) {
+    switch (status) {
+        case "allocated":
+            return "bg-emerald-100 text-emerald-800 border border-emerald-300 dark:bg-emerald-950/40 dark:text-emerald-200 dark:border-emerald-700/60";
+        case "ground-floor":
+            return "bg-slate-100 text-slate-700 border border-slate-300 dark:bg-slate-900 dark:text-slate-200 dark:border-slate-700";
+        case "support-floor":
+            return "bg-blue-100 text-blue-800 border border-blue-300 dark:bg-sky-950/45 dark:text-sky-200 dark:border-sky-700/60";
+        case "store-general":
+            return "bg-orange-100 text-orange-800 border border-orange-300 dark:bg-orange-950/45 dark:text-orange-200 dark:border-orange-700/60";
+        case "admin":
+            return "bg-amber-100 text-amber-800 border border-amber-300 dark:bg-amber-950/45 dark:text-amber-200 dark:border-amber-700/60";
+        case "non-working":
+            return "bg-red-100 text-red-800 border border-red-300 dark:bg-red-950/45 dark:text-red-200 dark:border-red-700/60";
+        case "unallocated":
+            return "bg-yellow-100 text-yellow-800 border border-yellow-300 dark:bg-yellow-950/40 dark:text-yellow-200 dark:border-yellow-700/60";
+        case "unset":
+        default:
+            return "bg-gray-100 text-gray-600 border border-gray-300 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700";
+    }
+}
+
+function normalizeAllocationPreviews(input: AllocationPreviewRow[]) {
+    return (input ?? []).map((r) => {
+        const rawWeekday = Number(r.weekday);
+
+        return {
+            weekday: Number.isFinite(rawWeekday) ? rawWeekday : -1,
+            activity_code: r.activity_code ?? null,
+            status: r.status ?? "unset",
+            roomId: r.roomId ?? null,
+            roomName: r.roomName ?? null,
+            label: r.label ?? "—",
+        } satisfies AllocationPreviewRow;
+    });
+}
+
 function normalizeWeekly(input: DayRuleRow[], selectedPattern: Pattern) {
     const by = new Map<number, DayRuleRow>();
     for (const r of input) by.set(r.weekday, r);
@@ -123,6 +189,8 @@ function normalizeWeekly(input: DayRuleRow[], selectedPattern: Pattern) {
             effective_from: r?.effective_from ?? null,
             effective_to: r?.effective_to ?? null,
             pattern_code: String(r?.pattern_code ?? selectedPattern),
+            room_id: r?.room_id ?? null,
+            room_allocation_mode: r?.room_allocation_mode ?? "AUTO",
         } satisfies DayRuleRow;
     });
 }
@@ -138,6 +206,8 @@ export default function DayRulesClient({ clinicianId }: { clinicianId: number })
     const [error, setError] = useState<string | null>(null);
 
     const [weekly, setWeekly] = useState<DayRuleRow[]>([]);
+    const [rooms, setRooms] = useState<{ id: number; name: string }[]>([]);
+    const [allocationPreviews, setAllocationPreviews] = useState<AllocationPreviewRow[]>([]);
     const [originalWeeklyJson, setOriginalWeeklyJson] = useState("");
 
     const weekdayMap = useMemo(() => {
@@ -146,14 +216,22 @@ export default function DayRulesClient({ clinicianId }: { clinicianId: number })
         return m;
     }, [weekly]);
 
+    const allocationPreviewMap = useMemo(() => {
+        const m = new Map<number, AllocationPreviewRow>();
+        for (const r of allocationPreviews) m.set(r.weekday, r);
+        return m;
+    }, [allocationPreviews]);
+
     const isDirty = useMemo(() => {
         const now = JSON.stringify(
-            weekly.map(({ weekday, activity_code, start_time, end_time, note }) => ({
+            weekly.map(({ weekday, activity_code, start_time, end_time, note, room_id, room_allocation_mode }) => ({
                 weekday,
                 activity_code,
                 start_time,
                 end_time,
                 note,
+                room_id,
+                room_allocation_mode,
             }))
         );
         return originalWeeklyJson !== "" && now !== originalWeeklyJson;
@@ -164,12 +242,20 @@ export default function DayRulesClient({ clinicianId }: { clinicianId: number })
         setError(null);
 
         try {
-            const res = await fetch(
-                `/planner/api/clinicians/${clinicianId}/day-rules?date=${encodeURIComponent(viewAsOfDate)}&pattern=${encodeURIComponent(
-                    pattern
-                )}`,
-                { cache: "no-store" }
-            );
+            const [res, previewRes] = await Promise.all([
+                fetch(
+                    `/planner/api/clinicians/${clinicianId}/day-rules?date=${encodeURIComponent(viewAsOfDate)}&pattern=${encodeURIComponent(
+                        pattern
+                    )}`,
+                    { cache: "no-store" }
+                ),
+                fetch(
+                    `/planner/api/clinicians/${clinicianId}/day-rules/allocations?date=${encodeURIComponent(
+                        viewAsOfDate
+                    )}&pattern=${encodeURIComponent(pattern)}`,
+                    { cache: "no-store" }
+                ),
+            ]);
 
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
@@ -177,25 +263,37 @@ export default function DayRulesClient({ clinicianId }: { clinicianId: number })
             const normalized = normalizeWeekly(json.weekly ?? [], pattern);
 
             setWeekly(normalized);
+            setRooms(json.rooms ?? []);
 
-            // ✅ When editing, default "effective from" to the currently-loaded ruleset effective_from
             const currentEffectiveFrom =
                 normalized.find((r) => r.effective_from)?.effective_from ?? null;
             if (currentEffectiveFrom) setEffectiveFrom(currentEffectiveFrom);
 
             const snap = JSON.stringify(
-                normalized.map(({ weekday, activity_code, start_time, end_time, note }) => ({
+                normalized.map(({ weekday, activity_code, start_time, end_time, note, room_id, room_allocation_mode }) => ({
                     weekday,
                     activity_code,
                     start_time,
                     end_time,
                     note,
+                    room_id,
+                    room_allocation_mode,
                 }))
             );
             setOriginalWeeklyJson(snap);
+
+            if (previewRes.ok) {
+                const previewJson = (await previewRes.json()) as AllocationPreviewResponse;
+                const normalizePreviews = normalizeAllocationPreviews(previewJson.previews ?? []);
+                setAllocationPreviews(normalizePreviews);
+            } else {
+                setAllocationPreviews([]);
+            }
         } catch (e: any) {
             setError(e?.message ?? "Failed to load day rules");
             setWeekly([]);
+            setRooms([]);
+            setAllocationPreviews([]);
             setOriginalWeeklyJson("");
         } finally {
             setLoading(false);
@@ -239,6 +337,8 @@ export default function DayRulesClient({ clinicianId }: { clinicianId: number })
                     start_time: r.start_time,
                     end_time: r.end_time,
                     note: r.note,
+                    room_id: r.room_id,
+                    room_allocation_mode: r.room_allocation_mode,
                 })),
             };
 
@@ -253,7 +353,6 @@ export default function DayRulesClient({ clinicianId }: { clinicianId: number })
                 throw new Error(msg?.error ?? `Failed to save (HTTP ${res.status})`);
             }
 
-            // Refresh view and reset dirty state
             await load();
         } catch (e: any) {
             setError(e?.message ?? "Failed to save");
@@ -348,7 +447,6 @@ export default function DayRulesClient({ clinicianId }: { clinicianId: number })
                 </div>
             )}
 
-            {/* ✅ Don’t flash UNSET while loading */}
             {loading ? (
                 <div className="rounded border border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-950 p-4 text-sm text-gray-600 dark:text-slate-300">
                     Loading day rules…
@@ -359,7 +457,11 @@ export default function DayRulesClient({ clinicianId }: { clinicianId: number })
                         <thead className="bg-gray-50 dark:bg-slate-900 text-left text-xs uppercase text-gray-500 dark:text-slate-400">
                         <tr>
                             <th className="px-3 py-2">Day</th>
-                            <th className="px-3 py-2">Activity</th>
+                            <th className="px-3 py-2">Current activity</th>
+                            <th className="px-3 py-2">Change activity</th>
+                            <th className="px-3 py-2">Allocation preview</th>
+                            <th className="px-3 py-2">Room mode</th>
+                            <th className="px-3 py-2">Room</th>
                             <th className="px-3 py-2">Start</th>
                             <th className="px-3 py-2">End</th>
                             <th className="px-3 py-2">Note</th>
@@ -374,6 +476,7 @@ export default function DayRulesClient({ clinicianId }: { clinicianId: number })
                                 : "UNSET";
                             const visual = activityVisuals[code] ?? activityVisuals.UNSET;
                             const off = isDayOff(r?.activity_code);
+                            const allocationPreview = allocationPreviewMap.get(weekday);
 
                             return (
                                 <tr key={weekday} className={`${visual.row} border-t border-gray-200 dark:border-slate-800`}>
@@ -395,6 +498,54 @@ export default function DayRulesClient({ clinicianId }: { clinicianId: number })
                                             {activityOptions.map((opt) => (
                                                 <option key={opt.value} value={opt.value}>
                                                     {opt.label}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </td>
+
+                                    <td className="px-3 py-2">
+                                        <span
+                                            className={`inline-flex items-center rounded px-2 py-1 text-xs ${allocationPreviewBadgeClass(
+                                                allocationPreview?.status ?? "unset"
+                                            )}`}
+                                            title={allocationPreview?.roomName ?? allocationPreview?.label ?? "—"}
+                                        >
+                                            {allocationPreview?.label ?? "—"}
+                                        </span>
+                                    </td>
+
+                                    <td className="px-3 py-2">
+                                        <select
+                                            value={r?.room_allocation_mode ?? "AUTO"}
+                                            onChange={(e) =>
+                                                updateWeekday(weekday, {
+                                                    room_allocation_mode: e.target.value as "AUTO" | "FIXED",
+                                                    room_id: e.target.value === "AUTO" ? null : r?.room_id ?? null,
+                                                } as Partial<DayRuleRow>)
+                                            }
+                                            className="w-full rounded border border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-2 py-1 text-sm text-gray-900 dark:text-slate-100"
+                                            disabled={saving || !r}
+                                        >
+                                            <option value="AUTO">Auto</option>
+                                            <option value="FIXED">Fixed</option>
+                                        </select>
+                                    </td>
+
+                                    <td className="px-3 py-2">
+                                        <select
+                                            value={r?.room_id ?? ""}
+                                            onChange={(e) =>
+                                                updateWeekday(weekday, {
+                                                    room_id: e.target.value ? Number(e.target.value) : null,
+                                                } as Partial<DayRuleRow>)
+                                            }
+                                            className="w-full rounded border border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-2 py-1 text-sm text-gray-900 dark:text-slate-100"
+                                            disabled={saving || !r || r.room_allocation_mode !== "FIXED"}
+                                        >
+                                            <option value="">— Select room —</option>
+                                            {rooms.map((room) => (
+                                                <option key={room.id} value={room.id}>
+                                                    {room.name}
                                                 </option>
                                             ))}
                                         </select>
@@ -453,16 +604,30 @@ export default function DayRulesClient({ clinicianId }: { clinicianId: number })
                 <div className="grid gap-3 md:grid-cols-2">
                     {weekdayNames.map((dayName, weekday) => {
                         const r = weekdayMap.get(weekday);
-                        const visual = activityVisuals[r?.activity_code ?? "UNSET"] ?? activityVisuals.UNSET;
+                        const code = activityOptions.some((a) => a.value === r?.activity_code)
+                            ? (r?.activity_code as string)
+                            : "UNSET";
+                        const visual = activityVisuals[code] ?? activityVisuals.UNSET;
                         const off = isDayOff(r?.activity_code);
+                        const allocationPreview = allocationPreviewMap.get(weekday);
 
                         return (
                             <div key={weekday} className={`rounded border border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-950 p-4 ${visual.row}`}>
-                                <div className="flex items-start justify-between">
+                                <div className="flex items-start justify-between gap-3">
                                     <div className="font-semibold text-gray-900 dark:text-slate-100">{dayName}</div>
-                                    <span className={`inline-flex items-center rounded px-2 py-1 text-xs ${visual.badge}`}>
-                                        {activityLabel(r?.activity_code)}
-                                    </span>
+                                    <div className="flex flex-col items-end gap-1">
+                                        <span className={`inline-flex items-center rounded px-2 py-1 text-xs ${visual.badge}`}>
+                                            {activityLabel(r?.activity_code)}
+                                        </span>
+                                        <span
+                                            className={`inline-flex items-center rounded px-2 py-1 text-xs ${allocationPreviewBadgeClass(
+                                                allocationPreview?.status ?? "unset"
+                                            )}`}
+                                            title={allocationPreview?.roomName ?? allocationPreview?.label ?? "—"}
+                                        >
+                                            {allocationPreview?.label ?? "—"}
+                                        </span>
+                                    </div>
                                 </div>
 
                                 <div className="mt-3 grid gap-2">
@@ -477,6 +642,45 @@ export default function DayRulesClient({ clinicianId }: { clinicianId: number })
                                             {activityOptions.map((opt) => (
                                                 <option key={opt.value} value={opt.value}>
                                                     {opt.label}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </label>
+
+                                    <label className="text-xs text-gray-500 dark:text-slate-400">
+                                        Room mode
+                                        <select
+                                            value={r?.room_allocation_mode ?? "AUTO"}
+                                            onChange={(e) =>
+                                                updateWeekday(weekday, {
+                                                    room_allocation_mode: e.target.value as "AUTO" | "FIXED",
+                                                    room_id: e.target.value === "AUTO" ? null : r?.room_id ?? null,
+                                                } as Partial<DayRuleRow>)
+                                            }
+                                            className="mt-1 w-full rounded border border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-2 py-1 text-sm text-gray-900 dark:text-slate-100"
+                                            disabled={saving || !r}
+                                        >
+                                            <option value="AUTO">Auto</option>
+                                            <option value="FIXED">Fixed</option>
+                                        </select>
+                                    </label>
+
+                                    <label className="text-xs text-gray-500 dark:text-slate-400">
+                                        Room
+                                        <select
+                                            value={r?.room_id ?? ""}
+                                            onChange={(e) =>
+                                                updateWeekday(weekday, {
+                                                    room_id: e.target.value ? Number(e.target.value) : null,
+                                                } as Partial<DayRuleRow>)
+                                            }
+                                            className="mt-1 w-full rounded border border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-2 py-1 text-sm text-gray-900 dark:text-slate-100"
+                                            disabled={saving || !r || r.room_allocation_mode !== "FIXED"}
+                                        >
+                                            <option value="">— Select room —</option>
+                                            {rooms.map((room) => (
+                                                <option key={room.id} value={room.id}>
+                                                    {room.name}
                                                 </option>
                                             ))}
                                         </select>
@@ -537,6 +741,7 @@ export default function DayRulesClient({ clinicianId }: { clinicianId: number })
 
             <div className="text-xs text-gray-500 dark:text-slate-400">
                 Saving updates the existing weekly ruleset rows for the selected pattern (no duplicate rows created).
+                Allocation preview shows the expected room outcome for the selected pattern and “View as of” date.
             </div>
         </div>
     );
