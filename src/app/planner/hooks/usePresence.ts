@@ -11,7 +11,40 @@ export type PresenceUser = {
     lastSeenAt: string;
     isOnline: boolean;
     jobRole?: string | null;
+    dateYmd?: string | null;
+    viewMode?: "month" | "day" | null;
 };
+
+function parsePlannerLocation(pathname: string | null | undefined): {
+    dateYmd: string | null;
+    viewMode: "month" | "day" | null;
+} {
+    const path = String(pathname ?? "").trim();
+
+    if (!path) {
+        return { dateYmd: null, viewMode: null };
+    }
+
+    const dayMatch = path.match(/^\/planner\/(\d{4}-\d{2}-\d{2})(?:\/)?$/);
+    if (dayMatch) {
+        return {
+            dateYmd: dayMatch[1],
+            viewMode: "day",
+        };
+    }
+
+    if (path === "/planner" || path.startsWith("/planner?")) {
+        return {
+            dateYmd: null,
+            viewMode: "month",
+        };
+    }
+
+    return {
+        dateYmd: null,
+        viewMode: null,
+    };
+}
 
 export function usePresence() {
     const pathname = usePathname();
@@ -47,7 +80,18 @@ export function usePresence() {
 
                 const data = await res.json();
                 if (!cancelled) {
-                    setUsers(Array.isArray(data?.users) ? data.users : []);
+                    const nextUsers = Array.isArray(data?.users)
+                        ? data.users.map((user: any) => {
+                            const parsed = parsePlannerLocation(user?.currentPath);
+                            return {
+                                ...user,
+                                dateYmd: parsed.dateYmd,
+                                viewMode: parsed.viewMode,
+                            };
+                        })
+                        : [];
+
+                    setUsers(nextUsers);
                 }
             } catch (error) {
                 console.error("Presence fetch failed", error);
