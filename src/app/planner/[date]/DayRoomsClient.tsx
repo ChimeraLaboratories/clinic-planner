@@ -371,7 +371,7 @@ export default function DayRoomsClient({
                                             : "border-green-300 bg-white dark:border-emerald-900/50 dark:bg-slate-900"
                             }`}
                         >
-                            <div className="flex items-center justify-between">
+                            <div className="flex items-center justify-between whitespace-nowrap">
                                 <h3 className="font-semibold text-gray-900 dark:text-slate-100">{room.name}</h3>
 
                                 <div className="flex items-center gap-2">
@@ -407,7 +407,7 @@ export default function DayRoomsClient({
                                     )}
 
                                     <span
-                                        className={`inline-flex items-center justify-center text-center leading-tight text-xs font-medium px-3 py-1 rounded-full ${
+                                        className={`inline-flex items-center justify-center text-center leading-tight text-xs font-medium px-3 py-1 rounded-full whitespace-nowrap ${
                                             isLockedByOtherUser
                                                 ? "bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-200"
                                                 : needsSupervisorWarning
