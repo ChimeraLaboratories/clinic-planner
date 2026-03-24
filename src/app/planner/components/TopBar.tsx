@@ -513,11 +513,11 @@ export default function TopBar({
                                     </Link>
 
                                     <Link
-                                        href="/planner/day-rules"
+                                        href="/planner/auto-scheduler"
                                         className="block rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800"
                                         onClick={() => setAdminOpen(false)}
                                     >
-                                        Day Rules
+                                        Auto Scheduler
                                     </Link>
                                 </div>
                             )}
