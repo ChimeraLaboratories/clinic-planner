@@ -1,8 +1,10 @@
+import "server-only";
 import bcrypt from "bcryptjs";
 import { SignJWT, jwtVerify } from "jose";
 import { cookies } from "next/headers";
 import type { NextRequest } from "next/server";
 import { db } from "@/lib/db";
+import { getAuthSecretFromDb } from "@/lib/secure-config";
 
 export type UserRole = "ADMIN" | "PLANNER" | "VIEWER";
 
@@ -24,11 +26,8 @@ type SessionPayload = {
 
 export const SESSION_COOKIE_NAME = "planner_session";
 
-function getJwtSecret() {
-    const secret = process.env.AUTH_SECRET;
-    if (!secret) {
-        throw new Error("AUTH_SECRET is not set");
-    }
+async function getJwtSecret() {
+    const secret = await getAuthSecretFromDb();
     return new TextEncoder().encode(secret);
 }
 
@@ -41,6 +40,8 @@ export async function verifyPassword(password: string, passwordHash: string) {
 }
 
 export async function signSession(user: AuthUser) {
+    const secret = await getJwtSecret();
+
     const payload: SessionPayload = {
         sub: String(user.id),
         email: user.email,
@@ -52,11 +53,12 @@ export async function signSession(user: AuthUser) {
         .setProtectedHeader({ alg: "HS256" })
         .setIssuedAt()
         .setExpirationTime("7d")
-        .sign(getJwtSecret());
+        .sign(secret);
 }
 
 export async function verifySessionToken(token: string) {
-    const { payload } = await jwtVerify(token, getJwtSecret());
+    const secret = await getJwtSecret();
+    const { payload } = await jwtVerify(token, secret);
     return payload as unknown as SessionPayload;
 }
 
@@ -88,10 +90,10 @@ export async function getCurrentUserFromCookies(): Promise<AuthUser | null> {
 
     const [rows] = await db.query(
         `
-        SELECT id, email, full_name, role, is_active
-        FROM users
-        WHERE id = ?
-        LIMIT 1
+            SELECT id, email, full_name, role, job_role, is_active
+            FROM users
+            WHERE id = ?
+                LIMIT 1
         `,
         [userId]
     );
