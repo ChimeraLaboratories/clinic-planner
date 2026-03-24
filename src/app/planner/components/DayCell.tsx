@@ -30,6 +30,17 @@ function usedRoomsCount(sessions: Session[]) {
     return set.size;
 }
 
+function getInitials(name: string) {
+    return String(name ?? "")
+        .trim()
+        .split(/\s+/)
+        .filter(Boolean)
+        .slice(0, 2)
+        .map((part) => part[0])
+        .join("")
+        .toUpperCase();
+}
+
 export default function DayCell({
                                     date,
                                     inMonth,
@@ -43,6 +54,7 @@ export default function DayCell({
                                     isToday,
                                     onAddOoHoliday,
                                     missingExpectedCount,
+                                    presenceUsers = [],
                                 }: {
     date: Date;
     inMonth: boolean;
@@ -56,6 +68,12 @@ export default function DayCell({
     isToday?: boolean;
     onAddOoHoliday?: (dateKey: string) => void;
     missingExpectedCount?: number;
+    presenceUsers?: Array<{
+        userId: number;
+        name: string;
+        viewMode?: "month" | "day" | null;
+        isOnline: boolean;
+    }>;
 }) {
     const daySessions = (sessions ?? []) as any[];
 
@@ -66,6 +84,8 @@ export default function DayCell({
     const valueCL = sumValue(daySessions as any, "CL");
 
     const missing = Number(missingExpectedCount ?? 0);
+    const visiblePresenceUsers = (presenceUsers ?? []).slice(0, 3);
+    const remainingPresenceCount = Math.max(0, (presenceUsers?.length ?? 0) - visiblePresenceUsers.length);
 
     return (
         <button
@@ -96,39 +116,64 @@ export default function DayCell({
                     {inMonth ? date.getDate() : ""}
                 </div>
 
-                <div className="flex flex-wrap items-center justify-end gap-1 max-w-[75%]">
-                    {inMonth && missing > 0 && (
-                        <div
-                            className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-red-600 text-white font-semibold shadow-sm whitespace-nowrap dark:shadow-none"
-                            title={`${missing} expected clinician${missing === 1 ? "" : "s"} not assigned`}
-                        >
-                            <span className="relative flex h-2 w-2">
-                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-200 opacity-75 dark:bg-red-400/30" />
-                                <span className="relative inline-flex rounded-full h-2 w-2 bg-white" />
-                            </span>
-                            MISSING {missing}
+                <div className="flex flex-col items-end gap-1 max-w-[75%]">
+                    {inMonth && (presenceUsers?.length ?? 0) > 0 && (
+                        <div className="flex items-center justify-end -space-x-1">
+                            {visiblePresenceUsers.map((user) => (
+                                <div
+                                    key={user.userId}
+                                    className="inline-flex h-5 w-5 items-center justify-center rounded-full border border-blue-200 bg-blue-50 text-[9px] font-semibold text-blue-700 shadow-sm dark:border-blue-900/60 dark:bg-blue-950/35 dark:text-blue-200"
+                                    title={user.name}
+                                >
+                                    {getInitials(user.name)}
+                                </div>
+                            ))}
+
+                            {remainingPresenceCount > 0 && (
+                                <div
+                                    className="inline-flex h-5 min-w-[20px] items-center justify-center rounded-full border border-slate-300 bg-slate-100 px-1 text-[9px] font-semibold text-slate-700 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
+                                    title={`${remainingPresenceCount} more user${remainingPresenceCount === 1 ? "" : "s"}`}
+                                >
+                                    +{remainingPresenceCount}
+                                </div>
+                            )}
                         </div>
                     )}
 
-                    {inMonth && isTrainingWeekend && (
-                        <div
-                            className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-purple-600 text-white font-semibold shadow-sm tracking-wide whitespace-nowrap dark:shadow-none"
-                            title="Monthly Training Weekend"
-                        >
-                            <span className="w-1.5 h-1.5 bg-white rounded-full opacity-80"></span>
-                            TRAINING
-                        </div>
-                    )}
+                    <div className="flex flex-wrap items-center justify-end gap-1">
+                        {inMonth && missing > 0 && (
+                            <div
+                                className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-red-600 text-white font-semibold shadow-sm whitespace-nowrap dark:shadow-none"
+                                title={`${missing} expected clinician${missing === 1 ? "" : "s"} not assigned`}
+                            >
+                                <span className="relative flex h-2 w-2">
+                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-200 opacity-75 dark:bg-red-400/30" />
+                                    <span className="relative inline-flex rounded-full h-2 w-2 bg-white" />
+                                </span>
+                                MISSING {missing}
+                            </div>
+                        )}
 
-                    {inMonth && isToday && !isTrainingWeekend && (
-                        <div
-                            className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-blue-600 text-white font-semibold shadow-sm whitespace-nowrap dark:shadow-none"
-                            title="Today"
-                        >
-                            <span className="w-1.5 h-1.5 bg-white rounded-full opacity-80"></span>
-                            TODAY
-                        </div>
-                    )}
+                        {inMonth && isTrainingWeekend && (
+                            <div
+                                className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-purple-600 text-white font-semibold shadow-sm tracking-wide whitespace-nowrap dark:shadow-none"
+                                title="Monthly Training Weekend"
+                            >
+                                <span className="w-1.5 h-1.5 bg-white rounded-full opacity-80"></span>
+                                TRAINING
+                            </div>
+                        )}
+
+                        {inMonth && isToday && !isTrainingWeekend && (
+                            <div
+                                className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-blue-600 text-white font-semibold shadow-sm whitespace-nowrap dark:shadow-none"
+                                title="Today"
+                            >
+                                <span className="w-1.5 h-1.5 bg-white rounded-full opacity-80"></span>
+                                TODAY
+                            </div>
+                        )}
+                    </div>
                 </div>
             </div>
 

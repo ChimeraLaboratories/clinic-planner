@@ -11,9 +11,47 @@ export type PresenceUser = {
     lastSeenAt: string;
     isOnline: boolean;
     jobRole?: string | null;
+    dateYmd?: string | null;
+    viewMode?: "month" | "day" | null;
+    activity?: "viewing" | "editing" | null;
+    activeRoomId?: number | null;
 };
 
-export function usePresence() {
+function parsePlannerLocation(pathname: string | null | undefined): {
+    dateYmd: string | null;
+    viewMode: "month" | "day" | null;
+} {
+    const path = String(pathname ?? "").trim();
+
+    if (!path) {
+        return { dateYmd: null, viewMode: null };
+    }
+
+    const dayMatch = path.match(/^\/planner\/(\d{4}-\d{2}-\d{2})(?:\/)?$/);
+    if (dayMatch) {
+        return {
+            dateYmd: dayMatch[1],
+            viewMode: "day",
+        };
+    }
+
+    if (path === "/planner" || path.startsWith("/planner?")) {
+        return {
+            dateYmd: null,
+            viewMode: "month",
+        };
+    }
+
+    return {
+        dateYmd: null,
+        viewMode: null,
+    };
+}
+
+export function usePresence(options?: {
+    activity?: "viewing" | "editing";
+    activeRoomId?: number | null;
+}) {
     const pathname = usePathname();
     const [users, setUsers] = useState<PresenceUser[]>([]);
     const [loading, setLoading] = useState(true);
@@ -28,6 +66,8 @@ export function usePresence() {
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({
                         currentPath: pathname ?? "/planner",
+                        activity: options?.activity ?? "viewing",
+                        activeRoomId: options?.activeRoomId ?? null,
                     }),
                     cache: "no-store",
                 });
@@ -47,7 +87,24 @@ export function usePresence() {
 
                 const data = await res.json();
                 if (!cancelled) {
-                    setUsers(Array.isArray(data?.users) ? data.users : []);
+                    const nextUsers = Array.isArray(data?.users)
+                        ? data.users.map((user: any) => {
+                            const parsed = parsePlannerLocation(user?.currentPath);
+                            return {
+                                ...user,
+                                dateYmd: parsed.dateYmd,
+                                viewMode: parsed.viewMode,
+                                activity:
+                                    user?.activity === "editing" || user?.activity === "viewing"
+                                        ? user.activity
+                                        : null,
+                                activeRoomId:
+                                    user?.activeRoomId == null ? null : Number(user.activeRoomId),
+                            };
+                        })
+                        : [];
+
+                    setUsers(nextUsers);
                 }
             } catch (error) {
                 console.error("Presence fetch failed", error);
@@ -77,7 +134,7 @@ export function usePresence() {
             window.clearInterval(refreshInterval);
             document.removeEventListener("visibilitychange", onVisible);
         };
-    }, [pathname]);
+    }, [pathname, options?.activity, options?.activeRoomId]);
 
     return { users, loading };
 }

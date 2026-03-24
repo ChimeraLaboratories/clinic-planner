@@ -4,7 +4,6 @@ import { formatMonthTitle } from "../utils/date";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import AddHolidayModal from "./AddHolidayModal";
-import UserPresencePill from "@/app/planner/components/UserPresencePill";
 
 function formatLastSynced(d: Date | null | undefined) {
     if (!d) return "";
@@ -490,6 +489,14 @@ export default function TopBar({
                                     </div>
 
                                     <Link
+                                        href="/planner/admin/users"
+                                        className="block rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800"
+                                        onClick={() => setAdminOpen(false)}
+                                    >
+                                        User Management
+                                    </Link>
+
+                                    <Link
                                         href="/planner/clinicians"
                                         className="block rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800"
                                         onClick={() => setAdminOpen(false)}
@@ -525,8 +532,6 @@ export default function TopBar({
                     >
                         Add Holiday
                     </button>
-
-                    <UserPresencePill/>
 
                     <div className="relative" ref={menuRef}>
                         <button
