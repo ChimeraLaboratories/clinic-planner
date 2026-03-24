@@ -12,6 +12,7 @@ type UserRow = {
     email: string;
     full_name: string | null;
     role: "ADMIN" | "PLANNER" | "VIEWER";
+    job_role: string | null;
     is_active: number;
     password_hash: string;
 };
@@ -22,7 +23,11 @@ export async function POST(req: Request) {
         const email = String(body?.email ?? "").trim().toLowerCase();
         const password = String(body?.password ?? "");
 
+        console.log("[login] request received");
+        console.log("[login] email:", email);
+
         if (!email || !password) {
+            console.log("[login] missing credentials");
             return NextResponse.json(
                 { error: "Email and password are required" },
                 { status: 400 }
@@ -31,7 +36,7 @@ export async function POST(req: Request) {
 
         const [rows] = await db.query(
             `
-            SELECT id, email, full_name, role, is_active, password_hash
+            SELECT id, email, full_name, role, job_role, is_active, password_hash
             FROM users
             WHERE email = ?
             LIMIT 1
@@ -42,6 +47,10 @@ export async function POST(req: Request) {
         const users = rows as UserRow[];
         const user = users[0];
 
+        console.log("[login] user found:", !!user);
+        console.log("[login] is_active:", user?.is_active ?? null);
+        console.log("[login] has password hash:", !!user?.password_hash);
+
         if (!user || !user.is_active) {
             return NextResponse.json(
                 { error: "Invalid email or password" },
@@ -49,8 +58,10 @@ export async function POST(req: Request) {
             );
         }
 
-        const ok = await verifyPassword(password, user.password_hash);
-        if (!ok) {
+        const passwordOk = await verifyPassword(password, user.password_hash);
+        console.log("[login] password match:", passwordOk);
+
+        if (!passwordOk) {
             return NextResponse.json(
                 { error: "Invalid email or password" },
                 { status: 401 }
@@ -58,6 +69,7 @@ export async function POST(req: Request) {
         }
 
         const token = await signSession(user);
+        console.log("[login] token created");
 
         const res = NextResponse.json({
             ok: true,
@@ -74,9 +86,10 @@ export async function POST(req: Request) {
             maxAge: 60 * 60 * 24 * 7,
         });
 
+        console.log("[login] cookie set");
         return res;
     } catch (error) {
-        console.error("POST /planner/api/login failed", error);
+        console.error("[login] failed:", error);
         return NextResponse.json(
             { error: "Unable to sign in" },
             { status: 500 }

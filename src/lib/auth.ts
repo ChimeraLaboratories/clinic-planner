@@ -11,6 +11,7 @@ export type AuthUser = {
     email: string;
     full_name: string | null;
     role: UserRole;
+    job_role: string | null;
     is_active: number;
 };
 
@@ -122,5 +123,6 @@ export function toPublicUser(user: AuthUser) {
         email: user.email,
         full_name: user.full_name,
         role: user.role,
+        job_role: user.job_role,
     };
 }

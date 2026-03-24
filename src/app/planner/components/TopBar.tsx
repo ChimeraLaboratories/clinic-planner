@@ -31,6 +31,7 @@ type CurrentUser = {
     email: string;
     full_name?: string | null;
     role: "ADMIN" | "PLANNER" | "VIEWER";
+    job_role?: string | null;
 };
 
 function normalizeEnv(v: any): Env | undefined {
@@ -487,7 +488,7 @@ export default function TopBar({
             {currentUser?.full_name || currentUser?.email || "User"}
         </span>
         <span className="block text-xs text-slate-500 dark:text-slate-400">
-            {currentUser?.role || "Unknown role"}
+    {[currentUser?.job_role, currentUser?.role].filter(Boolean).join(" · ")}
         </span>
     </span>
                         </button>
