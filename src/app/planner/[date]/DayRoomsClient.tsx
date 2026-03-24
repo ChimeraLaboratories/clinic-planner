@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 
 import { DayRoom } from "@/app/planner/[date]/types";
 import CreateSessionModal from "@/app/planner/components/CreateSessionModal";
+import {usePresence} from "@/app/planner/hooks/usePresence";
 
 type Slot = "AM" | "PM" | "FULL";
 
@@ -69,6 +70,7 @@ export default function DayRoomsClient({
     const [rooms, setRooms] = useState<DayRoom[]>(initialRooms);
     const [deleting, setDeleting] = useState<number | null>(null);
     const router = useRouter();
+    usePresence();
 
     const [createOpen, setCreateOpen] = useState(false);
     const [createDefaults, setCreateDefaults] = useState<{
