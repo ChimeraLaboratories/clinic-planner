@@ -26,6 +26,13 @@ type Meta = {
     region?: string | null;
 };
 
+type CurrentUser = {
+    id: number;
+    email: string;
+    full_name?: string | null;
+    role: "ADMIN" | "PLANNER" | "VIEWER";
+};
+
 function normalizeEnv(v: any): Env | undefined {
     const s = String(v ?? "").trim().toUpperCase();
     if (s === "DEV" || s === "QA" || s === "STAGE" || s === "PROD") return s as Env;
@@ -147,10 +154,35 @@ export default function TopBar({
     const badgeRef = useRef<HTMLSpanElement | null>(null);
     const tipRef = useRef<HTMLDivElement | null>(null);
     const [tipShift, setTipShift] = useState(0);
+    const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
+    const [loggingOut, setLoggingOut] = useState(false);
 
     useEffect(() => {
         setRuntimeEnv(env);
     }, [env]);
+
+    useEffect(() => {
+        let cancelled = false;
+
+        (async () => {
+            try {
+                const res = await fetch("/planner/api/me", { cache: "no-store" });
+                if (!res.ok) {
+                    if (!cancelled) setCurrentUser(null);
+                    return;
+                }
+
+                const json = await res.json();
+                if (!cancelled) setCurrentUser(json?.user ?? null);
+            } catch {
+                if (!cancelled) setCurrentUser(null);
+            }
+        })();
+
+        return () => {
+            cancelled = true;
+        };
+    }, []);
 
     // Fetch meta/env if not provided by parent
     useEffect(() => {
@@ -191,6 +223,16 @@ export default function TopBar({
         document.addEventListener("mousedown", handleClickOutside);
         return () => document.removeEventListener("mousedown", handleClickOutside);
     }, []);
+
+    async function handleLogout() {
+        try {
+            setLoggingOut(true);
+            await fetch("/planner/api/logout", { method: "POST" });
+            window.location.href = "/login";
+        } finally {
+            setLoggingOut(false);
+        }
+    }
 
     const updateTooltipClamp = () => {
         const badge = badgeRef.current;
@@ -430,15 +472,48 @@ export default function TopBar({
 
                     <div className="relative" ref={menuRef}>
                         <button
-                            disabled
                             onClick={() => setMenuOpen((v) => !v)}
                             className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
                         >
-                            <div className="flex h-7 w-7 items-center justify-center rounded-full bg-blue-600 text-xs font-semibold text-white">
-                                CE
-                            </div>
-                            <span className="hidden sm:block">Cane</span>
+    <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-blue-600 text-xs font-semibold text-white">
+        {(currentUser?.full_name || currentUser?.email || "U")
+            .trim()
+            .slice(0, 2)
+            .toUpperCase()}
+    </span>
+
+                            <span className="text-left leading-tight">
+        <span className="block">
+            {currentUser?.full_name || currentUser?.email || "User"}
+        </span>
+        <span className="block text-xs text-slate-500 dark:text-slate-400">
+            {currentUser?.role || "Unknown role"}
+        </span>
+    </span>
                         </button>
+
+                        {menuOpen && (
+                            <div className="absolute right-0 top-full z-50 mt-2 w-56 rounded-xl border border-slate-200 bg-white p-2 shadow-lg dark:border-slate-800 dark:bg-slate-900">
+                                <div className="rounded-lg px-3 py-2">
+                                    <div className="text-sm font-medium text-slate-900 dark:text-slate-100">
+                                        {currentUser?.full_name || "Signed in"}
+                                    </div>
+                                    <div className="text-xs text-slate-500 dark:text-slate-400">
+                                        {currentUser?.email || ""}
+                                    </div>
+                                </div>
+
+                                <div className="my-2 h-px bg-slate-200 dark:bg-slate-800" />
+
+                                <button
+                                    onClick={handleLogout}
+                                    disabled={loggingOut}
+                                    className="block w-full rounded-lg px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800"
+                                >
+                                    {loggingOut ? "Signing out..." : "Sign out"}
+                                </button>
+                            </div>
+                        )}
 
                         {menuOpen && (
                             <div className="absolute right-0 mt-2 w-52 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg dark:border-slate-800 dark:bg-slate-900">
