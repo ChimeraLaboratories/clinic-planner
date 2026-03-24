@@ -4,7 +4,6 @@ import { formatMonthTitle } from "../utils/date";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import AddHolidayModal from "./AddHolidayModal";
-import UserPresencePill from "@/app/planner/components/UserPresencePill";
 
 function formatLastSynced(d: Date | null | undefined) {
     if (!d) return "";
@@ -525,8 +524,6 @@ export default function TopBar({
                     >
                         Add Holiday
                     </button>
-
-                    <UserPresencePill/>
 
                     <div className="relative" ref={menuRef}>
                         <button
