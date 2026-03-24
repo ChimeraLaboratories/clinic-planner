@@ -7,7 +7,6 @@ import MonthGrid from "./MonthGrid";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import HolidayBookedView from "@/app/planner/components/HolidayBookedView";
-import UserPresenceIndicator from "@/app/planner/components/UserPresenceIndicator";
 
 /**
  * IMPORTANT FIX:
