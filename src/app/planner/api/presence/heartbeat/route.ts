@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { getCurrentUser } from "@/lib/auth/getCurrentUser";
+import {getCurrentUserFromCookies} from "@/lib/auth";
 
 export async function POST(req: Request) {
     try {
-        const user = await getCurrentUser();
+        const user = await getCurrentUserFromCookies();
 
         if (!user) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

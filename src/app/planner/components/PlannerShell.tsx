@@ -7,6 +7,7 @@ import MonthGrid from "./MonthGrid";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import HolidayBookedView from "@/app/planner/components/HolidayBookedView";
+import UserPresenceIndicator from "@/app/planner/components/UserPresenceIndicator";
 
 /**
  * IMPORTANT FIX:
@@ -352,6 +353,7 @@ export default function PlannerShell({
                     {/* LEFT SIDEBAR CARDS */}
                     <aside className="hidden lg:block w-80 shrink-0">
                         <div className="space-y-6">
+                            <UserPresenceIndicator/>
                             {/* NEEDS SUPERVISOR CARD */}
                             <div
                                 className={`rounded-2xl border shadow-sm dark:shadow-none p-6 transition-all ${
