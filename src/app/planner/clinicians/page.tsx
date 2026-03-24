@@ -17,16 +17,33 @@ type Clinician = {
 export default async function CliniciansPage() {
     const h = await headers();
     const host = h.get("host");
+    const cookie = h.get("cookie") ?? "";
+
     if (!host) return notFound();
+
     const protocol = process.env.NODE_ENV === "development" ? "http" : "https";
 
-    const res = await fetch(`${protocol}://${host}/planner/api/clinicians?includeInactive=1`, {
-        cache: "no-store",
-    });
+    let clinicians: Clinician[] = [];
 
-    if (!res.ok) return notFound();
+    try {
+        const res = await fetch(
+            `${protocol}://${host}/planner/api/clinicians?includeInactive=1`,
+            {
+                headers: {
+                    cookie,
+                },
+                cache: "no-store",
+            }
+        );
 
-    const clinicians: Clinician[] = await res.json();
+        if (!res.ok) {
+            throw new Error(`Clinicians API failed: ${res.status}`);
+        }
+
+        clinicians = await res.json();
+    } catch (err) {
+        console.error("[CliniciansPage] failed to load clinicians", err);
+    }
 
     return (
         <div className="min-h-screen bg-slate-50 p-8 text-slate-900 dark:bg-slate-950 dark:text-slate-50">

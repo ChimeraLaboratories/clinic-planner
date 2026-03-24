@@ -13,6 +13,7 @@ type DayApiResponse = {
         roomsUsed: number;
         clinicians: number;
     };
+    holidays?: any[];
 };
 
 type PlannerTotalsLikeResponse = {
@@ -25,11 +26,31 @@ type PlannerTotalsLikeResponse = {
     data?: any;
 };
 
+type ClinicianApi = {
+    id: number;
+    full_name?: string | null;
+    display_name?: string | null;
+    role_code?: number | null;
+    grade_code?: number | null;
+    GOC_number?: string | null;
+    is_supervisor?: number | null;
+    is_active?: number | null;
+};
+
+type SidebarClinician = {
+    id: number;
+    full_name?: string | null;
+    display_name: string;
+    role_code: number;
+    grade_code: number;
+    is_supervisor: number;
+    is_active?: number;
+};
+
 function normalizeTotals(raw: any) {
     const root = raw?.data ?? raw ?? {};
     const stats = root?.stats ?? {};
 
-    // 1) Prefer explicit totals from API if present
     const explicitSt = stats.totalStValue ?? root.totalStValue;
     const explicitCl = stats.totalClValue ?? root.totalClValue;
 
@@ -40,7 +61,6 @@ function normalizeTotals(raw: any) {
         };
     }
 
-    // 2) Fallback: compute totals from sessions array (match MonthGrid/DayCell logic)
     const sessions: any[] = Array.isArray(root.sessions) ? root.sessions : [];
 
     let totalStValue = 0;
@@ -49,13 +69,13 @@ function normalizeTotals(raw: any) {
     for (const s of sessions) {
         if (String(s?.status ?? "").trim().toUpperCase() === "CANCELLED") continue;
 
-        const t = String(s.session_type ?? s.type ?? s.clinic_code ?? "")
+        const t = String(s?.session_type ?? s?.type ?? s?.clinic_code ?? "")
             .trim()
             .toUpperCase();
 
-        const rawVal = s.value ?? s.session_value ?? s.clinic_value ?? 0;
-
+        const rawVal = s?.value ?? s?.session_value ?? s?.clinic_value ?? 0;
         const v = typeof rawVal === "number" ? rawVal : parseFloat(String(rawVal));
+
         if (!Number.isFinite(v)) continue;
 
         if (t.startsWith("ST")) totalStValue += v;
@@ -63,6 +83,29 @@ function normalizeTotals(raw: any) {
     }
 
     return { totalStValue, totalClValue };
+}
+
+function getBaseUrl(host: string, forwardedProto: string | null) {
+    if (forwardedProto === "http" || forwardedProto === "https") {
+        return `${forwardedProto}://${host}`;
+    }
+
+    return process.env.NODE_ENV === "development" ? `http://${host}` : `https://${host}`;
+}
+
+function normalizeClinicians(input: ClinicianApi[]): SidebarClinician[] {
+    return (input ?? []).map((c) => ({
+        id: Number(c.id),
+        full_name: c.full_name ?? null,
+        display_name:
+            String(c.display_name ?? "").trim() ||
+            String(c.full_name ?? "").trim() ||
+            `Clinician ${c.id}`,
+        role_code: Number(c.role_code ?? 0),
+        grade_code: Number(c.grade_code ?? 0),
+        is_supervisor: Number(c.is_supervisor ?? 0),
+        is_active: Number(c.is_active ?? 1),
+    }));
 }
 
 export default async function PlannerDayPage({
@@ -76,27 +119,66 @@ export default async function PlannerDayPage({
     const sp = (await searchParams) ?? {};
     const monthParam = sp?.m;
 
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return notFound();
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+        notFound();
+    }
 
     const h = await headers();
     const host = h.get("host");
-    if (!host) return notFound();
+    const cookieHeader = h.get("cookie") ?? "";
 
-    const protocol = process.env.NODE_ENV === "development" ? "http" : "https";
+    if (!host) {
+        return (
+            <div className="min-h-screen bg-gray-50 p-8 dark:bg-slate-950">
+                <div className="mx-auto max-w-4xl rounded-xl border border-red-200 bg-white p-6 text-red-700 shadow-sm dark:border-red-900/50 dark:bg-slate-900 dark:text-red-300">
+                    Unable to determine request host.
+                </div>
+            </div>
+        );
+    }
 
-    const dayRes = await fetch(`${protocol}://${host}/planner/api/day?date=${date}`, {
-        cache: "no-store",
-    });
-    if (!dayRes.ok) return notFound();
-    const dayData: DayApiResponse = await dayRes.json();
+    const baseUrl = getBaseUrl(host, h.get("x-forwarded-proto"));
+
+    async function authedFetch(url: string) {
+        return fetch(url, {
+            cache: "no-store",
+            headers: {
+                cookie: cookieHeader,
+            },
+        });
+    }
+
+    let dayData: DayApiResponse = {
+        rooms: [],
+        stats: {
+            totalSessions: 0,
+            roomsUsed: 0,
+            clinicians: 0,
+        },
+        holidays: [],
+    };
 
     let totals = { totalStValue: 0, totalClValue: 0 };
     let dayRules: any[] = [];
+    let clinicianList: SidebarClinician[] = [];
+    let dayLoadError = "";
 
     try {
-        const totalsRes = await fetch(
-            `${protocol}://${host}/planner/api/planner?from=${date}&to=${date}`,
-            { cache: "no-store" }
+        const dayRes = await authedFetch(`${baseUrl}/planner/api/day?date=${date}`);
+
+        if (!dayRes.ok) {
+            throw new Error(`Day API failed with status ${dayRes.status}`);
+        }
+
+        dayData = await dayRes.json();
+    } catch (error) {
+        console.error("[PlannerDayPage] failed to load day data:", error);
+        dayLoadError = "Unable to load day data right now.";
+    }
+
+    try {
+        const totalsRes = await authedFetch(
+            `${baseUrl}/planner/api/planner?from=${date}&to=${date}`
         );
 
         if (totalsRes.ok) {
@@ -105,44 +187,53 @@ export default async function PlannerDayPage({
 
             const root = (rawTotals as any)?.data ?? rawTotals ?? {};
             dayRules = Array.isArray(root?.dayRules) ? root.dayRules : [];
+        } else {
+            console.error(
+                `[PlannerDayPage] planner totals API failed with status ${totalsRes.status}`
+            );
         }
-    } catch {
-        totals = { totalStValue: 0, totalClValue: 0 };
-        dayRules = [];
+    } catch (error) {
+        console.error("[PlannerDayPage] failed to load totals/day rules:", error);
     }
 
-    const cRes = await fetch(`${protocol}://${host}/planner/api/clinicians`, {
-        cache: "no-store",
-    });
-    const clinicianList = cRes.ok ? await cRes.json() : [];
+    try {
+        const cRes = await authedFetch(`${baseUrl}/planner/api/clinicians`);
+
+        if (cRes.ok) {
+            const rawClinicians: ClinicianApi[] = await cRes.json();
+            clinicianList = normalizeClinicians(rawClinicians);
+        } else {
+            console.error(
+                `[PlannerDayPage] clinicians API failed with status ${cRes.status}`
+            );
+        }
+    } catch (error) {
+        console.error("[PlannerDayPage] failed to load clinicians:", error);
+    }
 
     const displayDate = new Date(`${date}T00:00:00`);
     const dayName = displayDate.toLocaleDateString("en-GB", { weekday: "long" });
-
     const backHref = monthParam ? `/planner?m=${monthParam}` : "/planner";
 
-    // IMPORTANT: set this to your rota’s Week A anchor date (same one used everywhere else)
-    const trainingStart = new Date("2026-01-05T00:00:00");
-
     return (
-        <div className="min-h-screen bg-gray-50 dark:bg-slate-950 p-8">
-            {/* ✅ Sidebar is outside any max-width container so it can sit on the left edge */}
-            <div className="flex gap-8 items-start">
-                <div className="w-[320px] flex-shrink-0 sticky top-8 h-fit">
+        <div className="min-h-screen bg-gray-50 p-8 dark:bg-slate-950">
+            <div className="flex items-start gap-8">
+                <div className="sticky top-8 h-fit w-[320px] flex-shrink-0">
                     <DayExpectedSidebar
                         dateISO={`${date}T00:00:00`}
                         clinicians={clinicianList}
                         dayRules={dayRules}
                         rooms={dayData.rooms}
-                        holidays={(dayData as any)?.holidays ?? []}
+                        holidays={dayData.holidays ?? []}
                     />
                 </div>
 
-                {/* Main content */}
-                <div className="flex-1 max-w-6xl space-y-8">
+                <div className="max-w-6xl flex-1 space-y-8">
                     <div className="flex items-center justify-between">
                         <div>
-                            <h1 className="text-3xl font-bold text-gray-900 dark:text-slate-100">{dayName}</h1>
+                            <h1 className="text-3xl font-bold text-gray-900 dark:text-slate-100">
+                                {dayName}
+                            </h1>
                             <p className="text-gray-500 dark:text-slate-400">
                                 {displayDate.toLocaleDateString("en-GB")}
                             </p>
@@ -150,15 +241,21 @@ export default async function PlannerDayPage({
 
                         <Link
                             href={backHref}
-                            className="inline-flex items-center px-3 py-2 text-sm rounded border border-gray-200 dark:border-slate-800 text-gray-900 dark:text-slate-100 hover:bg-gray-50 dark:hover:bg-slate-900"
+                            className="inline-flex items-center rounded border border-gray-200 px-3 py-2 text-sm text-gray-900 hover:bg-gray-50 dark:border-slate-800 dark:text-slate-100 dark:hover:bg-slate-900"
                         >
                             ← Back to Planner
                         </Link>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                        <div className="bg-white dark:bg-slate-900 rounded-lg border border-gray-200 dark:border-slate-800 p-6 shadow-sm dark:shadow-none">
-                            <div className="text-base font-medium text-gray-700 dark:text-slate-200 tracking-tight">
+                    {dayLoadError ? (
+                        <div className="rounded-lg border border-red-200 bg-white p-4 text-sm text-red-700 shadow-sm dark:border-red-900/50 dark:bg-slate-900 dark:text-red-300">
+                            {dayLoadError}
+                        </div>
+                    ) : null}
+
+                    <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
+                        <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900 dark:shadow-none">
+                            <div className="text-base font-medium tracking-tight text-gray-700 dark:text-slate-200">
                                 Rooms Used
                             </div>
                             <div className="text-3xl font-bold text-gray-900 dark:text-slate-100">
@@ -166,10 +263,10 @@ export default async function PlannerDayPage({
                             </div>
                         </div>
 
-                        <div className="bg-white dark:bg-slate-900 rounded-lg border border-gray-200 dark:border-slate-800 shadow-sm dark:shadow-none overflow-hidden">
+                        <div className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900 dark:shadow-none">
                             <div className="grid grid-cols-2">
                                 <div className="p-6">
-                                    <div className="text-base font-medium text-gray-700 dark:text-slate-200 tracking-tight">
+                                    <div className="text-base font-medium tracking-tight text-gray-700 dark:text-slate-200">
                                         Total ST
                                     </div>
                                     <div className="text-3xl font-bold text-gray-900 dark:text-slate-100">
@@ -177,8 +274,8 @@ export default async function PlannerDayPage({
                                     </div>
                                 </div>
 
-                                <div className="p-6 border-l border-gray-200 dark:border-slate-800">
-                                    <div className="text-base font-medium text-gray-700 dark:text-slate-200 tracking-tight">
+                                <div className="border-l border-gray-200 p-6 dark:border-slate-800">
+                                    <div className="text-base font-medium tracking-tight text-gray-700 dark:text-slate-200">
                                         Total CL
                                     </div>
                                     <div className="text-3xl font-bold text-gray-900 dark:text-slate-100">
@@ -188,18 +285,18 @@ export default async function PlannerDayPage({
                             </div>
                         </div>
 
-                        <div className="bg-white dark:bg-slate-900 rounded-lg border border-gray-200 dark:border-slate-800 p-6 shadow-sm dark:shadow-none">
-                            <div className="text-base font-medium text-gray-700 dark:text-slate-200 tracking-tight">
+                        <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900 dark:shadow-none">
+                            <div className="text-base font-medium tracking-tight text-gray-700 dark:text-slate-200">
                                 Available Rooms
                             </div>
                             <div className="text-3xl font-bold text-gray-900 dark:text-slate-100">
-                                {dayData.rooms.length - dayData.stats.roomsUsed}
+                                {Math.max(0, dayData.rooms.length - dayData.stats.roomsUsed)}
                             </div>
                         </div>
                     </div>
 
                     <section>
-                        <h2 className="text-xl font-semibold mb-4 text-slate-900 dark:text-slate-100">
+                        <h2 className="mb-4 text-xl font-semibold text-slate-900 dark:text-slate-100">
                             Room Overview
                         </h2>
                         <DayRoomsClient
