@@ -489,6 +489,14 @@ export default function TopBar({
                                     </div>
 
                                     <Link
+                                        href="/planner/admin/users"
+                                        className="block rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800"
+                                        onClick={() => setAdminOpen(false)}
+                                    >
+                                        User Management
+                                    </Link>
+
+                                    <Link
                                         href="/planner/clinicians"
                                         className="block rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800"
                                         onClick={() => setAdminOpen(false)}

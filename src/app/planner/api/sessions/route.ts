@@ -2,6 +2,10 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { createSession } from "@/app/planner/services/plannerService";
 import { getWeekPatternFromYmd, patternToLabel } from "@/lib/WeekPattern";
+import { writeAuditLog } from "@/lib/audit/audit";
+import { getRequestAuditContext } from "@/lib/audit/audit-request";
+import { AuditAction } from "@/lib/audit/audit-actions";
+import { getCurrentUserFromCookies } from "@/lib/auth";
 
 type Pattern = "W1" | "W2";
 
@@ -140,7 +144,7 @@ export async function POST(req: Request) {
             });
         }
 
-        await createSession({
+        const sessionId = await createSession({
             session_date: sessionDateYmd,
             room_id: roomIdNum,
             clinician_id: clinicianIdNum,
@@ -150,6 +154,47 @@ export async function POST(req: Request) {
             notes,
             is_overtime: isOvertime ? 1 : 0,
         });
+
+        try {
+            const currentUser = await getCurrentUserFromCookies();
+            const reqCtx = await getRequestAuditContext();
+
+            await writeAuditLog({
+                actor: currentUser
+                    ? {
+                        id: currentUser.id,
+                        email: currentUser.email,
+                        name: currentUser.full_name,
+                    }
+                    : undefined,
+                action: AuditAction.SESSION_CREATED,
+                entityType: "session",
+                entityId: sessionId,
+                targetDate: sessionDateYmd,
+                summary: `Created ${session_type} session in room ${roomIdNum}`,
+                before: null,
+                after: {
+                    id: sessionId,
+                    session_date: sessionDateYmd,
+                    room_id: roomIdNum,
+                    clinician_id: clinicianIdNum,
+                    session_type,
+                    slot,
+                    status,
+                    notes,
+                    is_overtime: isOvertime ? 1 : 0,
+                },
+                meta: {
+                    room_id: roomIdNum,
+                    clinician_id: clinicianIdNum,
+                    is_overtime: isOvertime ? 1 : 0,
+                },
+                ipAddress: reqCtx.ipAddress,
+                userAgent: reqCtx.userAgent,
+            });
+        } catch (error) {
+            console.error("[AUDIT_LOG_FAILED][SESSION_CREATED]", error);
+        }
 
         return NextResponse.json(
             {

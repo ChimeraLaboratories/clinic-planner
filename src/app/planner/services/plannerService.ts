@@ -56,13 +56,13 @@ export async function createSession(input: {
         // 2) Clinician conflicts (already booked)
         const [clinicianConflicts] = await db.query(
             `
-            SELECT id, slot, room_id
-            FROM sessions
-            WHERE session_date = ?
-              AND clinician_id = ?
-              AND slot IN (${slotsToCheck.map(() => "?").join(",")})
-              AND status <> 'CANCELLED'
-            LIMIT 1
+                SELECT id, slot, room_id
+                FROM sessions
+                WHERE session_date = ?
+                  AND clinician_id = ?
+                  AND slot IN (${slotsToCheck.map(() => "?").join(",")})
+                  AND status <> 'CANCELLED'
+                    LIMIT 1
             `,
             [session_date, clinician_id, ...slotsToCheck]
         );
@@ -78,7 +78,7 @@ export async function createSession(input: {
     }
 
     // 3) Insert
-    await db.query(
+    const [result] = await db.query(
         `
             INSERT INTO sessions
             (session_date, room_id, clinician_id, session_type, slot, status, notes, is_overtime)
@@ -96,4 +96,6 @@ export async function createSession(input: {
             is_overtime ? 1 : 0,
         ]
     );
+
+    return (result as any).insertId as number;
 }
