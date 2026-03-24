@@ -10,6 +10,7 @@ export type PresenceUser = {
     currentPath: string | null;
     lastSeenAt: string;
     isOnline: boolean;
+    jobRole?: string | null;
 };
 
 export function usePresence() {

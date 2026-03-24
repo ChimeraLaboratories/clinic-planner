@@ -4,6 +4,7 @@ import { formatMonthTitle } from "../utils/date";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import AddHolidayModal from "./AddHolidayModal";
+import UserPresencePill from "@/app/planner/components/UserPresencePill";
 
 function formatLastSynced(d: Date | null | undefined) {
     if (!d) return "";
@@ -155,8 +156,14 @@ export default function TopBar({
     const badgeRef = useRef<HTMLSpanElement | null>(null);
     const tipRef = useRef<HTMLDivElement | null>(null);
     const [tipShift, setTipShift] = useState(0);
+
+    //User States
     const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
     const [loggingOut, setLoggingOut] = useState(false);
+
+    //Admin Menu States
+    const [adminOpen, setAdminOpen] = useState(false);
+    const adminRef = useRef<HTMLDivElement | null>(null);
 
     useEffect(() => {
         setRuntimeEnv(env);
@@ -216,9 +223,14 @@ export default function TopBar({
 
     useEffect(() => {
         function handleClickOutside(e: MouseEvent) {
-            if (!menuRef.current) return;
-            if (!menuRef.current.contains(e.target as Node)) {
+            const target = e.target as Node;
+
+            if (menuRef.current && !menuRef.current.contains(target)) {
                 setMenuOpen(false);
+            }
+
+            if (adminRef.current && !adminRef.current.contains(target)) {
+                setAdminOpen(false);
             }
         }
         document.addEventListener("mousedown", handleClickOutside);
@@ -455,12 +467,55 @@ export default function TopBar({
                         <span className="text-base leading-none">{isDark ? "☀" : "🌙"}</span>
                     </button>
 
-                    <Link
-                        href="/planner/clinicians"
-                        className="inline-flex items-center rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
-                    >
-                        Clinician Management
-                    </Link>
+                    {currentUser?.role === "ADMIN" && (
+                        <div className="relative" ref={adminRef}>
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setAdminOpen((v) => !v);
+                                    setMenuOpen(false);
+                                }}
+                                className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+                                aria-haspopup="menu"
+                                aria-expanded={adminOpen}
+                            >
+                                <span>Admin</span>
+                                <span className={`text-xs transition-transform ${adminOpen ? "rotate-180" : ""}`}>▼</span>
+                            </button>
+
+                            {adminOpen && (
+                                <div className="absolute right-0 top-full z-50 mt-2 w-56 overflow-hidden rounded-xl border border-slate-200 bg-white p-2 shadow-lg dark:border-slate-800 dark:bg-slate-900">
+                                    <div className="px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                                        Maintenance
+                                    </div>
+
+                                    <Link
+                                        href="/planner/clinicians"
+                                        className="block rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800"
+                                        onClick={() => setAdminOpen(false)}
+                                    >
+                                        Clinician Management
+                                    </Link>
+
+                                    <Link
+                                        href="/planner/rooms"
+                                        className="block rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800"
+                                        onClick={() => setAdminOpen(false)}
+                                    >
+                                        Room Management
+                                    </Link>
+
+                                    <Link
+                                        href="/planner/day-rules"
+                                        className="block rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800"
+                                        onClick={() => setAdminOpen(false)}
+                                    >
+                                        Day Rules
+                                    </Link>
+                                </div>
+                            )}
+                        </div>
+                    )}
 
                     <button
                         type="button"
@@ -471,9 +526,14 @@ export default function TopBar({
                         Add Holiday
                     </button>
 
+                    <UserPresencePill/>
+
                     <div className="relative" ref={menuRef}>
                         <button
-                            onClick={() => setMenuOpen((v) => !v)}
+                            onClick={() => {
+                                setMenuOpen((v) => !v);
+                                setAdminOpen(false);
+                            }}
                             className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
                         >
     <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-blue-600 text-xs font-semibold text-white">
@@ -506,30 +566,29 @@ export default function TopBar({
 
                                 <div className="my-2 h-px bg-slate-200 dark:bg-slate-800" />
 
-                                <button
-                                    onClick={handleLogout}
-                                    disabled={loggingOut}
-                                    className="block w-full rounded-lg px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800"
-                                >
-                                    {loggingOut ? "Signing out..." : "Sign out"}
-                                </button>
-                            </div>
-                        )}
-
-                        {menuOpen && (
-                            <div className="absolute right-0 mt-2 w-52 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg dark:border-slate-800 dark:bg-slate-900">
                                 <Link
                                     href="/settings"
-                                    className="block px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800"
+                                    onClick={() => setMenuOpen(false)}
+                                    className="block w-full rounded-lg px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800"
                                 >
                                     Settings
                                 </Link>
-                                <button className="w-full px-4 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800">
+
+                                <button
+                                    type="button"
+                                    className="block w-full rounded-lg px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800"
+                                >
                                     Account
                                 </button>
-                                <div className="border-t border-slate-200 dark:border-slate-800" />
-                                <button className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-slate-50 dark:hover:bg-slate-800">
-                                    Sign out
+
+                                <div className="my-2 h-px bg-slate-200 dark:bg-slate-800" />
+
+                                <button
+                                    onClick={handleLogout}
+                                    disabled={loggingOut}
+                                    className="block w-full rounded-lg px-3 py-2 text-left text-sm text-red-600 hover:bg-slate-50 dark:hover:bg-slate-800"
+                                >
+                                    {loggingOut ? "Signing out..." : "Sign out"}
                                 </button>
                             </div>
                         )}
