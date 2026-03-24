@@ -14,6 +14,7 @@ import { useMemo } from "react";
 
 import { useRouter } from "next/navigation";
 import { getWeekPatternFromYmd } from "@/lib/WeekPattern";
+import { usePresence } from "@/app/planner/hooks/usePresence";
 
 function ym(d: Date) {
     const yyyy = d.getFullYear();
@@ -112,6 +113,7 @@ export default function MonthGrid({
     onRefresh: () => void | Promise<void>;
 }) {
     const router = useRouter();
+    const { users: presenceUsers } = usePresence();
 
     const monthParam = ym(anchorMonth);
 
@@ -137,6 +139,20 @@ export default function MonthGrid({
             m.set(Number(c.id), String(c.full_name ?? c.display_name ?? ""));
         return m;
     }, [data]);
+
+    const presenceByDay = useMemo(() => {
+        const map: Record<string, any[]> = {};
+
+        for (const user of presenceUsers) {
+            if (!user?.isOnline) continue;
+            if (user?.viewMode !== "day") continue;
+            if (!user?.dateYmd) continue;
+
+            (map[user.dateYmd] ??= []).push(user);
+        }
+
+        return map;
+    }, [presenceUsers]);
 
     // ✅ Group by day_key FIRST (stable)
     const sessionsByDay = useMemo(() => {
@@ -295,12 +311,10 @@ export default function MonthGrid({
                             cliniciansById={cliniciansById}
                             onSelect={(key) => router.push(`/planner/${key}?m=${monthParam}`)}
                             isTrainingWeekend={inMonth && trainingKeys.has(toISODate(d))}
-                            // ✅ NEW: highlight current day
                             isToday={inMonth && dateKey === todayKey}
-                            // ✅ NEW: show flag on month cell when not all expected clinicians are assigned
                             missingExpectedCount={inMonth ? (missingExpectedCountByDay[dateKey] ?? 0) : 0}
-                            // ✅ existing
                             onAddOoHoliday={addOoHoliday}
+                            presenceUsers={inMonth ? (presenceByDay[dateKey] ?? []) : []}
                         />
                     );
                 })}
