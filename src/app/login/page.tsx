@@ -1,18 +1,21 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 
-export default function LoginPage() {
+type LoginPageProps = {
+    nextUrl?: string;
+};
+
+function LoginForm({ nextUrl }: LoginPageProps) {
     const router = useRouter();
-    const searchParams = useSearchParams();
 
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState("");
 
-    const next = searchParams.get("next") || "/planner";
+    const next = nextUrl || "/planner";
 
     async function handleSubmit(e: React.FormEvent) {
         e.preventDefault();
@@ -115,4 +118,12 @@ export default function LoginPage() {
             </div>
         </main>
     );
+}
+
+export default function LoginPage({
+                                      searchParams,
+                                  }: {
+    searchParams?: { next?: string };
+}) {
+    return <LoginForm nextUrl={searchParams?.next} />;
 }
