@@ -13,6 +13,8 @@ export type PresenceUser = {
     jobRole?: string | null;
     dateYmd?: string | null;
     viewMode?: "month" | "day" | null;
+    activity?: "viewing" | "editing" | null;
+    activeRoomId?: number | null;
 };
 
 function parsePlannerLocation(pathname: string | null | undefined): {
@@ -46,7 +48,10 @@ function parsePlannerLocation(pathname: string | null | undefined): {
     };
 }
 
-export function usePresence() {
+export function usePresence(options?: {
+    activity?: "viewing" | "editing";
+    activeRoomId?: number | null;
+}) {
     const pathname = usePathname();
     const [users, setUsers] = useState<PresenceUser[]>([]);
     const [loading, setLoading] = useState(true);
@@ -61,6 +66,8 @@ export function usePresence() {
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({
                         currentPath: pathname ?? "/planner",
+                        activity: options?.activity ?? "viewing",
+                        activeRoomId: options?.activeRoomId ?? null,
                     }),
                     cache: "no-store",
                 });
@@ -87,6 +94,12 @@ export function usePresence() {
                                 ...user,
                                 dateYmd: parsed.dateYmd,
                                 viewMode: parsed.viewMode,
+                                activity:
+                                    user?.activity === "editing" || user?.activity === "viewing"
+                                        ? user.activity
+                                        : null,
+                                activeRoomId:
+                                    user?.activeRoomId == null ? null : Number(user.activeRoomId),
                             };
                         })
                         : [];
@@ -121,7 +134,7 @@ export function usePresence() {
             window.clearInterval(refreshInterval);
             document.removeEventListener("visibilitychange", onVisible);
         };
-    }, [pathname]);
+    }, [pathname, options?.activity, options?.activeRoomId]);
 
     return { users, loading };
 }

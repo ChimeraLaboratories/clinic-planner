@@ -9,6 +9,8 @@ type PresenceRow = RowDataPacket & {
     role: string | null;
     job_role: string | null;
     current_path: string | null;
+    activity: string | null;
+    active_room_id: number | null;
     last_seen_at: Date | string;
     is_online: number;
 };
@@ -29,6 +31,8 @@ export async function GET() {
                     u.role,
                     u.job_role,
                     p.current_path,
+                    p.activity,
+                    p.active_room_id,
                     p.last_seen_at,
                     CASE
                         WHEN p.last_seen_at >= DATE_SUB(NOW(), INTERVAL 60 SECOND) THEN 1
@@ -48,6 +52,9 @@ export async function GET() {
                 role: r.role,
                 jobRole: r.job_role,
                 currentPath: r.current_path,
+                activity: r.activity,
+                activeRoomId:
+                    r.active_room_id == null ? null : Number(r.active_room_id),
                 lastSeenAt:
                     r.last_seen_at instanceof Date
                         ? r.last_seen_at.toISOString()

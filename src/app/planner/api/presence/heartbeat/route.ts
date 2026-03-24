@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import {getCurrentUserFromCookies} from "@/lib/auth";
+import { getCurrentUserFromCookies } from "@/lib/auth";
 
 export async function POST(req: Request) {
     try {
@@ -16,15 +16,28 @@ export async function POST(req: Request) {
                 ? body.currentPath.trim().slice(0, 255)
                 : null;
 
+        const activity =
+            body?.activity === "editing" || body?.activity === "viewing"
+                ? body.activity
+                : "viewing";
+
+        const activeRoomIdRaw = Number(body?.activeRoomId);
+        const activeRoomId =
+            Number.isInteger(activeRoomIdRaw) && activeRoomIdRaw > 0
+                ? activeRoomIdRaw
+                : null;
+
         await db.query(
             `
-            INSERT INTO user_presence (user_id, last_seen_at, current_path)
-            VALUES (?, NOW(), ?)
-            ON DUPLICATE KEY UPDATE
-                last_seen_at = NOW(),
-                current_path = VALUES(current_path)
+                INSERT INTO user_presence (user_id, last_seen_at, current_path, activity, active_room_id)
+                VALUES (?, NOW(), ?, ?, ?)
+                    ON DUPLICATE KEY UPDATE
+                                         last_seen_at = NOW(),
+                                         current_path = VALUES(current_path),
+                                         activity = VALUES(activity),
+                                         active_room_id = VALUES(active_room_id)
             `,
-            [user.id, currentPath]
+            [user.id, currentPath, activity, activeRoomId]
         );
 
         return NextResponse.json({ ok: true });
