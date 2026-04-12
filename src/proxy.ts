@@ -6,6 +6,9 @@ const SESSION_COOKIE_NAME = "planner_session";
 export function proxy(req: NextRequest) {
     const { pathname, search } = req.nextUrl;
 
+    const token = req.cookies.get(SESSION_COOKIE_NAME)?.value;
+    const authed = !!token;
+
     const isLoginPath =
         pathname === "/login" || pathname === "/planner/login";
 
@@ -15,37 +18,27 @@ export function proxy(req: NextRequest) {
 
     const isPlannerApiPath = pathname.startsWith("/planner/api/");
 
-    const isPlannerPagePath =
-        pathname === "/planner" ||
-        (pathname.startsWith("/planner/") &&
-            !pathname.startsWith("/planner/api/") &&
-            pathname !== "/planner/login");
-
+    // Allow auth endpoints through
     if (isAuthApiPath) {
         return NextResponse.next();
     }
 
+    // Protect API routes with 401 instead of redirect
     if (isPlannerApiPath) {
-        const token = req.cookies.get(SESSION_COOKIE_NAME)?.value;
-        if (!token) {
+        if (!authed) {
             return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
         }
         return NextResponse.next();
     }
 
-    if (!isPlannerPagePath && !isLoginPath) {
-        return NextResponse.next();
-    }
-
-    const token = req.cookies.get(SESSION_COOKIE_NAME)?.value;
-    const authed = !!token;
-
-    if (isPlannerPagePath && !authed) {
-        const loginUrl = new URL("/planner/login", req.url);
+    // If not logged in, block everything except login pages
+    if (!authed && !isLoginPath) {
+        const loginUrl = new URL("/login", req.url);
         loginUrl.searchParams.set("next", `${pathname}${search}`);
         return NextResponse.redirect(loginUrl);
     }
 
+    // If already logged in, stop access to login page
     if (isLoginPath && authed) {
         return NextResponse.redirect(new URL("/planner", req.url));
     }
@@ -54,5 +47,7 @@ export function proxy(req: NextRequest) {
 }
 
 export const config = {
-    matcher: ["/planner/:path*", "/login"],
+    matcher: [
+        "/((?!_next|favicon.ico|.*\\..*).*)",
+    ],
 };
