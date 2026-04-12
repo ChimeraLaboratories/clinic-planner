@@ -109,6 +109,44 @@ function overlapsSlot(a: Slot, b: Slot) {
     return a === b;
 }
 
+function roomHasOverlappingSlot(
+    usedByRoom: Map<number, Slot[]>,
+    roomId: number,
+    slot: Slot
+) {
+    const used = usedByRoom.get(roomId) ?? [];
+    return used.some((s) => overlapsSlot(s, slot));
+}
+
+function reserveRoomSlot(
+    usedByRoom: Map<number, Slot[]>,
+    roomId: number,
+    slot: Slot
+) {
+    const used = usedByRoom.get(roomId) ?? [];
+    used.push(slot);
+    usedByRoom.set(roomId, used);
+}
+
+function clinicianHasOverlappingSlot(
+    usedByClinician: Map<number, Slot[]>,
+    clinicianId: number,
+    slot: Slot
+) {
+    const used = usedByClinician.get(clinicianId) ?? [];
+    return used.some((s) => overlapsSlot(s, slot));
+}
+
+function reserveClinicianSlot(
+    usedByClinician: Map<number, Slot[]>,
+    clinicianId: number,
+    slot: Slot
+) {
+    const used = usedByClinician.get(clinicianId) ?? [];
+    used.push(slot);
+    usedByClinician.set(clinicianId, used);
+}
+
 function inferSessionTypeFromActivity(activityCode: string | null | undefined): SessionType | null {
     const s = String(activityCode ?? "").trim().toUpperCase();
 
@@ -188,8 +226,8 @@ async function deleteAutoDraftSessionsForDate(dateYmd: string) {
         `
             DELETE FROM sessions
             WHERE DATE(session_date) = ?
-          AND status = 'DRAFT'
-          AND COALESCE(notes, '') LIKE '%[AUTO-SCHEDULER]%'
+              AND status = 'DRAFT'
+              AND COALESCE(notes, '') LIKE '%[AUTO-SCHEDULER]%'
         `,
         [dateYmd]
     );
@@ -206,7 +244,11 @@ async function getHolidayClinicianIds(dateYmd: string): Promise<Set<number>> {
             [dateYmd]
         );
 
-        return new Set((rows as AnyRow[]).map((r) => Number(r.clinician_id)).filter(Boolean));
+        return new Set(
+            (rows as AnyRow[])
+                .map((r) => Number(r.clinician_id))
+                .filter(Boolean)
+        );
     } catch {
         return new Set();
     }
@@ -242,22 +284,22 @@ async function getRuleRowsForDate(dateYmd: string): Promise<{
                 c.grade_code,
                 c.is_supervisor
             FROM clinician_day_rule r
-                     INNER JOIN clinicians c
-                                ON c.id = r.clinician_id
+            INNER JOIN clinicians c
+                ON c.id = r.clinician_id
             WHERE r.is_active = 1
               AND c.is_active = 1
               AND r.weekday = ?
               AND r.is_available_shift = 1
               AND (
-                r.room_id IS NOT NULL
+                    r.room_id IS NOT NULL
                     OR UPPER(COALESCE(r.room_allocation_mode, '')) = 'AUTO'
-                )
+                  )
             ORDER BY
                 CASE
                     WHEN UPPER(COALESCE(r.room_allocation_mode, '')) = 'FIXED' THEN 0
                     WHEN UPPER(COALESCE(r.room_allocation_mode, '')) = 'AUTO' THEN 1
                     ELSE 2
-                    END,
+                END,
                 COALESCE(r.room_id, 999999),
                 r.clinician_id,
                 r.id
@@ -350,16 +392,10 @@ function buildDemandKey(roomId: number, slot: Slot, sessionType: SessionType) {
     return `${roomId}:${slot}:${sessionType}`;
 }
 
-function buildPhysicalRoomSlotKey(roomId: number, slot: Slot) {
-    return `${roomId}:${slot}`;
-}
-
 function getAllowedSessionTypesForRoom(roomName: string): SessionType[] {
     const s = String(roomName ?? "").trim().toUpperCase();
 
-    // Special exception: CL Room 10 can be used for CL primarily, but ST if needed
     if (s === "CL ROOM 10") return ["CL", "ST"];
-
     if (s.startsWith("CL ROOM")) return ["CL"];
     if (s.startsWith("ST ROOM")) return ["ST"];
     if (s.includes("GROUND FLOOR")) return ["ST"];
@@ -438,10 +474,10 @@ export async function previewAutoScheduleDay(options: {
     const warnings: string[] = [];
     const allocations: PlannedSession[] = [];
     const unfilled: UnfilledDemand[] = [];
-    const usedBySlot = new Map<number, Slot[]>();
 
-    const occupiedRoomSlots = new Set<string>();
-    const physicallyOccupiedRoomSlots = new Set<string>();
+    const usedBySlot = new Map<number, Slot[]>();
+    const occupiedRoomSlots = new Map<number, Slot[]>();
+    const physicallyOccupiedRoomSlots = new Map<number, Slot[]>();
 
     for (const s of existingSessions) {
         const roomId = Number(s.room_id);
@@ -449,14 +485,12 @@ export async function previewAutoScheduleDay(options: {
         const clinicianId = Number(s.clinician_id);
 
         if (roomId && slot) {
-            occupiedRoomSlots.add(`${roomId}:${slot}`);
-            physicallyOccupiedRoomSlots.add(buildPhysicalRoomSlotKey(roomId, slot));
+            reserveRoomSlot(occupiedRoomSlots, roomId, slot);
+            reserveRoomSlot(physicallyOccupiedRoomSlots, roomId, slot);
         }
 
         if (clinicianId && slot) {
-            const curr = usedBySlot.get(clinicianId) ?? [];
-            curr.push(slot);
-            usedBySlot.set(clinicianId, curr);
+            reserveClinicianSlot(usedBySlot, clinicianId, slot);
         }
     }
 
@@ -488,7 +522,7 @@ export async function previewAutoScheduleDay(options: {
 
     for (const rows of fixedBuckets.values()) {
         const first = rows[0];
-        if (!first.room_id) continue;
+        if (!first?.room_id) continue;
 
         const sessionType = inferSessionTypeFromActivity(first.activity_code);
         if (!sessionType) continue;
@@ -518,11 +552,20 @@ export async function previewAutoScheduleDay(options: {
 
     for (const group of expandedDemands) {
         const demand = group.demand;
-        const roomSlotKey = `${demand.room_id}:${demand.slot}`;
 
-        if (!overwriteExisting && occupiedRoomSlots.has(roomSlotKey)) {
+        if (
+            !overwriteExisting &&
+            roomHasOverlappingSlot(occupiedRoomSlots, demand.room_id, demand.slot)
+        ) {
             warnings.push(
-                `${dateYmd}: ${demand.room_name} ${demand.slot} already has an existing session, skipped`
+                `${dateYmd}: ${demand.room_name} ${demand.slot} overlaps an existing session, skipped`
+            );
+            continue;
+        }
+
+        if (roomHasOverlappingSlot(physicallyOccupiedRoomSlots, demand.room_id, demand.slot)) {
+            warnings.push(
+                `${dateYmd}: ${demand.room_name} ${demand.slot} already allocated in this run, skipped`
             );
             continue;
         }
@@ -561,28 +604,29 @@ export async function previewAutoScheduleDay(options: {
             notes: buildAutoNote(dateYmd),
         });
 
-        physicallyOccupiedRoomSlots.add(buildPhysicalRoomSlotKey(demand.room_id, demand.slot));
+        reserveRoomSlot(physicallyOccupiedRoomSlots, demand.room_id, demand.slot);
+        reserveClinicianSlot(usedBySlot, chosen.clinician_id, demand.slot);
 
-        const curr = usedBySlot.get(chosen.clinician_id) ?? [];
-        curr.push(demand.slot);
-        usedBySlot.set(chosen.clinician_id, curr);
-
-        group.candidates = group.candidates.filter((r) => r.clinician_id !== chosen.clinician_id);
+        group.candidates = group.candidates.filter(
+            (r) => r.clinician_id !== chosen.clinician_id
+        );
     }
 
     const roomSlotCapacity = new Map<string, number>();
 
     for (const rows of fixedBuckets.values()) {
         const first = rows[0];
-        if (!first.room_id) continue;
+        if (!first?.room_id) continue;
 
         const sessionType = inferSessionTypeFromActivity(first.activity_code);
         if (!sessionType) continue;
 
         const slot = inferSlotFromTimes(first.start_time, first.end_time);
-        const roomSlotKey = `${first.room_id}:${slot}`;
 
-        if (!overwriteExisting && occupiedRoomSlots.has(roomSlotKey)) {
+        if (
+            !overwriteExisting &&
+            roomHasOverlappingSlot(occupiedRoomSlots, first.room_id, slot)
+        ) {
             continue;
         }
 
@@ -592,9 +636,8 @@ export async function previewAutoScheduleDay(options: {
 
     for (const [room_id, room_name] of roomMap.entries()) {
         const slot: Slot = "FULL";
-        const physicalKey = buildPhysicalRoomSlotKey(room_id, slot);
 
-        if (physicallyOccupiedRoomSlots.has(physicalKey)) {
+        if (roomHasOverlappingSlot(physicallyOccupiedRoomSlots, room_id, slot)) {
             continue;
         }
 
@@ -621,8 +664,7 @@ export async function previewAutoScheduleDay(options: {
 
         const slot = inferSlotFromTimes(row.start_time, row.end_time);
 
-        const usedSlots = usedBySlot.get(row.clinician_id) ?? [];
-        if (usedSlots.some((s) => overlapsSlot(s, slot))) {
+        if (clinicianHasOverlappingSlot(usedBySlot, row.clinician_id, slot)) {
             warnings.push(
                 `${dateYmd}: ${row.display_name || row.full_name || `Clinician ${row.clinician_id}`} is AUTO but already used in overlapping slot`
             );
@@ -637,15 +679,16 @@ export async function previewAutoScheduleDay(options: {
 
             if (slotValue !== slot) return false;
             if (sessionTypeValue !== sessionType) return false;
+            if (!roomMap.has(room_id)) return false;
 
-            const physicalKey = buildPhysicalRoomSlotKey(room_id, slotValue);
-            if (physicallyOccupiedRoomSlots.has(physicalKey)) return false;
+            if (roomHasOverlappingSlot(physicallyOccupiedRoomSlots, room_id, slotValue)) {
+                return false;
+            }
 
             const capacity = roomSlotCapacity.get(key) ?? 0;
             const used = roomSlotUsed.get(key) ?? 0;
             if (used >= capacity) return false;
 
-            if (!roomMap.has(room_id)) return false;
             return true;
         });
 
@@ -689,12 +732,9 @@ export async function previewAutoScheduleDay(options: {
             notes: `${buildAutoNote(dateYmd)} [AUTO-ROOM]`,
         });
 
-        physicallyOccupiedRoomSlots.add(buildPhysicalRoomSlotKey(room_id, chosenSlot));
+        reserveRoomSlot(physicallyOccupiedRoomSlots, room_id, chosenSlot);
+        reserveClinicianSlot(usedBySlot, row.clinician_id, chosenSlot);
         roomSlotUsed.set(chosenKey, (roomSlotUsed.get(chosenKey) ?? 0) + 1);
-
-        const curr = usedBySlot.get(row.clinician_id) ?? [];
-        curr.push(chosenSlot);
-        usedBySlot.set(row.clinician_id, curr);
     }
 
     return {
@@ -735,7 +775,7 @@ export async function applyAutoScheduleDay(options: {
 
     const result = await previewAutoScheduleDay({
         date: dateYmd,
-        overwriteExisting: false,
+        overwriteExisting,
     });
 
     if (result.allocations.length === 0) {
@@ -754,15 +794,61 @@ export async function applyAutoScheduleDay(options: {
                 FROM sessions
                 WHERE DATE(session_date) = ?
                   AND room_id = ?
-                  AND slot = ?
                   AND clinician_id = ?
                   AND status <> 'CANCELLED'
+                  AND (
+                    slot = ?
+                   OR slot = 'FULL'
+                   OR ? = 'FULL'
+                    )
                     LIMIT 1
             `,
-            [item.date, item.room_id, item.slot, item.clinician_id]
+            [item.date, item.room_id, item.clinician_id, item.slot, item.slot]
         );
 
         if ((existing as AnyRow[]).length > 0) {
+            continue;
+        }
+
+        const [roomConflict] = await db.query(
+            `
+                SELECT id
+                FROM sessions
+                WHERE DATE(session_date) = ?
+                  AND room_id = ?
+                  AND status <> 'CANCELLED'
+                  AND (
+                        slot = ?
+                        OR slot = 'FULL'
+                        OR ? = 'FULL'
+                      )
+                LIMIT 1
+            `,
+            [item.date, item.room_id, item.slot, item.slot]
+        );
+
+        if ((roomConflict as AnyRow[]).length > 0) {
+            continue;
+        }
+
+        const [clinicianConflict] = await db.query(
+            `
+                SELECT id
+                FROM sessions
+                WHERE DATE(session_date) = ?
+                  AND clinician_id = ?
+                  AND status <> 'CANCELLED'
+                  AND (
+                        slot = ?
+                        OR slot = 'FULL'
+                        OR ? = 'FULL'
+                      )
+                LIMIT 1
+            `,
+            [item.date, item.clinician_id, item.slot, item.slot]
+        );
+
+        if ((clinicianConflict as AnyRow[]).length > 0) {
             continue;
         }
 
@@ -810,7 +896,11 @@ function enumerateDates(from: string, to: string) {
 
     while (cursor.getTime() <= end.getTime()) {
         out.push(toIsoDate(cursor));
-        cursor = new Date(cursor.getFullYear(), cursor.getMonth(), cursor.getDate() + 1);
+        cursor = new Date(
+            cursor.getFullYear(),
+            cursor.getMonth(),
+            cursor.getDate() + 1
+        );
     }
 
     return out;
