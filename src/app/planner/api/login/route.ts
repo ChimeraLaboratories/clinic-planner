@@ -25,6 +25,11 @@ export async function POST(req: Request) {
 
         console.log("[login] request received");
         console.log("[login] email:", email);
+        console.log("[login] DB_HOST:", process.env.DB_HOST);
+        console.log("[login] DB_POST:", process.env.DB_PORT);
+        console.log("[login] DB_NAME:", process.env.DB_NAME);
+        console.log("[login] has DATABASE_URL:", !!process.env.DATABASE_URL);
+
 
         if (!email || !password) {
             console.log("[login] missing credentials");
