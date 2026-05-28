@@ -7,16 +7,7 @@ import MonthGrid from "./MonthGrid";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import HolidayBookedView from "@/app/planner/components/HolidayBookedView";
-
-/**
- * IMPORTANT FIX:
- * - Normalizes supervisionByDate dates to YYYY-MM-DD
- * - Computes "needs supervisor" from actual supervisors present (clinic OR in-store)
- *
- * ADDITION (per your request):
- * ✅ Adds a NEW sidebar box identical to "Days with Low ST Value" but for CL:
- *    "Days with Low CL Value" — computed from CL session values
- */
+import { ExportButton } from "@/app/planner/export";
 
 function normalizeYmd(input: any): string | null {
     if (!input) return null;
@@ -242,6 +233,88 @@ export default function PlannerShell({
 
         return out.sort((a, b) => a.date.localeCompare(b.date));
     }, [supervisionByDateMap]);
+
+    const exportRooms = useMemo(() => {
+        return ((data?.rooms ?? []) as any[])
+            .map((room) => String(room?.name ?? room?.room_name ?? room?.display_name ?? "").trim())
+            .filter(Boolean);
+    }, [data?.rooms]);
+
+    const exportRows = useMemo(() => {
+        if (!data) return [];
+
+        const roomsById = new Map<number, string>();
+        for (const room of (data.rooms ?? []) as any[]) {
+            const roomName = String(room?.name ?? room?.room_name ?? room?.display_name ?? "").trim();
+            const roomId = Number(room?.id ?? room?.room_id);
+            if (Number.isFinite(roomId) && roomName) {
+                roomsById.set(roomId, roomName);
+            }
+        }
+
+        const cliniciansById = new Map<number, string>();
+        for (const clinician of (data.clinicians ?? []) as any[]) {
+            const clinicianName = String(
+                clinician?.display_name ??
+                clinician?.full_name ??
+                clinician?.first_name ??
+                clinician?.name ??
+                ""
+            ).trim();
+
+            const clinicianId = Number(clinician?.id ?? clinician?.clinician_id);
+            if (Number.isFinite(clinicianId) && clinicianName) {
+                cliniciansById.set(clinicianId, clinicianName);
+            }
+        }
+
+        const start = monthStart(anchorMonth);
+        const end = monthEnd(anchorMonth);
+        const allMonthDates: any[] = [];
+
+        const cur = new Date(start);
+        while (cur <= end) {
+            const dateKey = ymd(cur);
+
+            allMonthDates.push({
+                date: dateKey,
+                day: cur.toLocaleDateString("en-GB", { weekday: "short" }),
+                roomName: "",
+                clinicianFirstName: "",
+                stValue: 0,
+                clValue: 0,
+            });
+
+            cur.setDate(cur.getDate() + 1);
+        }
+
+        const sessionRows = ((data.sessions ?? []) as any[])
+            .map((session) => {
+                const dateKey = getSessionDateKey(session);
+                if (!dateKey) return null;
+
+                const sessionDate = new Date(dateKey);
+                const clinicianId = Number(session?.clinician_id ?? session?.clinicianId);
+                const roomId = Number(session?.room_id ?? session?.roomId);
+
+                const clinicianName = cliniciansById.get(clinicianId) ?? "";
+                const firstName = clinicianName.split(" ").filter(Boolean)[0] ?? "";
+
+                return {
+                    date: dateKey,
+                    day: isNaN(sessionDate.getTime())
+                        ? ""
+                        : sessionDate.toLocaleDateString("en-GB", { weekday: "short" }),
+                    roomName: roomsById.get(roomId) ?? "",
+                    clinicianFirstName: firstName,
+                    stValue: getSessionSTValue(session),
+                    clValue: getSessionCLValue(session),
+                };
+            })
+            .filter(Boolean) as any[];
+
+        return [...allMonthDates, ...sessionRows];
+    }, [data, anchorMonth]);
 
     // ✅ Days where Total ST Value is low (includes days with 0)
     const lowSTValueDays = useMemo(() => {
@@ -630,8 +703,14 @@ export default function PlannerShell({
 
                     {/* MAIN CARD */}
                     <div className="flex-1 min-w-0 bg-white dark:bg-slate-950 rounded-2xl shadow-sm dark:shadow-none border border-slate-200 dark:border-slate-800">
-                        <div className="px-6 pt-5">
+                        <div className="px-6 pt-5 flex items-center justify-between gap-4">
                             <ViewTabs value={activeTab} onChange={setActiveTab} />
+
+                            <ExportButton
+                                rows={exportRows}
+                                rooms={exportRooms}
+                                fileName="clinic-planner-rota-export"
+                            />
                         </div>
 
                         <div className="p-6">
