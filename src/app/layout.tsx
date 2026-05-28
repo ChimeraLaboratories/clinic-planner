@@ -1,4 +1,5 @@
 import "./globals.css";
+import SystemAnnouncementBar from "@/app/planner/components/SystemAnnouncementBar";
 
 export const metadata = {
     title: "Clinic Planner",
@@ -12,7 +13,7 @@ export const metadata = {
 const themeInitScript = `
 (function () {
   try {
-    var stored = localStorage.getItem('theme'); // 'dark' | 'light' | null
+    var stored = localStorage.getItem('theme');
     var prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
     var shouldDark = stored ? stored === 'dark' : prefersDark;
     var el = document.documentElement;
@@ -29,7 +30,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <meta name="color-scheme" content="light dark" />
             <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
         </head>
+
         <body className="min-h-screen bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100">
+        <SystemAnnouncementBar />
+
         {children}
         </body>
         </html>
