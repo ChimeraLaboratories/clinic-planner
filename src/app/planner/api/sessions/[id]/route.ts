@@ -65,7 +65,7 @@ export async function DELETE(_: Request, ctx: RouteContext) {
             action: AuditAction.SESSION_DELETED,
             entityType: "session",
             entityId: session.id,
-            targetDate: String(session.session_date).slice(0, 10),
+            targetDate: new Date(session.session_date).toISOString().split("T")[0],
             summary: `Deleted session ${session.id}`,
             before: {
                 id: session.id,
