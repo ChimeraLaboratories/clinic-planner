@@ -1,13 +1,14 @@
 "use client";
 
 import type { PlannerResponse } from "../types/planner";
-import TopBar from "./TopBar";
+import PlannerTopBar from "./PlannerTopBar";
 import ViewTabs, { type PlannerTab } from "./ViewTabs";
 import MonthGrid from "./MonthGrid";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import HolidayBookedView from "@/app/planner/components/HolidayBookedView";
 import { ExportButton } from "@/app/planner/export";
+import MonthSwitcher from "@/app/planner/components/MonthSwitcher";
 
 function normalizeYmd(input: any): string | null {
     if (!input) return null;
@@ -411,13 +412,11 @@ export default function PlannerShell({
 
     return (
         <div className="min-h-screen bg-slate-100 dark:bg-slate-950">
-            <TopBar
+            <MonthSwitcher
                 anchorMonth={anchorMonth}
                 onPrevMonth={onPrevMonth}
                 onNextMonth={onNextMonth}
                 onCurrentMonth={handleCurrentMonth}
-                clinicians={data?.clinicians ?? []}
-                onRefresh={onRefresh}
             />
 
             <main className="w-full px-6 py-8">
