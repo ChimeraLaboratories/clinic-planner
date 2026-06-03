@@ -510,6 +510,13 @@ export default function TopBar({
                                     >
                                         Auto Scheduler
                                     </Link>
+                                    <Link
+                                        href="/planner/admin/audit"
+                                        className="block rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800"
+                                        onClick={() => setAdminOpen(false)}
+                                    >
+                                        Audit Logs
+                                    </Link>
 
 {/*                                    <Link
                                         href="/planner/rooms"
