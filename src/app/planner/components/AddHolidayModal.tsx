@@ -32,7 +32,7 @@ export default function AddHolidayModal({
                                         }: {
     open: boolean;
     onClose: () => void;
-    clinicians: ClinicianLite[];
+    clinicians?: ClinicianLite[];
     onRefresh?: () => void | Promise<void>;
 }) {
     const router = useRouter();

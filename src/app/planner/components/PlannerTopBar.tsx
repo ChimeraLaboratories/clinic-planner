@@ -125,7 +125,7 @@ export default function PlannerTopBar({
     env?: Env;
     syncState?: "idle" | "syncing" | "synced" | "error";
     lastSyncedAt?: Date | null;
-    clinicians: ClinicianLite[];
+    clinicians?: ClinicianLite[];
     onRefresh?: () => void | Promise<void>;
 }) {
 
