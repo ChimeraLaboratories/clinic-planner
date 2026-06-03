@@ -1,6 +1,5 @@
 "use client";
 
-import { formatMonthTitle } from "../utils/date";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import AddHolidayModal from "./AddHolidayModal";
@@ -116,30 +115,19 @@ function SyncBadge({
     );
 }
 
-export default function TopBar({
-                                   anchorMonth,
-                                   onPrevMonth,
-                                   onNextMonth,
-                                   onCurrentMonth,
+export default function PlannerTopBar({
                                    env,
                                    syncState,
                                    lastSyncedAt,
                                    clinicians,
                                    onRefresh,
                                }: {
-    anchorMonth: Date;
-    onPrevMonth: () => void;
-    onNextMonth: () => void;
-    onCurrentMonth: () => void;
     env?: Env;
     syncState?: "idle" | "syncing" | "synced" | "error";
     lastSyncedAt?: Date | null;
     clinicians: ClinicianLite[];
     onRefresh?: () => void | Promise<void>;
 }) {
-    const today = new Date();
-    const isCurrentMonth =
-        today.getMonth() === anchorMonth.getMonth() && today.getFullYear() === anchorMonth.getFullYear();
 
     const [menuOpen, setMenuOpen] = useState(false);
     const menuRef = useRef<HTMLDivElement | null>(null);
@@ -412,46 +400,6 @@ export default function TopBar({
                                             : "Synced"}
                         </div>*/}
                     </div>
-                </div>
-
-                {/* CENTER — Month Navigation (true centered on screen) */}
-                <div className="absolute left-1/2 -translate-x-1/2 flex items-center gap-3">
-                    <button
-                        onClick={onPrevMonth}
-                        className="h-9 w-9 rounded-lg border border-slate-200 bg-white text-slate-600 shadow-sm transition hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
-                        aria-label="Previous month"
-                    >
-                        ‹
-                    </button>
-
-                    <div className="flex h-9 items-center overflow-hidden rounded-lg border border-slate-200 bg-white px-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-                        <span
-                            key={formatMonthTitle(anchorMonth)}
-                            className="animate-fadeInUp text-sm font-semibold text-slate-800 dark:text-slate-100"
-                        >
-                            {formatMonthTitle(anchorMonth)}
-                        </span>
-                    </div>
-
-                    <button
-                        onClick={onNextMonth}
-                        className="h-9 w-9 rounded-lg border border-slate-200 bg-white text-slate-600 shadow-sm transition hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
-                        aria-label="Next month"
-                    >
-                        ›
-                    </button>
-
-                    <button
-                        onClick={onCurrentMonth}
-                        disabled={isCurrentMonth}
-                        className={`ml-2 h-9 rounded-lg px-4 text-sm font-medium shadow-sm transition ${
-                            isCurrentMonth
-                                ? "cursor-default border border-slate-200 bg-slate-100 text-slate-400 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-500"
-                                : "bg-blue-600 text-white hover:bg-blue-700"
-                        }`}
-                    >
-                        Current Month
-                    </button>
                 </div>
 
                 {/* RIGHT — force this column to take space and align to the far right */}
