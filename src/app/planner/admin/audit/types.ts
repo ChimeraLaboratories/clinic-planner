@@ -1,3 +1,6 @@
+/**
+ * Represents a single audit event recorded by Clinic Planner.
+ */
 export type AuditLog = {
     id: number;
     created_at: string;
