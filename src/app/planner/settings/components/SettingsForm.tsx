@@ -19,15 +19,15 @@ export function SettingsForm() {
     }, []);
 
     async function loadSettings() {
-        const res = await fetch("/planner/api/me/settings");
-        const data = await res.json();
-        setSettings(data);
+        const res = await fetch("/api/me/preferences");
+        const json = await res.json();
+        setSettings(json);
     }
 
     async function saveSettings() {
         setSaving(true);
 
-        await fetch("/planner/api/me/settings", {
+        await fetch("/api/me/preferences", {
             method: "PUT",
             headers: {
                 "Content-Type": "application/json",
