@@ -62,7 +62,7 @@ export async function updateUserPreferences(userId: number, preferences: Partial
         SET
         default_calendar_view = ?,
         week_start_day = ?,
-        theme = ?
+        theme = ?,
         compact_view = ?,
         show_weekends = ?,
         updated_at = NOW()
