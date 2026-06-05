@@ -72,6 +72,8 @@ export async function updateUserPreferences(userId: number, preferences: Partial
         theme = ?,
         compact_view = ?,
         show_weekends = ?,
+        date_format = ?,
+        time_format = ?,
         updated_at = NOW()
         WHERE user_id = ?`,
         [
