@@ -8,6 +8,8 @@ type UserPreferences = {
     theme: string;
     compact_view: boolean;
     show_weekends: boolean;
+    date_format: string;
+    time_format: string;
 };
 
 export function SettingsForm() {
@@ -70,6 +72,41 @@ export function SettingsForm() {
                     ...settings,
                     show_weekends: e.target.checked,
                 })}/>
+            </div>
+
+            <div>
+                <label>Date Format</label>
+
+                <select
+                    value={settings.date_format}
+                    onChange={(e) =>
+                        setSettings({
+                            ...settings,
+                            date_format: e.target.value,
+                        })
+                    }
+                >
+                    <option value="dd/MM/yyyy">31/12/2026</option>
+                    <option value="MM/dd/yyyy">12/31/2026</option>
+                    <option value="yyyy-MM-dd">2026-12-31</option>
+                </select>
+            </div>
+
+            <div>
+                <label>Time Format</label>
+
+                <select
+                    value={settings.time_format}
+                    onChange={(e) =>
+                        setSettings({
+                            ...settings,
+                            time_format: e.target.value,
+                        })
+                    }
+                >
+                    <option value="HH:mm">14:30</option>
+                    <option value="h:mm a">2:30 PM</option>
+                </select>
             </div>
 
             <button onClick={saveSettings} disabled={saving}>

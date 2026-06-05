@@ -43,6 +43,8 @@ export async function PUT(request: Request) {
             theme: body.theme,
             compact_view: body.compact_view,
             show_weekends: body.show_weekends,
+            date_format: body.date_format,
+            time_format: body.time_format,
         });
 
         return NextResponse.json(preferences);
