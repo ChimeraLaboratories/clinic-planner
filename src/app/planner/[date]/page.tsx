@@ -5,6 +5,7 @@ import Link from "next/link";
 import DayRoomsClient from "@/app/planner/[date]/DayRoomsClient";
 import type { DayRoom } from "@/app/planner/[date]/types";
 import DayExpectedSidebar from "@/app/planner/components/DayExpectedSidebar";
+import {formatUserDate} from "@/app/planner/utils/userFormat";
 
 type DayApiResponse = {
     rooms: DayRoom[];
@@ -235,7 +236,7 @@ export default async function PlannerDayPage({
                                 {dayName}
                             </h1>
                             <p className="text-gray-500 dark:text-slate-400">
-                                {displayDate.toLocaleDateString("en-GB")}
+                                {formatUserDate(displayDate)}
                             </p>
                         </div>
 

@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import SuccessToast from "./SuccessToast";
 import ErrorModal from "./ErrorModal";
+import {formatUserDate} from "@/app/planner/utils/userFormat";
 
 type ClinicianLite = {
     id: number;
@@ -179,11 +180,7 @@ export default function AddHolidayModal({
             await refreshAfterWrite();
 
             const who = clinicianOptions.find((c) => c.id === clinicianId)?.label ?? "Clinician";
-            const niceDate = new Date(holidayDate).toLocaleDateString("en-GB", {
-                day: "2-digit",
-                month: "short",
-                year: "numeric",
-            });
+            const niceDate = formatUserDate(holidayDate);
 
             setSuccessMsg(`Holiday recorded for ${who} (${niceDate}).`);
             setSuccessOpen(true);
@@ -234,11 +231,7 @@ export default function AddHolidayModal({
             await refreshAfterWrite();
 
             const who = clinicianOptions.find((c) => c.id === clinicianId)?.label ?? "Clinician";
-            const niceDate = new Date(holidayDate).toLocaleDateString("en-GB", {
-                day: "2-digit",
-                month: "short",
-                year: "numeric",
-            });
+            const niceDate = formatUserDate(holidayDate);
 
             setSuccessMsg(`Holiday removed for ${who} (${niceDate}).`);
             setSuccessOpen(true);
