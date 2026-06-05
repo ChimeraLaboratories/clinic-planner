@@ -7,6 +7,8 @@ export type UserPreferences = {
     theme: string;
     compact_view: boolean;
     show_weekends: boolean;
+    date_format: string;
+    time_format: string;
 }
 
 export const DEFAULT_PREFERENCES = {
@@ -15,6 +17,9 @@ export const DEFAULT_PREFERENCES = {
     theme: "system",
     compact_view: false,
     show_weekends: true,
+    date_format: "dd/MM/yyyy",
+    time_format: "HH:mm:SSS",
+
 };
 
 export async function getUserPreferences(user_id: number) {
@@ -50,6 +55,8 @@ export async function createDefaultPreferences(userId: number) {
             DEFAULT_PREFERENCES.theme,
             DEFAULT_PREFERENCES.compact_view,
             DEFAULT_PREFERENCES.show_weekends,
+            DEFAULT_PREFERENCES.date_format,
+            DEFAULT_PREFERENCES.time_format,
         ]
     );
 
@@ -73,6 +80,8 @@ export async function updateUserPreferences(userId: number, preferences: Partial
             preferences.theme,
             preferences.compact_view,
             preferences.show_weekends,
+            preferences.date_format,
+            preferences.time_format,
             userId,
         ]
     );
