@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import SuccessToast from "./SuccessToast";
 import ErrorModal from "./ErrorModal";
 import {formatUserDate} from "@/app/planner/utils/userFormat";
+import {useUserPreferences} from "@/app/planner/hooks/useUserPreferences";
 
 type ClinicianLite = {
     id: number;
@@ -55,6 +56,9 @@ export default function AddHolidayModal({
     const [clinicianQuery, setClinicianQuery] = useState("");
     const [pickerOpen, setPickerOpen] = useState(false);
     const pickerRef = useRef<HTMLDivElement | null>(null);
+
+    const { preferences } = useUserPreferences();
+    console.log("AddHolidayModal clinicians:", clinicians);
 
     const clinicianOptions = useMemo(() => {
         const list = (clinicians ?? []).map((c) => {
@@ -180,7 +184,7 @@ export default function AddHolidayModal({
             await refreshAfterWrite();
 
             const who = clinicianOptions.find((c) => c.id === clinicianId)?.label ?? "Clinician";
-            const niceDate = formatUserDate(holidayDate);
+            const niceDate = formatUserDate(holidayDate, preferences.date_format);
 
             setSuccessMsg(`Holiday recorded for ${who} (${niceDate}).`);
             setSuccessOpen(true);
@@ -231,7 +235,7 @@ export default function AddHolidayModal({
             await refreshAfterWrite();
 
             const who = clinicianOptions.find((c) => c.id === clinicianId)?.label ?? "Clinician";
-            const niceDate = formatUserDate(holidayDate);
+            const niceDate = formatUserDate(holidayDate, preferences.date_format);
 
             setSuccessMsg(`Holiday removed for ${who} (${niceDate}).`);
             setSuccessOpen(true);
