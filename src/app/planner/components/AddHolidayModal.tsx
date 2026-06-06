@@ -6,6 +6,7 @@ import SuccessToast from "./SuccessToast";
 import ErrorModal from "./ErrorModal";
 import {formatUserDate} from "@/app/planner/utils/userFormat";
 import {useUserPreferences} from "@/app/planner/hooks/useUserPreferences";
+import {load} from "next/dist/compiled/@edge-runtime/primitives/load";
 
 type ClinicianLite = {
     id: number;
@@ -57,11 +58,39 @@ export default function AddHolidayModal({
     const [pickerOpen, setPickerOpen] = useState(false);
     const pickerRef = useRef<HTMLDivElement | null>(null);
 
+    // Loading Clinicians names state
+    const [loadedClinicians, setLoadedClinicians] = useState<ClinicianLite[]>([]);
+
     const { preferences } = useUserPreferences();
-    console.log("AddHolidayModal clinicians:", clinicians);
+
+    useEffect(() => {
+        if (!open) return;
+        if (clinicians && clinicians.length > 0) return;
+
+        async function loadClinicians() {
+            try {
+                const res = await fetch ("/planner/api/clinicians");
+                const text = await res.text();
+
+                if (!res.ok) {
+                    setLoadedClinicians([]);
+                    return;
+                }
+
+                const data = JSON.parse(text);
+
+                setLoadedClinicians(Array.isArray(data) ? data : data.clinicians ?? []);
+            } catch (e) {
+                console.error("Failed to load clinicians:", e);
+                setLoadedClinicians([]);
+            }
+        }
+        loadClinicians();
+    }, [open, clinicians]);
 
     const clinicianOptions = useMemo(() => {
-        const list = (clinicians ?? []).map((c) => {
+        const sourceClinicians = clinicians && clinicians.length > 0 ? clinicians : loadedClinicians;
+        const list = sourceClinicians.map((c) => {
             const full = String(c.full_name ?? "").trim();
             const display = String(c.display_name ?? "").trim();
 
@@ -75,7 +104,7 @@ export default function AddHolidayModal({
         });
 
         return list.sort((a, b) => a.label.localeCompare(b.label));
-    }, [clinicians]);
+    }, [clinicians, loadedClinicians]);
 
     const filteredClinicians = useMemo(() => {
         const q = clinicianQuery.trim().toLowerCase();

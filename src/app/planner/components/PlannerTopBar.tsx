@@ -3,10 +3,12 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import AddHolidayModal from "./AddHolidayModal";
+import {formatUserTime} from "@/app/planner/utils/userFormat";
+import {useUserPreferences} from "@/app/planner/hooks/useUserPreferences";
 
-function formatLastSynced(d: Date | null | undefined) {
+function formatLastSynced(d: Date | null | undefined, timeFormat: string) {
     if (!d) return "";
-    return d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+    return formatUserTime(d, timeFormat);
 }
 
 type ClinicianLite = {
@@ -76,9 +78,10 @@ function SyncBadge({
     const isSyncing = state === "syncing";
     const isError = state === "error";
     const isSynced = state === "synced" || state === "idle";
+    const { preferences } = useUserPreferences();
 
     const label = isSyncing ? "Syncing…" : isError ? "Sync failed" : "Synced";
-    const time = !isSyncing && !isError ? formatLastSynced(lastSyncedAt ?? null) : "";
+    const time = !isSyncing && !isError ? formatLastSynced(lastSyncedAt ?? null, preferences.time_format) : "";
 
     return (
         <div
