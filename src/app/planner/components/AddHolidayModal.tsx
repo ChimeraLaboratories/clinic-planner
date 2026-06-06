@@ -6,7 +6,6 @@ import SuccessToast from "./SuccessToast";
 import ErrorModal from "./ErrorModal";
 import {formatUserDate} from "@/app/planner/utils/userFormat";
 import {useUserPreferences} from "@/app/planner/hooks/useUserPreferences";
-import {load} from "next/dist/compiled/@edge-runtime/primitives/load";
 
 type ClinicianLite = {
     id: number;
@@ -207,7 +206,7 @@ export default function AddHolidayModal({
                 } catch {
                     if (text) msg = text;
                 }
-                throw new Error(msg);
+                new Error(msg);
             }
 
             await refreshAfterWrite();
@@ -258,7 +257,7 @@ export default function AddHolidayModal({
                 } catch {
                     if (text) msg = text;
                 }
-                throw new Error(msg);
+                new Error(msg);
             }
 
             await refreshAfterWrite();
