@@ -239,7 +239,8 @@ async function getHolidayClinicianIds(dateYmd: string): Promise<Set<number>> {
             `
                 SELECT DISTINCT clinician_id
                 FROM clinician_holiday
-                WHERE ? BETWEEN DATE(date_from) AND DATE(date_to)
+--                 WHERE ? BETWEEN DATE(date_from) AND DATE(date_to)
+                WHERE holiday_date=?
             `,
             [dateYmd]
         );
