@@ -6,6 +6,7 @@ import AddHolidayModal from "./AddHolidayModal";
 import {formatUserTime} from "@/app/planner/utils/userFormat";
 import {useUserPreferences} from "@/app/planner/hooks/useUserPreferences";
 import {usePlannerUser} from "@/app/planner/context/UserContext";
+import {getUserInitials} from "@/app/planner/utils/userInitials";
 
 function formatLastSynced(d: Date | null | undefined, timeFormat: string) {
     if (!d) return "";
@@ -513,10 +514,7 @@ export default function PlannerTopBar({
                             className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
                         >
     <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-blue-600 text-xs font-semibold text-white">
-        {(user?.full_name || user?.email || "U")
-            .trim()
-            .slice(0, 2)
-            .toUpperCase()}
+        {getUserInitials(user?.full_name, user?.email)}
     </span>
 
                             <span className="text-left leading-tight">
