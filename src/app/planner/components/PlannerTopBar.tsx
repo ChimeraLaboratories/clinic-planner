@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import AddHolidayModal from "./AddHolidayModal";
 import {formatUserTime} from "@/app/planner/utils/userFormat";
 import {useUserPreferences} from "@/app/planner/hooks/useUserPreferences";
+import {usePlannerUser} from "@/app/planner/context/UserContext";
 
 function formatLastSynced(d: Date | null | undefined, timeFormat: string) {
     if (!d) return "";
@@ -150,6 +151,7 @@ export default function PlannerTopBar({
     //User States
     const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
     const [loggingOut, setLoggingOut] = useState(false);
+    const { user, setUser } = usePlannerUser();
 
     //Admin Menu States
     const [adminOpen, setAdminOpen] = useState(false);
@@ -171,7 +173,11 @@ export default function PlannerTopBar({
                 }
 
                 const json = await res.json();
-                if (!cancelled) setCurrentUser(json?.user ?? null);
+                if (!cancelled) {
+                    const loadedUser = json?.user ?? null;
+                    setCurrentUser(loadedUser);
+                    setUser(loadedUser);
+                }
             } catch {
                 if (!cancelled) setCurrentUser(null);
             }

@@ -1,8 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import {router} from "next/client";
-import {useRouter} from "next/navigation";
+import {usePlannerUser} from "@/app/planner/context/UserContext";
 
 type ProfileForm = {
     full_name: string;
@@ -21,7 +20,7 @@ export default function ProfileSettingsPage() {
     const [saving, setSaving] = useState(false);
     const [message, setMessage] = useState("");
     const [messageType, setMessageType] = useState<"success" | "error" | null>(null);
-    const router = useRouter();
+    const { setUser } = usePlannerUser();
 
     useEffect(() => {
         fetch("/planner/api/me/profile")
@@ -73,13 +72,22 @@ export default function ProfileSettingsPage() {
 
         const updated = await res.json();
 
-        setForm({
+        const updatedUser = {
+            id: updated.id,
             full_name: updated.full_name ?? "",
             email: updated.email ?? "",
             job_role: updated.job_role ?? "",
+            role: updated.role,
+        };
+
+        setForm({
+            full_name: updatedUser.full_name,
+            email: updatedUser.email,
+            job_role: updatedUser.job_role,
         });
 
-        router.refresh();
+        setUser(updatedUser);
+
         setMessage("Profile saved.");
         setSaving(false);
     }
