@@ -513,7 +513,7 @@ export default function PlannerTopBar({
                             className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
                         >
     <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-blue-600 text-xs font-semibold text-white">
-        {(currentUser?.full_name || currentUser?.email || "U")
+        {(user?.full_name || user?.email || "U")
             .trim()
             .slice(0, 2)
             .toUpperCase()}
@@ -521,10 +521,10 @@ export default function PlannerTopBar({
 
                             <span className="text-left leading-tight">
         <span className="block">
-            {currentUser?.full_name || currentUser?.email || "User"}
+            {user?.full_name || user?.email || "User"}
         </span>
         <span className="block text-xs text-slate-500 dark:text-slate-400">
-    {[currentUser?.job_role, currentUser?.role].filter(Boolean).join(" · ")}
+    {[user?.job_role, user?.role].filter(Boolean).join(" · ")}
         </span>
     </span>
                         </button>
@@ -533,10 +533,10 @@ export default function PlannerTopBar({
                             <div className="absolute right-0 top-full z-50 mt-2 w-56 rounded-xl border border-slate-200 bg-white p-2 shadow-lg dark:border-slate-800 dark:bg-slate-900">
                                 <div className="rounded-lg px-3 py-2">
                                     <div className="text-sm font-medium text-slate-900 dark:text-slate-100">
-                                        {currentUser?.full_name || "Signed in"}
+                                        {user?.full_name || "Signed in"}
                                     </div>
                                     <div className="text-xs text-slate-500 dark:text-slate-400">
-                                        {currentUser?.email || ""}
+                                        {user?.email || ""}
                                     </div>
                                 </div>
 

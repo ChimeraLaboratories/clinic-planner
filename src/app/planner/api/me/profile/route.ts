@@ -53,5 +53,11 @@ export async function PUT(req: Request) {
         `, [full_name, email, job_role || null, user.id]
     );
 
-    return NextResponse.json({ ok: true });
+    return NextResponse.json({
+        id: user.id,
+        full_name,
+        email,
+        job_role,
+        role: user.role,
+    });
 }
