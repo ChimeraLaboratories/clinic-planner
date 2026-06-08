@@ -9,6 +9,7 @@ export type PlannerUser = {
     email: string;
     job_role?: string;
     role?: string;
+    profile_image_url?: string | null;
 };
 
 type UserContextValue = {
