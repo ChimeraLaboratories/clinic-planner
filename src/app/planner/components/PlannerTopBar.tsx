@@ -149,7 +149,7 @@ export default function PlannerTopBar({
     const [tipShift, setTipShift] = useState(0);
 
     //User States
-    const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
+    const [, setCurrentUser] = useState<CurrentUser | null>(null);
     const [loggingOut, setLoggingOut] = useState(false);
     const { user, setUser } = usePlannerUser();
 
@@ -423,7 +423,7 @@ export default function PlannerTopBar({
                         <span className="text-base leading-none">{isDark ? "☀" : "🌙"}</span>
                     </button>
 
-                    {currentUser?.role === "ADMIN" && (
+                    {user?.role === "ADMIN" && (
                         <div className="relative" ref={adminRef}>
                             <button
                                 type="button"
