@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import {router} from "next/client";
+import {useRouter} from "next/navigation";
 
 type ProfileForm = {
     full_name: string;
@@ -19,6 +21,7 @@ export default function ProfileSettingsPage() {
     const [saving, setSaving] = useState(false);
     const [message, setMessage] = useState("");
     const [messageType, setMessageType] = useState<"success" | "error" | null>(null);
+    const router = useRouter();
 
     useEffect(() => {
         fetch("/planner/api/me/profile")
@@ -76,6 +79,7 @@ export default function ProfileSettingsPage() {
             job_role: updated.job_role ?? "",
         });
 
+        router.refresh();
         setMessage("Profile saved.");
         setSaving(false);
     }
