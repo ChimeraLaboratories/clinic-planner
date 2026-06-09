@@ -104,20 +104,6 @@ export default function PreferencesSettingsPage() {
             </h1>
 
             <div className="mt-6 space-y-4 rounded-2xl border border-slate-200 bg-white p-6 dark:border-slate-800 dark:bg-slate-950">
-                <label className="block">
-                    <span className="text-sm font-medium">Default calendar view</span>
-                    <select
-                        className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 dark:border-slate-700 dark:bg-slate-900"
-                        value={form.default_calendar_view}
-                        onChange={(e) =>
-                            setForm({ ...form, default_calendar_view: e.target.value })
-                        }
-                    >
-                        <option value="month">Month</option>
-                        <option value="week">Week</option>
-                        {/*<option value="day">Day</option>*/}
-                    </select>
-                </label>
 
                 <label className="block">
                     <span className="text-sm font-medium">Week start day</span>
@@ -131,43 +117,6 @@ export default function PreferencesSettingsPage() {
                         <option value="monday">Monday</option>
                         <option value="sunday">Sunday</option>
                     </select>
-                </label>
-
-                <label className="block">
-                    <span className="text-sm font-medium">Theme</span>
-                    <select
-                        className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 dark:border-slate-700 dark:bg-slate-900"
-                        value={form.theme}
-                        onChange={(e) =>
-                            setForm({ ...form, theme: e.target.value })
-                        }
-                    >
-                        <option value="system">System</option>
-                        <option value="light">Light</option>
-                        <option value="dark">Dark</option>
-                    </select>
-                </label>
-
-                <label className="flex items-center gap-3">
-                    <input
-                        type="checkbox"
-                        checked={form.compact_view === 1}
-                        onChange={(e) =>
-                            setForm({ ...form, compact_view: e.target.checked ? 1 : 0 })
-                        }
-                    />
-                    <span className="text-sm font-medium">Compact view</span>
-                </label>
-
-                <label className="flex items-center gap-3">
-                    <input
-                        type="checkbox"
-                        checked={form.show_weekends === 1}
-                        onChange={(e) =>
-                            setForm({ ...form, show_weekends: e.target.checked ? 1 : 0 })
-                        }
-                    />
-                    <span className="text-sm font-medium">Show weekends</span>
                 </label>
 
                 <label className="block">
