@@ -548,13 +548,13 @@ export default function PlannerTopBar({
 
                                 <div className="my-2 h-px bg-slate-200 dark:bg-slate-800" />
 
-                                <Link
+{/*                                <Link
                                     href="/planner/settings/preferences"
                                     onClick={() => setMenuOpen(false)}
                                     className="block w-full rounded-lg px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800"
                                 >
                                     Preferences
-                                </Link>
+                                </Link>*/}
 
                                 <Link
                                     href="/planner/settings/profile"
