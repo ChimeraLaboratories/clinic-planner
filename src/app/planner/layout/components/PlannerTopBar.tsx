@@ -7,6 +7,7 @@ import {formatUserTime} from "@/app/planner/utils/userFormat";
 import {useUserPreferences} from "@/app/planner/hooks/useUserPreferences";
 import {usePlannerUser} from "@/app/planner/context/UserContext";
 import {getUserInitials} from "@/app/planner/utils/userInitials";
+import MonthSwitcher from "@/app/planner/calendar/components/MonthSwitcher";
 
 function formatLastSynced(d: Date | null | undefined, timeFormat: string) {
     if (!d) return "";
@@ -126,12 +127,22 @@ export default function PlannerTopBar({
                                    lastSyncedAt,
                                    clinicians,
                                    onRefresh,
+                                   anchorMonth,
+                                   onPrevMonth,
+                                   onNextMonth,
+                                   onCurrentMonth,
+                                   showMonthSwitcher,
                                }: {
     env?: Env;
     syncState?: "idle" | "syncing" | "synced" | "error";
     lastSyncedAt?: Date | null;
     clinicians?: ClinicianLite[];
     onRefresh?: () => void | Promise<void>;
+    anchorMonth?: Date;
+    onPrevMonth?: () => void;
+    onNextMonth?: () => void;
+    onCurrentMonth?: () => void;
+    showMonthSwitcher?: boolean;
 }) {
 
     const [menuOpen, setMenuOpen] = useState(false);
@@ -282,6 +293,8 @@ export default function PlannerTopBar({
 
     const envToShow = runtimeEnv;
 
+    const shouldShowMonthSwitcher = showMonthSwitcher && anchorMonth && onPrevMonth && onNextMonth && onCurrentMonth;
+
     return (
         <header className="sticky top-0 z-40 w-full border-b border-slate-200 bg-white/90 backdrop-blur dark:border-slate-800 dark:bg-slate-950/80">
             <div className="relative flex h-16 w-full items-center px-4">
@@ -411,6 +424,12 @@ export default function PlannerTopBar({
                         </div>*/}
                     </div>
                 </div>
+
+                {shouldShowMonthSwitcher ?(
+                <div className="flex flex-1 basis-0 items-center gap-3 min-w-0">
+                    <MonthSwitcher anchorMonth={anchorMonth} onPrevMonth={onPrevMonth} onNextMonth={onNextMonth} onCurrentMonth={onCurrentMonth}/>
+                </div>
+                    ) : null}
 
                 {/* RIGHT — force this column to take space and align to the far right */}
                 <div className="flex flex-1 basis-0 items-center justify-end gap-3">
