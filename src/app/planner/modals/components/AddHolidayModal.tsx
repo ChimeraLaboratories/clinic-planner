@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import SuccessToast from "./SuccessToast";
+import SuccessToast from "../../feedback/components/SuccessToast";
 import ErrorModal from "./ErrorModal";
 import {formatUserDate} from "@/app/planner/utils/userFormat";
 import {useUserPreferences} from "@/app/planner/hooks/useUserPreferences";

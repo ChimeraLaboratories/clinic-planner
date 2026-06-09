@@ -1,8 +1,8 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import ErrorModal from "@/app/planner/components/ErrorModal";
-import { matchesPattern } from "../utils/date";
+import ErrorModal from "@/app/planner/modals/components/ErrorModal";
+import { matchesPattern } from "../../utils/date";
 
 type Slot = "AM" | "PM" | "FULL";
 type SessionType = "ST" | "CL" | "OTHER";

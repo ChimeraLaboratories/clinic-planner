@@ -1,14 +1,14 @@
 "use client";
 
-import type { PlannerResponse } from "../types/planner";
+import type { PlannerResponse } from "../../types/planner";
 import PlannerTopBar from "./PlannerTopBar";
-import ViewTabs, { type PlannerTab } from "./ViewTabs";
-import MonthGrid from "./MonthGrid";
+import ViewTabs, { type PlannerTab } from "../../calendar/components/ViewTabs";
+import MonthGrid from "../../calendar/components/MonthGrid";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import HolidayBookedView from "@/app/planner/components/HolidayBookedView";
+import HolidayBookedView from "@/app/planner/holidays/components/HolidayBookedView";
 import { ExportButton } from "@/app/planner/export";
-import MonthSwitcher from "@/app/planner/components/MonthSwitcher";
+import MonthSwitcher from "@/app/planner/calendar/components/MonthSwitcher";
 
 function normalizeYmd(input: any): string | null {
     if (!input) return null;

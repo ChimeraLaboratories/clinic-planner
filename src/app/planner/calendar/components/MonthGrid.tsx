@@ -1,12 +1,12 @@
 "use client";
-import type { PlannerResponse } from "../types/planner";
+import type { PlannerResponse } from "../../types/planner";
 
 import {
     buildMonthGrid,
     getFirstFullWeekend,
     isSameMonth,
     toISODate,
-} from "../utils/date";
+} from "../../utils/date";
 
 import DayCell from "./DayCell";
 

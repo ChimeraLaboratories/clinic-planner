@@ -1,5 +1,5 @@
 import "./globals.css";
-import SystemAnnouncementBar from "@/app/planner/components/SystemAnnouncementBar";
+import SystemAnnouncementBar from "@/app/planner/layout/components/SystemAnnouncementBar";
 
 export const metadata = {
     title: "Clinic Planner",

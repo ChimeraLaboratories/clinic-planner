@@ -1,6 +1,6 @@
 "use client";
 
-import type { Session } from "../types/planner";
+import type { Session } from "../../types/planner";
 
 export default function SessionChip({
                                         session,

@@ -4,7 +4,7 @@ import Link from "next/link";
 
 import DayRoomsClient from "@/app/planner/[date]/DayRoomsClient";
 import type { DayRoom } from "@/app/planner/[date]/types";
-import DayExpectedSidebar from "@/app/planner/components/DayExpectedSidebar";
+import DayExpectedSidebar from "@/app/planner/sidebar/components/DayExpectedSidebar";
 import {formatUserDate} from "@/app/planner/utils/userFormat";
 
 type DayApiResponse = {

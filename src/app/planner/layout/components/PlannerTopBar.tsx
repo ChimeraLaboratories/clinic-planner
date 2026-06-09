@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import AddHolidayModal from "./AddHolidayModal";
+import AddHolidayModal from "../../modals/components/AddHolidayModal";
 import {formatUserTime} from "@/app/planner/utils/userFormat";
 import {useUserPreferences} from "@/app/planner/hooks/useUserPreferences";
 import {usePlannerUser} from "@/app/planner/context/UserContext";

@@ -1,4 +1,4 @@
-import PlannerTopBar from "@/app/planner/components/PlannerTopBar";
+import PlannerTopBar from "@/app/planner/layout/components/PlannerTopBar";
 import { UserProvider } from "@/app/planner/context/UserContext";
 
 export default function PlannerLayout({

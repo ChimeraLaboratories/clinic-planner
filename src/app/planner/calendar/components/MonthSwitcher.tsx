@@ -1,4 +1,4 @@
-import { formatMonthTitle } from "../utils/date";
+import { formatMonthTitle } from "../../utils/date";
 
 export default function MonthSwitcher({
                                           anchorMonth,
