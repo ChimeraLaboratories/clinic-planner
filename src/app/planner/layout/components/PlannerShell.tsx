@@ -1,7 +1,6 @@
 "use client";
 
 import type { PlannerResponse } from "../../types/planner";
-import PlannerTopBar from "./PlannerTopBar";
 import ViewTabs, { type PlannerTab } from "../../calendar/components/ViewTabs";
 import MonthGrid from "../../calendar/components/MonthGrid";
 import { useEffect, useMemo, useState } from "react";
@@ -9,6 +8,8 @@ import { useRouter } from "next/navigation";
 import HolidayBookedView from "@/app/planner/holidays/components/HolidayBookedView";
 import { ExportButton } from "@/app/planner/export";
 import MonthSwitcher from "@/app/planner/calendar/components/MonthSwitcher";
+import {useUserPreferences} from "@/app/planner/hooks/useUserPreferences";
+import WeekView from "@/app/planner/calendar/components/WeekView";
 
 function normalizeYmd(input: any): string | null {
     if (!input) return null;
@@ -133,10 +134,19 @@ export default function PlannerShell({
 }) {
     const router = useRouter();
     const [activeTab, setActiveTab] = useState<PlannerTab>("month");
+    const { preferences, loading: preferencesLoading } = useUserPreferences();
 
     useEffect(() => {
+        if (preferencesLoading) return;
+
+        const savedView = preferences.default_calendar_view;
+
+        if (savedView === "month" || savedView === "week") {
+            setActiveTab(savedView);
+            return;
+        }
         setActiveTab("month");
-    }, [anchorMonth]);
+    }, [preferencesLoading, preferences.default_calendar_view]);
 
     const ooClinicianId = useMemo(() => {
         const list = (data?.clinicians ?? []) as any[];
@@ -722,6 +732,10 @@ export default function PlannerShell({
 
                             {!loading && !error && data && activeTab === "holidays" && (
                                 <HolidayBookedView anchorMonth={anchorMonth} data={data} ooClinicianId={ooClinicianId} />
+                            )}
+
+                            {!loading && !error && data && activeTab === "week" && (
+                                <WeekView anchorMonth={anchorMonth} data={data}/>
                             )}
                         </div>
                     </div>
