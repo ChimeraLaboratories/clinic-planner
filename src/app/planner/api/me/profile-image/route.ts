@@ -1,4 +1,4 @@
-import {getCurrentUserFromCookies} from "@/lib/auth";
+import {getCurrentUserFromCookies, toPublicUser} from "@/lib/auth";
 import {NextRequest, NextResponse} from "next/server";
 import path from "node:path";
 import {writeFile} from "fs/promises";
@@ -48,4 +48,30 @@ export async function POST(req: NextRequest)  {
         `,
         [publicUrl, user.id]
     );
+
+    return NextResponse.json({
+        ...toPublicUser(user),
+        profile_image_url: publicUrl,
+    });
+}
+
+export async function DELETE() {
+    const user = await getCurrentUserFromCookies();
+
+    if (!user) {
+        return NextResponse.json({ error: "Unauthorised" }, { status: 401});
+    }
+
+    await db.query(
+        `
+        UPDATE users
+        SET profile_image_url = NULL
+        WHERE id = ?
+        `, [user.id]
+    );
+
+    return NextResponse.json({
+        ...toPublicUser(user),
+        profile_image_url: null,
+    });
 }

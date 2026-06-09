@@ -15,7 +15,8 @@ export async function GET() {
         full_name,
         role,
         job_role,
-        is_active
+        is_active,
+        profile_image_url
         FROM users
         WHERE id = ?
         LIMIT 1`, [user.id]

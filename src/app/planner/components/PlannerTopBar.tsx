@@ -514,7 +514,15 @@ export default function PlannerTopBar({
                             className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
                         >
     <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-blue-600 text-xs font-semibold text-white">
-        {getUserInitials(user?.full_name, user?.email)}
+        {user?.profile_image_url ? (
+            <img
+                src={user.profile_image_url}
+                alt="Profile"
+                className="h-full w-full object-cover"
+                />
+        ) : (
+            getUserInitials(user?.full_name, user?.email)
+        )}
     </span>
 
                             <span className="text-left leading-tight">

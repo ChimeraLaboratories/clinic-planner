@@ -20,7 +20,8 @@ export default function ProfileSettingsPage() {
     const [saving, setSaving] = useState(false);
     const [message, setMessage] = useState("");
     const [messageType, setMessageType] = useState<"success" | "error" | null>(null);
-    const { setUser } = usePlannerUser();
+    const { user, setUser } = usePlannerUser();
+    const [uploadingImage, setUploadingImage] = useState(false);
 
     useEffect(() => {
         fetch("/planner/api/me/profile")
@@ -33,9 +34,71 @@ export default function ProfileSettingsPage() {
                     email: profile.email ?? "",
                     job_role: profile.job_role ?? "",
                 });
+                setUser({
+                    id: profile.id,
+                    full_name: profile.full_name ?? "",
+                    email: profile.email ?? "",
+                    job_role: profile.job_role ?? "",
+                    role: profile.role,
+                    profile_image_url: profile.profile_image_url ?? null,
+                });
             })
             .finally(() => setLoading(false));
     }, []);
+
+    async function handleProfileImageUpload(file: File) {
+        setUploadingImage(true);
+        setMessage("");
+
+        try {
+            const formData = new FormData();
+            formData.append("file", file);
+
+            const res = await fetch("/planner/api/me/profile-image", {
+                method: "POST",
+                body: formData,
+            });
+
+            const updatedUser = await res.json();
+
+            if (!res.ok) {
+                setMessage(updatedUser.error ?? "Could not upload image.");
+                setMessageType("error");
+                return;
+            }
+
+            setUser(updatedUser);
+            setMessage("Profile image updated.");
+            setMessageType("success");
+        } finally {
+            setUploadingImage(false);
+        }
+    }
+
+    async function handleRemoveProfileImage() {
+        setUploadingImage(true);
+        setMessage("");
+
+        try {
+            const res = await fetch("/planner/api/me/profile-image", {
+                method: "DELETE",
+            });
+
+            const updatedUser = await res.json();
+
+            if (!res.ok) {
+                setMessage(updatedUser.error ?? "Could not remove image.");
+                setMessageType("error");
+                return;
+            }
+
+            setUser(updatedUser);
+            setMessage("Profile image removed.");
+            setMessageType("success");
+        } finally {
+            setUploadingImage(false);
+        }
+    }
 
     async function handleSave() {
         if (!form.full_name.trim()) {
@@ -99,6 +162,50 @@ export default function ProfileSettingsPage() {
             <h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-100">
                 Profile
             </h1>
+            <div>
+                <span className="text-sm font-medium">Profile picture</span>
+
+                <div className={"mt-2 flex items-center gap-4"}>
+                    {user?.profile_image_url ? (
+                        <img
+                            src={user.profile_image_url}
+                            alt="Profile"
+                            className="h-16 w-16 rounded-full object-cover border border-slate-200 dark:border-slate-700"
+                            />
+                    ) : (
+                        <div className="flex h-16 w-16 items-center justify-center rounded-full bg-blue-600 text-sm font-semibold text-white">
+                            No image
+                        </div>
+                    )}
+
+                    <div className="flex gap-2">
+                        <label className="cursor-pointer rounded-lg border border-slate-300 px-3 py-2 text-sm hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-900">
+                            {uploadingImage ? "Uploading..." : "Upload image"}
+                            <input
+                                type="file"
+                                accept="image/png,image/jpeg,image/webp"
+                                className="hidden"
+                                disabled={uploadingImage}
+                                onChange={(e) => {
+                                    const file = e.target.files?.[0];
+                                    if (file) handleProfileImageUpload(file);
+                                }}
+                                />
+                        </label>
+
+                        {user?.profile_image_url && (
+                            <button
+                                type="button"
+                                onClick={handleRemoveProfileImage}
+                                disabled={uploadingImage}
+                                className="rounded-lg border border-red-200 px-3 py-2 text-sm text-red-600 hover:bg-red-50 disabled:opacity-50"
+                            >
+                                Remove
+                            </button>
+                        )}
+                    </div>
+                </div>
+            </div>
 
             <div className="mt-6 space-y-4 rounded-2xl border border-slate-200 bg-white p-6 dark:border-slate-800 dark:bg-slate-950">
                 <label className="block">
