@@ -9,7 +9,6 @@ import HolidayBookedView from "@/app/planner/holidays/components/HolidayBookedVi
 import { ExportButton } from "@/app/planner/export";
 import MonthSwitcher from "@/app/planner/calendar/components/MonthSwitcher";
 import {useUserPreferences} from "@/app/planner/hooks/useUserPreferences";
-import WeekView from "@/app/planner/calendar/components/WeekView";
 
 function normalizeYmd(input: any): string | null {
     if (!input) return null;
@@ -141,7 +140,7 @@ export default function PlannerShell({
 
         const savedView = preferences.default_calendar_view;
 
-        if (savedView === "month" || savedView === "week") {
+        if (savedView === "month") {
             setActiveTab(savedView);
             return;
         }
@@ -732,10 +731,6 @@ export default function PlannerShell({
 
                             {!loading && !error && data && activeTab === "holidays" && (
                                 <HolidayBookedView anchorMonth={anchorMonth} data={data} ooClinicianId={ooClinicianId} />
-                            )}
-
-                            {!loading && !error && data && activeTab === "week" && (
-                                <WeekView anchorMonth={anchorMonth} data={data}/>
                             )}
                         </div>
                     </div>

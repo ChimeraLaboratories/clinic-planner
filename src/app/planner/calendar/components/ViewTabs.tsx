@@ -1,6 +1,6 @@
 "use client";
 
-export type PlannerTab = "month" | "holidays" | "week";
+export type PlannerTab = "month" | "holidays";
 
 export default function ViewTabs({
                                      value,
