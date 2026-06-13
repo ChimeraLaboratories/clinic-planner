@@ -43,7 +43,11 @@ export default function MonthSwitcher({
             <button
                 type="button"
                 onClick={onCurrentMonth}
-                className="inline-flex h-12 items-center justify-center rounded-xl border border-slate-200 bg-slate-100 px-6 text-base font-semibold text-slate-400 shadow-sm hover:bg-slate-200 dark:border-slate-800 dark:bg-slate-800 dark:text-slate-500 dark:hover:bg-slate-700"
+                className={`inline-flex h-12 items-center justify-center rounded-xl border px-6 text-base font-semibold shadow-sm transitions-colors ${
+                    isCurrentMonth 
+                        ? "border-slate-200 bg-slate-100 text-slate-400 cursor-default"
+                        : "border-blue-200 bg-blue-600 text-white hover:bg-blue-700"
+                }`}
             >
                 Current Month
             </button>
