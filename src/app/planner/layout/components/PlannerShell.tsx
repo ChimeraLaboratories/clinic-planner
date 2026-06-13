@@ -9,6 +9,7 @@ import HolidayBookedView from "@/app/planner/holidays/components/HolidayBookedVi
 import { ExportButton } from "@/app/planner/export";
 import MonthSwitcher from "@/app/planner/calendar/components/MonthSwitcher";
 import {useUserPreferences} from "@/app/planner/hooks/useUserPreferences";
+import {useMonthNavigation} from "@/app/planner/context/MonthNavigationContext";
 
 function normalizeYmd(input: any): string | null {
     if (!input) return null;
@@ -134,6 +135,21 @@ export default function PlannerShell({
     const router = useRouter();
     const [activeTab, setActiveTab] = useState<PlannerTab>("month");
     const { preferences, loading: preferencesLoading } = useUserPreferences();
+
+    const {
+        anchorMonth: sharedAnchorMonth,
+        setAnchorMonth,
+        setShowMonthSwitcher,
+    } = useMonthNavigation();
+    useEffect(() => {
+        setShowMonthSwitcher(true);
+        setAnchorMonth(anchorMonth);
+
+        return () => {
+            setShowMonthSwitcher(false);
+            setAnchorMonth(null);
+        }
+    }, [anchorMonth, setAnchorMonth, setShowMonthSwitcher]);
 
     useEffect(() => {
         if (preferencesLoading) return;
@@ -421,12 +437,6 @@ export default function PlannerShell({
 
     return (
         <div className="min-h-screen bg-slate-100 dark:bg-slate-950">
-            <MonthSwitcher
-                anchorMonth={anchorMonth}
-                onPrevMonth={onPrevMonth}
-                onNextMonth={onNextMonth}
-                onCurrentMonth={handleCurrentMonth}
-            />
 
             <main className="w-full px-6 py-8">
                 <div className="flex gap-6 items-start">

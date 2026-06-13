@@ -1,5 +1,3 @@
-import { formatMonthTitle } from "../../utils/date";
-
 export default function MonthSwitcher({
                                           anchorMonth,
                                           onPrevMonth,
@@ -18,20 +16,37 @@ export default function MonthSwitcher({
         today.getFullYear() === anchorMonth.getFullYear();
 
     return (
-        <div className="flex items-center gap-2">
-            <button onClick={onPrevMonth}>‹</button>
+        <div className="flex items-center gap-3">
+            <button
+                type="button"
+                onClick={onPrevMonth}
+                className="inline-flex h-12 w-12 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 shadow-sm hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+            >
+                ‹
+            </button>
 
-            <div className="font-semibold">
-                {formatMonthTitle(anchorMonth)}
+            <div className="inline-flex h-12 min-w-[128px] items-center justify-center rounded-xl border border-slate-200 bg-white px-6 text-base font-semibold text-slate-800 shadow-sm dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100">
+                {anchorMonth.toLocaleDateString("en-GB", {
+                    month: "long",
+                    year: "numeric",
+                })}
             </div>
 
-            <button onClick={onNextMonth}>›</button>
+            <button
+                type="button"
+                onClick={onNextMonth}
+                className="inline-flex h-12 w-12 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 shadow-sm hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+            >
+                ›
+            </button>
 
-            {!isCurrentMonth && (
-                <button onClick={onCurrentMonth}>
-                    Current Month
-                </button>
-            )}
+            <button
+                type="button"
+                onClick={onCurrentMonth}
+                className="inline-flex h-12 items-center justify-center rounded-xl border border-slate-200 bg-slate-100 px-6 text-base font-semibold text-slate-400 shadow-sm hover:bg-slate-200 dark:border-slate-800 dark:bg-slate-800 dark:text-slate-500 dark:hover:bg-slate-700"
+            >
+                Current Month
+            </button>
         </div>
     );
 }

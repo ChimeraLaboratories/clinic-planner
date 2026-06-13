@@ -8,6 +8,7 @@ import {useUserPreferences} from "@/app/planner/hooks/useUserPreferences";
 import {usePlannerUser} from "@/app/planner/context/UserContext";
 import {getUserInitials} from "@/app/planner/utils/userInitials";
 import MonthSwitcher from "@/app/planner/calendar/components/MonthSwitcher";
+import {useMonthNavigation} from "@/app/planner/context/MonthNavigationContext";
 
 function formatLastSynced(d: Date | null | undefined, timeFormat: string) {
     if (!d) return "";
@@ -127,22 +128,18 @@ export default function PlannerTopBar({
                                    lastSyncedAt,
                                    clinicians,
                                    onRefresh,
-                                   anchorMonth,
                                    onPrevMonth,
                                    onNextMonth,
                                    onCurrentMonth,
-                                   showMonthSwitcher,
                                }: {
     env?: Env;
     syncState?: "idle" | "syncing" | "synced" | "error";
     lastSyncedAt?: Date | null;
     clinicians?: ClinicianLite[];
     onRefresh?: () => void | Promise<void>;
-    anchorMonth?: Date;
     onPrevMonth?: () => void;
     onNextMonth?: () => void;
     onCurrentMonth?: () => void;
-    showMonthSwitcher?: boolean;
 }) {
 
     const [menuOpen, setMenuOpen] = useState(false);
@@ -168,6 +165,12 @@ export default function PlannerTopBar({
     //Admin Menu States
     const [adminOpen, setAdminOpen] = useState(false);
     const adminRef = useRef<HTMLDivElement | null>(null);
+
+    const {
+        anchorMonth,
+        setAnchorMonth,
+        showMonthSwitcher,
+    } = useMonthNavigation();
 
     useEffect(() => {
         setRuntimeEnv(env);
@@ -292,6 +295,30 @@ export default function PlannerTopBar({
     };
 
     const envToShow = runtimeEnv;
+
+    function handlePrevMonth() {
+        if (!anchorMonth) return;
+
+        setAnchorMonth(
+            new Date(anchorMonth.getFullYear(), anchorMonth.getMonth() - 1, 1)
+        );
+    }
+
+    function handleNextMonth() {
+        if (!anchorMonth) return;
+
+        setAnchorMonth(
+            new Date(anchorMonth.getFullYear(), anchorMonth.getMonth() + 1, 1)
+        );
+    }
+
+    function handleCurrentMonth() {
+        const now = new Date();
+
+        setAnchorMonth(
+            new Date(now.getFullYear(), now.getMonth(), 1)
+        );
+    }
 
     const shouldShowMonthSwitcher = showMonthSwitcher && anchorMonth && onPrevMonth && onNextMonth && onCurrentMonth;
 
@@ -425,11 +452,16 @@ export default function PlannerTopBar({
                     </div>
                 </div>
 
-                {shouldShowMonthSwitcher ?(
-                <div className="flex flex-1 basis-0 items-center gap-3 min-w-0">
-                    <MonthSwitcher anchorMonth={anchorMonth} onPrevMonth={onPrevMonth} onNextMonth={onNextMonth} onCurrentMonth={onCurrentMonth}/>
-                </div>
-                    ) : null}
+                { showMonthSwitcher && anchorMonth && (
+                    <div className="absolute left-1/2 -translate-x-1/2">
+                        <MonthSwitcher
+                            anchorMonth={anchorMonth}
+                            onPrevMonth={handlePrevMonth}
+                            onNextMonth={handleNextMonth}
+                            onCurrentMonth={handleCurrentMonth}
+                        />
+                    </div>
+                )}
 
                 {/* RIGHT — force this column to take space and align to the far right */}
                 <div className="flex flex-1 basis-0 items-center justify-end gap-3">
