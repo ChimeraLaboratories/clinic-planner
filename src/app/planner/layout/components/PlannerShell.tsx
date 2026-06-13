@@ -140,16 +140,34 @@ export default function PlannerShell({
         anchorMonth: sharedAnchorMonth,
         setAnchorMonth,
         setShowMonthSwitcher,
+        setOnPrevMonth,
+        setOnNextMonth,
+        setOnCurrentMonth,
     } = useMonthNavigation();
+
     useEffect(() => {
         setShowMonthSwitcher(true);
         setAnchorMonth(anchorMonth);
+        setOnPrevMonth(() => onPrevMonth);
+        setOnNextMonth(() => onNextMonth);
+        setOnCurrentMonth(() => handleCurrentMonth);
 
         return () => {
             setShowMonthSwitcher(false);
             setAnchorMonth(null);
+            setOnPrevMonth(null);
+            setOnNextMonth(null);
+            setOnCurrentMonth(null);
         }
-    }, [anchorMonth, setAnchorMonth, setShowMonthSwitcher]);
+    }, [anchorMonth,
+        onPrevMonth,
+        onNextMonth,
+        setAnchorMonth,
+        setShowMonthSwitcher,
+        setOnPrevMonth,
+        setOnNextMonth,
+        setOnCurrentMonth,
+    ]);
 
     useEffect(() => {
         if (preferencesLoading) return;

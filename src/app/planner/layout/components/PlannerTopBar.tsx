@@ -128,18 +128,12 @@ export default function PlannerTopBar({
                                    lastSyncedAt,
                                    clinicians,
                                    onRefresh,
-                                   onPrevMonth,
-                                   onNextMonth,
-                                   onCurrentMonth,
                                }: {
     env?: Env;
     syncState?: "idle" | "syncing" | "synced" | "error";
     lastSyncedAt?: Date | null;
     clinicians?: ClinicianLite[];
     onRefresh?: () => void | Promise<void>;
-    onPrevMonth?: () => void;
-    onNextMonth?: () => void;
-    onCurrentMonth?: () => void;
 }) {
 
     const [menuOpen, setMenuOpen] = useState(false);
@@ -170,6 +164,9 @@ export default function PlannerTopBar({
         anchorMonth,
         setAnchorMonth,
         showMonthSwitcher,
+        onPrevMonth,
+        onNextMonth,
+        onCurrentMonth,
     } = useMonthNavigation();
 
     useEffect(() => {
@@ -295,30 +292,6 @@ export default function PlannerTopBar({
     };
 
     const envToShow = runtimeEnv;
-
-    function handlePrevMonth() {
-        if (!anchorMonth) return;
-
-        setAnchorMonth(
-            new Date(anchorMonth.getFullYear(), anchorMonth.getMonth() - 1, 1)
-        );
-    }
-
-    function handleNextMonth() {
-        if (!anchorMonth) return;
-
-        setAnchorMonth(
-            new Date(anchorMonth.getFullYear(), anchorMonth.getMonth() + 1, 1)
-        );
-    }
-
-    function handleCurrentMonth() {
-        const now = new Date();
-
-        setAnchorMonth(
-            new Date(now.getFullYear(), now.getMonth(), 1)
-        );
-    }
 
     const shouldShowMonthSwitcher = showMonthSwitcher && anchorMonth && onPrevMonth && onNextMonth && onCurrentMonth;
 
@@ -452,13 +425,17 @@ export default function PlannerTopBar({
                     </div>
                 </div>
 
-                { showMonthSwitcher && anchorMonth && (
-                    <div className="absolute left-1/2 -translate-x-1/2">
+                { showMonthSwitcher &&
+                    anchorMonth &&
+                    onPrevMonth &&
+                    onNextMonth &&
+                    onCurrentMonth && (
+                        <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
                         <MonthSwitcher
                             anchorMonth={anchorMonth}
-                            onPrevMonth={handlePrevMonth}
-                            onNextMonth={handleNextMonth}
-                            onCurrentMonth={handleCurrentMonth}
+                            onPrevMonth={onPrevMonth}
+                            onNextMonth={onNextMonth}
+                            onCurrentMonth={onCurrentMonth}
                         />
                     </div>
                 )}
