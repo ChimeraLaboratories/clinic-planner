@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
-import PlannerShell from "../components/PlannerShell";
+import PlannerShell from "../layout/components/PlannerShell";
 import { endOfMonth, startOfMonth, toISODate } from "../utils/date";
 import { usePlannerData } from "../hooks/usePlannerData";
 

@@ -1,6 +1,6 @@
 "use client";
 
-import type { Clinician } from "../types/planner";
+import type { Clinician } from "../../types/planner";
 import { parseYmdLocal } from "@/app/planner/utils/date";
 import { getWeekPatternFromYmd } from "@/lib/WeekPattern";
 

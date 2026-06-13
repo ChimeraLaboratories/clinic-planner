@@ -1,14 +1,30 @@
-import {AuditLog} from "@/app/planner/admin/audit/types";
-import {AuditActionBadge} from "@/app/planner/admin/audit/components/AuditActionBadge";
+/**
+ * AuditTable.tsx
+ *
+ * Displays audit log entries in a tabular format.
+ *
+ * Responsibilities:
+ * - Show key audit information at a glance.
+ * - Provide quick access to detailed audit records.
+ * - Present audit actions using consistent badge styling.
+ */
+
+import { AuditLog } from "@/app/planner/admin/audit/types";
+import { AuditActionBadge } from "@/app/planner/admin/audit/components/AuditActionBadge";
 
 type AuditTableProps = {
     logs: AuditLog[];
     onViewDetails: (log: AuditLog) => void;
 };
 
-export function AuditTable({logs, onViewDetails, }: AuditTableProps) {
+export function AuditTable({
+                               logs,
+                               onViewDetails,
+                           }: AuditTableProps) {
     return (
         <table className="w-full text-sm">
+
+            {/* Table headings */}
             <thead className="bg-slate-50 dark:bg-slate-900 text-slate-600 dark:text-slate-300">
             <tr>
                 <th className="text-left px-4 py-3">Date Changed</th>
@@ -27,19 +43,25 @@ export function AuditTable({logs, onViewDetails, }: AuditTableProps) {
                     <td className="px-4 py-3">
                         {new Date(log.created_at).toLocaleString("en-GB")}
                     </td>
+
                     <td className="px-4 py-3">
+                        {/* System-generated events may not have an actor */}
                         {log.actor_name || log.actor_email || "System"}
                     </td>
+
                     <td className="px-4 py-3">
                         <AuditActionBadge action={log.action} />
                     </td>
+
                     <td className="px-4 py-3">{log.entity_type}</td>
                     <td className="px-4 py-3">{log.target_date || "-"}</td>
                     <td className="px-4 py-3">{log.summary || "-"}</td>
+
                     <td className="px-4 py-3">
                         <button
                             onClick={() => onViewDetails(log)}
-                            className="rounded-lg border border-slate-300 dark:border-slate-700 px-3 py-1.5 text-xs font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-900">
+                            className="rounded-lg border border-slate-300 dark:border-slate-700 px-3 py-1.5 text-xs font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-900"
+                        >
                             View Details
                         </button>
                     </td>
@@ -47,5 +69,5 @@ export function AuditTable({logs, onViewDetails, }: AuditTableProps) {
             ))}
             </tbody>
         </table>
-    )
+    );
 }

@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { DayRoom } from "@/app/planner/[date]/types";
-import CreateSessionModal from "@/app/planner/components/CreateSessionModal";
+import CreateSessionModal from "@/app/planner/modals/components/CreateSessionModal";
 import { usePresence, type PresenceUser } from "@/app/planner/hooks/usePresence";
 
 type Slot = "AM" | "PM" | "FULL";

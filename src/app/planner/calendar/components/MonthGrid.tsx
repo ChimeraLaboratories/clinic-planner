@@ -1,12 +1,12 @@
 "use client";
-import type { PlannerResponse } from "../types/planner";
+import type { PlannerResponse } from "../../types/planner";
 
 import {
     buildMonthGrid,
     getFirstFullWeekend,
     isSameMonth,
     toISODate,
-} from "../utils/date";
+} from "../../utils/date";
 
 import DayCell from "./DayCell";
 
@@ -15,6 +15,7 @@ import { useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { getWeekPatternFromYmd } from "@/lib/WeekPattern";
 import { usePresence } from "@/app/planner/hooks/usePresence";
+import {useUserPreferences} from "@/app/planner/hooks/useUserPreferences";
 
 function ym(d: Date) {
     const yyyy = d.getFullYear();
@@ -113,12 +114,17 @@ export default function MonthGrid({
     onRefresh: () => void | Promise<void>;
 }) {
     const router = useRouter();
+    const { preferences } = useUserPreferences();
+    const weekStartsOn = (preferences.week_start_day ?? "monday") as "monday" | "sunday";
     const { users: presenceUsers } = usePresence();
 
     const monthParam = ym(anchorMonth);
 
-    const days = buildMonthGrid(anchorMonth);
-    const dow = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+    const days = buildMonthGrid(anchorMonth, weekStartsOn);
+    const dow =
+        weekStartsOn === "sunday" ?
+        ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
+        : ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
     const totalRooms = data.rooms?.length ?? 0;
 

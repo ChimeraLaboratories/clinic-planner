@@ -1,13 +1,18 @@
 "use client";
 
-import { formatMonthTitle } from "../utils/date";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import AddHolidayModal from "./AddHolidayModal";
+import AddHolidayModal from "../../modals/components/AddHolidayModal";
+import {formatUserTime} from "@/app/planner/utils/userFormat";
+import {useUserPreferences} from "@/app/planner/hooks/useUserPreferences";
+import {usePlannerUser} from "@/app/planner/context/UserContext";
+import {getUserInitials} from "@/app/planner/utils/userInitials";
+import MonthSwitcher from "@/app/planner/calendar/components/MonthSwitcher";
+import {useMonthNavigation} from "@/app/planner/context/MonthNavigationContext";
 
-function formatLastSynced(d: Date | null | undefined) {
+function formatLastSynced(d: Date | null | undefined, timeFormat: string) {
     if (!d) return "";
-    return d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+    return formatUserTime(d, timeFormat);
 }
 
 type ClinicianLite = {
@@ -77,9 +82,10 @@ function SyncBadge({
     const isSyncing = state === "syncing";
     const isError = state === "error";
     const isSynced = state === "synced" || state === "idle";
+    const { preferences } = useUserPreferences();
 
     const label = isSyncing ? "Syncing…" : isError ? "Sync failed" : "Synced";
-    const time = !isSyncing && !isError ? formatLastSynced(lastSyncedAt ?? null) : "";
+    const time = !isSyncing && !isError ? formatLastSynced(lastSyncedAt ?? null, preferences.time_format) : "";
 
     return (
         <div
@@ -116,30 +122,19 @@ function SyncBadge({
     );
 }
 
-export default function TopBar({
-                                   anchorMonth,
-                                   onPrevMonth,
-                                   onNextMonth,
-                                   onCurrentMonth,
+export default function PlannerTopBar({
                                    env,
                                    syncState,
                                    lastSyncedAt,
                                    clinicians,
                                    onRefresh,
                                }: {
-    anchorMonth: Date;
-    onPrevMonth: () => void;
-    onNextMonth: () => void;
-    onCurrentMonth: () => void;
     env?: Env;
     syncState?: "idle" | "syncing" | "synced" | "error";
     lastSyncedAt?: Date | null;
-    clinicians: ClinicianLite[];
+    clinicians?: ClinicianLite[];
     onRefresh?: () => void | Promise<void>;
 }) {
-    const today = new Date();
-    const isCurrentMonth =
-        today.getMonth() === anchorMonth.getMonth() && today.getFullYear() === anchorMonth.getFullYear();
 
     const [menuOpen, setMenuOpen] = useState(false);
     const menuRef = useRef<HTMLDivElement | null>(null);
@@ -157,12 +152,22 @@ export default function TopBar({
     const [tipShift, setTipShift] = useState(0);
 
     //User States
-    const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
+    const [, setCurrentUser] = useState<CurrentUser | null>(null);
     const [loggingOut, setLoggingOut] = useState(false);
+    const { user, setUser } = usePlannerUser();
 
     //Admin Menu States
     const [adminOpen, setAdminOpen] = useState(false);
     const adminRef = useRef<HTMLDivElement | null>(null);
+
+    const {
+        anchorMonth,
+        setAnchorMonth,
+        showMonthSwitcher,
+        onPrevMonth,
+        onNextMonth,
+        onCurrentMonth,
+    } = useMonthNavigation();
 
     useEffect(() => {
         setRuntimeEnv(env);
@@ -180,7 +185,11 @@ export default function TopBar({
                 }
 
                 const json = await res.json();
-                if (!cancelled) setCurrentUser(json?.user ?? null);
+                if (!cancelled) {
+                    const loadedUser = json?.user ?? null;
+                    setCurrentUser(loadedUser);
+                    setUser(loadedUser);
+                }
             } catch {
                 if (!cancelled) setCurrentUser(null);
             }
@@ -283,6 +292,8 @@ export default function TopBar({
     };
 
     const envToShow = runtimeEnv;
+
+    const shouldShowMonthSwitcher = showMonthSwitcher && anchorMonth && onPrevMonth && onNextMonth && onCurrentMonth;
 
     return (
         <header className="sticky top-0 z-40 w-full border-b border-slate-200 bg-white/90 backdrop-blur dark:border-slate-800 dark:bg-slate-950/80">
@@ -414,45 +425,20 @@ export default function TopBar({
                     </div>
                 </div>
 
-                {/* CENTER — Month Navigation (true centered on screen) */}
-                <div className="absolute left-1/2 -translate-x-1/2 flex items-center gap-3">
-                    <button
-                        onClick={onPrevMonth}
-                        className="h-9 w-9 rounded-lg border border-slate-200 bg-white text-slate-600 shadow-sm transition hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
-                        aria-label="Previous month"
-                    >
-                        ‹
-                    </button>
-
-                    <div className="flex h-9 items-center overflow-hidden rounded-lg border border-slate-200 bg-white px-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-                        <span
-                            key={formatMonthTitle(anchorMonth)}
-                            className="animate-fadeInUp text-sm font-semibold text-slate-800 dark:text-slate-100"
-                        >
-                            {formatMonthTitle(anchorMonth)}
-                        </span>
+                { showMonthSwitcher &&
+                    anchorMonth &&
+                    onPrevMonth &&
+                    onNextMonth &&
+                    onCurrentMonth && (
+                        <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
+                        <MonthSwitcher
+                            anchorMonth={anchorMonth}
+                            onPrevMonth={onPrevMonth}
+                            onNextMonth={onNextMonth}
+                            onCurrentMonth={onCurrentMonth}
+                        />
                     </div>
-
-                    <button
-                        onClick={onNextMonth}
-                        className="h-9 w-9 rounded-lg border border-slate-200 bg-white text-slate-600 shadow-sm transition hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
-                        aria-label="Next month"
-                    >
-                        ›
-                    </button>
-
-                    <button
-                        onClick={onCurrentMonth}
-                        disabled={isCurrentMonth}
-                        className={`ml-2 h-9 rounded-lg px-4 text-sm font-medium shadow-sm transition ${
-                            isCurrentMonth
-                                ? "cursor-default border border-slate-200 bg-slate-100 text-slate-400 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-500"
-                                : "bg-blue-600 text-white hover:bg-blue-700"
-                        }`}
-                    >
-                        Current Month
-                    </button>
-                </div>
+                )}
 
                 {/* RIGHT — force this column to take space and align to the far right */}
                 <div className="flex flex-1 basis-0 items-center justify-end gap-3">
@@ -466,7 +452,7 @@ export default function TopBar({
                         <span className="text-base leading-none">{isDark ? "☀" : "🌙"}</span>
                     </button>
 
-                    {currentUser?.role === "ADMIN" && (
+                    {user?.role === "ADMIN" && (
                         <div className="relative" ref={adminRef}>
                             <button
                                 type="button"
@@ -556,18 +542,23 @@ export default function TopBar({
                             className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
                         >
     <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-blue-600 text-xs font-semibold text-white">
-        {(currentUser?.full_name || currentUser?.email || "U")
-            .trim()
-            .slice(0, 2)
-            .toUpperCase()}
+        {user?.profile_image_url ? (
+            <img
+                src={user.profile_image_url}
+                alt="Profile"
+                className="h-full w-full object-cover"
+                />
+        ) : (
+            getUserInitials(user?.full_name, user?.email)
+        )}
     </span>
 
                             <span className="text-left leading-tight">
         <span className="block">
-            {currentUser?.full_name || currentUser?.email || "User"}
+            {user?.full_name || user?.email || "User"}
         </span>
         <span className="block text-xs text-slate-500 dark:text-slate-400">
-    {[currentUser?.job_role, currentUser?.role].filter(Boolean).join(" · ")}
+    {[user?.job_role, user?.role].filter(Boolean).join(" · ")}
         </span>
     </span>
                         </button>
@@ -576,29 +567,38 @@ export default function TopBar({
                             <div className="absolute right-0 top-full z-50 mt-2 w-56 rounded-xl border border-slate-200 bg-white p-2 shadow-lg dark:border-slate-800 dark:bg-slate-900">
                                 <div className="rounded-lg px-3 py-2">
                                     <div className="text-sm font-medium text-slate-900 dark:text-slate-100">
-                                        {currentUser?.full_name || "Signed in"}
+                                        {user?.full_name || "Signed in"}
                                     </div>
                                     <div className="text-xs text-slate-500 dark:text-slate-400">
-                                        {currentUser?.email || ""}
+                                        {user?.email || ""}
                                     </div>
                                 </div>
 
                                 <div className="my-2 h-px bg-slate-200 dark:bg-slate-800" />
 
-                                <Link
-                                    href="/settings"
+{/*                                <Link
+                                    href="/planner/settings/preferences"
                                     onClick={() => setMenuOpen(false)}
                                     className="block w-full rounded-lg px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800"
                                 >
-                                    Settings
-                                </Link>
+                                    Preferences
+                                </Link>*/}
 
-                                <button
-                                    type="button"
+                                <Link
+                                    href="/planner/settings/profile"
+                                    onClick={() => setMenuOpen(false)}
                                     className="block w-full rounded-lg px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800"
                                 >
-                                    Account
-                                </button>
+                                    Profile
+                                </Link>
+
+                                <Link
+                                    href="/planner/settings/security"
+                                    onClick={() => setMenuOpen(false)}
+                                    className="block w-full rounded-lg px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800"
+                                >
+                                    Security
+                                </Link>
 
                                 <div className="my-2 h-px bg-slate-200 dark:bg-slate-800" />
 

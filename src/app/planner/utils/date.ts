@@ -19,20 +19,39 @@ export function isSameMonth(a: Date, b: Date) {
     return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth();
 }
 
-export function buildMonthGrid(anchorMonth: Date) {
+export function buildMonthGrid(
+    anchorMonth: Date,
+    weekStartsOn: "monday" | "sunday" = "sunday"
+) {
     const year = anchorMonth.getFullYear();
     const month = anchorMonth.getMonth();
 
     const first = new Date(year, month, 1);
     const last = new Date(year, month + 1, 0);
 
-    // grid starts on Sunday
     const start = new Date(first);
-    start.setDate(first.getDate() - first.getDay());
+    const firstDay = first.getDay(); // Sun = 0
 
-    // grid ends on Saturday
+    const startOffset =
+        weekStartsOn === "monday"
+            ? firstDay === 0
+                ? 6
+                : firstDay - 1
+            : firstDay;
+
+    start.setDate(first.getDate() - startOffset);
+
     const end = new Date(last);
-    end.setDate(last.getDate() + (6 - last.getDay()));
+    const lastDay = last.getDay();
+
+    const endOffset =
+        weekStartsOn === "monday"
+            ? lastDay === 0
+                ? 0
+                : 7 - lastDay
+            : 6 - lastDay;
+
+    end.setDate(last.getDate() + endOffset);
 
     const days: Date[] = [];
     const cur = new Date(start);
