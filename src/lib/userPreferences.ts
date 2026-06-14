@@ -63,29 +63,62 @@ export async function createDefaultPreferences(userId: number) {
     return getUserPreferences(userId);
 }
 
-export async function updateUserPreferences(userId: number, preferences: Partial<UserPreferences>) {
+export async function updateUserPreferences(
+    userId: number,
+    preferences: Partial<UserPreferences>
+) {
+    const updates: string[] = [];
+    const values: unknown[] = [];
+
+    if (preferences.default_calendar_view !== undefined) {
+        updates.push("default_calendar_view = ?");
+        values.push(preferences.default_calendar_view);
+    }
+
+    if (preferences.week_start_day !== undefined) {
+        updates.push("week_start_day = ?");
+        values.push(preferences.week_start_day);
+    }
+
+    if (preferences.theme !== undefined) {
+        updates.push("theme = ?");
+        values.push(preferences.theme);
+    }
+
+    if (preferences.compact_view !== undefined) {
+        updates.push("compact_view = ?");
+        values.push(preferences.compact_view ? 1 : 0);
+    }
+
+    if (preferences.show_weekends !== undefined) {
+        updates.push("show_weekends = ?");
+        values.push(preferences.show_weekends ? 1 : 0);
+    }
+
+    if (preferences.date_format !== undefined) {
+        updates.push("date_format = ?");
+        values.push(preferences.date_format);
+    }
+
+    if (preferences.time_format !== undefined) {
+        updates.push("time_format = ?");
+        values.push(preferences.time_format);
+    }
+
+    if (updates.length === 0) {
+        return getUserPreferences(userId);
+    }
+
+    values.push(userId);
+
     await db.query(
-        `UPDATE user_preferences
-        SET
-        default_calendar_view = ?,
-        week_start_day = ?,
-        theme = ?,
-        compact_view = ?,
-        show_weekends = ?,
-        date_format = ?,
-        time_format = ?,
-        updated_at = NOW()
-        WHERE user_id = ?`,
-        [
-            preferences.default_calendar_view,
-            preferences.week_start_day,
-            preferences.theme,
-            preferences.compact_view,
-            preferences.show_weekends,
-            preferences.date_format,
-            preferences.time_format,
-            userId,
-        ]
+        `
+        UPDATE user_preferences
+        SET ${updates.join(", ")},
+            updated_at = NOW()
+        WHERE user_id = ?
+        `,
+        values
     );
 
     return getUserPreferences(userId);
