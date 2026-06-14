@@ -7,7 +7,6 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import HolidayBookedView from "@/app/planner/holidays/components/HolidayBookedView";
 import { ExportButton } from "@/app/planner/export";
-import MonthSwitcher from "@/app/planner/calendar/components/MonthSwitcher";
 import {useUserPreferences} from "@/app/planner/hooks/useUserPreferences";
 import {useMonthNavigation} from "@/app/planner/context/MonthNavigationContext";
 
@@ -454,9 +453,7 @@ export default function PlannerShell({
     }
 
     return (
-        <div className="min-h-screen bg-slate-100 dark:bg-slate-950">
-
-            <main className="w-full px-6 py-8">
+        <div className="w-full">
                 <div className="flex gap-6 items-start">
                     {/* LEFT SIDEBAR CARDS */}
                     <aside className="hidden lg:block w-80 shrink-0">
@@ -763,7 +760,6 @@ export default function PlannerShell({
                         </div>
                     </div>
                 </div>
-            </main>
         </div>
     );
 }
