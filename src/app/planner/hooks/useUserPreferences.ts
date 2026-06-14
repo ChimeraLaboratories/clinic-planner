@@ -40,9 +40,9 @@ export function useUserPreferences() {
 
                 setPreferences({
                     ...defaultPreferences,
-                    ...data,
-                    compact_view: Boolean(data.compact_view),
-                    show_weekends: Boolean(data.show_weekends),
+                    ...data.preferences,
+                    compact_view: Boolean(data.preferences.compact_view),
+                    show_weekends: Boolean(data.preferences.show_weekends),
                 });
             } catch {
                 setPreferences(defaultPreferences);
