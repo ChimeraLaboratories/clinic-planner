@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import type { PlannerResponse } from "../types/planner";
+import type { PlannerResponse } from "../../types/planner";
 
 type HolidayRow = {
     id: number | string;

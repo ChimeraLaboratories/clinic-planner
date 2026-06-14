@@ -15,6 +15,7 @@ export type AuthUser = {
     role: UserRole;
     job_role: string | null;
     is_active: number;
+    profile_image_url?: string | null;
 };
 
 type SessionPayload = {
@@ -126,5 +127,6 @@ export function toPublicUser(user: AuthUser) {
         full_name: user.full_name,
         role: user.role,
         job_role: user.job_role,
+        profile_image_url: user.profile_image_url ?? null,
     };
 }

@@ -1,14 +1,15 @@
 "use client";
 
-import type { PlannerResponse } from "../types/planner";
-import PlannerTopBar from "./PlannerTopBar";
-import ViewTabs, { type PlannerTab } from "./ViewTabs";
-import MonthGrid from "./MonthGrid";
+import type { PlannerResponse } from "../../types/planner";
+import ViewTabs, { type PlannerTab } from "../../calendar/components/ViewTabs";
+import MonthGrid from "../../calendar/components/MonthGrid";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import HolidayBookedView from "@/app/planner/components/HolidayBookedView";
+import HolidayBookedView from "@/app/planner/holidays/components/HolidayBookedView";
 import { ExportButton } from "@/app/planner/export";
-import MonthSwitcher from "@/app/planner/components/MonthSwitcher";
+import MonthSwitcher from "@/app/planner/calendar/components/MonthSwitcher";
+import {useUserPreferences} from "@/app/planner/hooks/useUserPreferences";
+import {useMonthNavigation} from "@/app/planner/context/MonthNavigationContext";
 
 function normalizeYmd(input: any): string | null {
     if (!input) return null;
@@ -133,10 +134,52 @@ export default function PlannerShell({
 }) {
     const router = useRouter();
     const [activeTab, setActiveTab] = useState<PlannerTab>("month");
+    const { preferences, loading: preferencesLoading } = useUserPreferences();
+
+    const {
+        anchorMonth: sharedAnchorMonth,
+        setAnchorMonth,
+        setShowMonthSwitcher,
+        setOnPrevMonth,
+        setOnNextMonth,
+        setOnCurrentMonth,
+    } = useMonthNavigation();
 
     useEffect(() => {
+        setShowMonthSwitcher(true);
+        setAnchorMonth(anchorMonth);
+        setOnPrevMonth(() => onPrevMonth);
+        setOnNextMonth(() => onNextMonth);
+        setOnCurrentMonth(() => handleCurrentMonth);
+
+        return () => {
+            setShowMonthSwitcher(false);
+            setAnchorMonth(null);
+            setOnPrevMonth(null);
+            setOnNextMonth(null);
+            setOnCurrentMonth(null);
+        }
+    }, [anchorMonth,
+        onPrevMonth,
+        onNextMonth,
+        setAnchorMonth,
+        setShowMonthSwitcher,
+        setOnPrevMonth,
+        setOnNextMonth,
+        setOnCurrentMonth,
+    ]);
+
+    useEffect(() => {
+        if (preferencesLoading) return;
+
+        const savedView = preferences.default_calendar_view;
+
+        if (savedView === "month") {
+            setActiveTab(savedView);
+            return;
+        }
         setActiveTab("month");
-    }, [anchorMonth]);
+    }, [preferencesLoading, preferences.default_calendar_view]);
 
     const ooClinicianId = useMemo(() => {
         const list = (data?.clinicians ?? []) as any[];
@@ -412,12 +455,6 @@ export default function PlannerShell({
 
     return (
         <div className="min-h-screen bg-slate-100 dark:bg-slate-950">
-            <MonthSwitcher
-                anchorMonth={anchorMonth}
-                onPrevMonth={onPrevMonth}
-                onNextMonth={onNextMonth}
-                onCurrentMonth={handleCurrentMonth}
-            />
 
             <main className="w-full px-6 py-8">
                 <div className="flex gap-6 items-start">

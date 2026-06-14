@@ -2,8 +2,10 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import SuccessToast from "./SuccessToast";
+import SuccessToast from "../../feedback/components/SuccessToast";
 import ErrorModal from "./ErrorModal";
+import {formatUserDate} from "@/app/planner/utils/userFormat";
+import {useUserPreferences} from "@/app/planner/hooks/useUserPreferences";
 
 type ClinicianLite = {
     id: number;
@@ -55,8 +57,39 @@ export default function AddHolidayModal({
     const [pickerOpen, setPickerOpen] = useState(false);
     const pickerRef = useRef<HTMLDivElement | null>(null);
 
+    // Loading Clinicians names state
+    const [loadedClinicians, setLoadedClinicians] = useState<ClinicianLite[]>([]);
+
+    const { preferences } = useUserPreferences();
+
+    useEffect(() => {
+        if (!open) return;
+        if (clinicians && clinicians.length > 0) return;
+
+        async function loadClinicians() {
+            try {
+                const res = await fetch ("/planner/api/clinicians");
+                const text = await res.text();
+
+                if (!res.ok) {
+                    setLoadedClinicians([]);
+                    return;
+                }
+
+                const data = JSON.parse(text);
+
+                setLoadedClinicians(Array.isArray(data) ? data : data.clinicians ?? []);
+            } catch (e) {
+                console.error("Failed to load clinicians:", e);
+                setLoadedClinicians([]);
+            }
+        }
+        loadClinicians();
+    }, [open, clinicians]);
+
     const clinicianOptions = useMemo(() => {
-        const list = (clinicians ?? []).map((c) => {
+        const sourceClinicians = clinicians && clinicians.length > 0 ? clinicians : loadedClinicians;
+        const list = sourceClinicians.map((c) => {
             const full = String(c.full_name ?? "").trim();
             const display = String(c.display_name ?? "").trim();
 
@@ -70,7 +103,7 @@ export default function AddHolidayModal({
         });
 
         return list.sort((a, b) => a.label.localeCompare(b.label));
-    }, [clinicians]);
+    }, [clinicians, loadedClinicians]);
 
     const filteredClinicians = useMemo(() => {
         const q = clinicianQuery.trim().toLowerCase();
@@ -173,17 +206,13 @@ export default function AddHolidayModal({
                 } catch {
                     if (text) msg = text;
                 }
-                throw new Error(msg);
+                new Error(msg);
             }
 
             await refreshAfterWrite();
 
             const who = clinicianOptions.find((c) => c.id === clinicianId)?.label ?? "Clinician";
-            const niceDate = new Date(holidayDate).toLocaleDateString("en-GB", {
-                day: "2-digit",
-                month: "short",
-                year: "numeric",
-            });
+            const niceDate = formatUserDate(holidayDate, preferences.date_format);
 
             setSuccessMsg(`Holiday recorded for ${who} (${niceDate}).`);
             setSuccessOpen(true);
@@ -228,17 +257,13 @@ export default function AddHolidayModal({
                 } catch {
                     if (text) msg = text;
                 }
-                throw new Error(msg);
+                new Error(msg);
             }
 
             await refreshAfterWrite();
 
             const who = clinicianOptions.find((c) => c.id === clinicianId)?.label ?? "Clinician";
-            const niceDate = new Date(holidayDate).toLocaleDateString("en-GB", {
-                day: "2-digit",
-                month: "short",
-                year: "numeric",
-            });
+            const niceDate = formatUserDate(holidayDate, preferences.date_format);
 
             setSuccessMsg(`Holiday removed for ${who} (${niceDate}).`);
             setSuccessOpen(true);

@@ -2,11 +2,17 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import AddHolidayModal from "./AddHolidayModal";
+import AddHolidayModal from "../../modals/components/AddHolidayModal";
+import {formatUserTime} from "@/app/planner/utils/userFormat";
+import {useUserPreferences} from "@/app/planner/hooks/useUserPreferences";
+import {usePlannerUser} from "@/app/planner/context/UserContext";
+import {getUserInitials} from "@/app/planner/utils/userInitials";
+import MonthSwitcher from "@/app/planner/calendar/components/MonthSwitcher";
+import {useMonthNavigation} from "@/app/planner/context/MonthNavigationContext";
 
-function formatLastSynced(d: Date | null | undefined) {
+function formatLastSynced(d: Date | null | undefined, timeFormat: string) {
     if (!d) return "";
-    return d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+    return formatUserTime(d, timeFormat);
 }
 
 type ClinicianLite = {
@@ -76,9 +82,10 @@ function SyncBadge({
     const isSyncing = state === "syncing";
     const isError = state === "error";
     const isSynced = state === "synced" || state === "idle";
+    const { preferences } = useUserPreferences();
 
     const label = isSyncing ? "Syncing…" : isError ? "Sync failed" : "Synced";
-    const time = !isSyncing && !isError ? formatLastSynced(lastSyncedAt ?? null) : "";
+    const time = !isSyncing && !isError ? formatLastSynced(lastSyncedAt ?? null, preferences.time_format) : "";
 
     return (
         <div
@@ -145,12 +152,22 @@ export default function PlannerTopBar({
     const [tipShift, setTipShift] = useState(0);
 
     //User States
-    const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
+    const [, setCurrentUser] = useState<CurrentUser | null>(null);
     const [loggingOut, setLoggingOut] = useState(false);
+    const { user, setUser } = usePlannerUser();
 
     //Admin Menu States
     const [adminOpen, setAdminOpen] = useState(false);
     const adminRef = useRef<HTMLDivElement | null>(null);
+
+    const {
+        anchorMonth,
+        setAnchorMonth,
+        showMonthSwitcher,
+        onPrevMonth,
+        onNextMonth,
+        onCurrentMonth,
+    } = useMonthNavigation();
 
     useEffect(() => {
         setRuntimeEnv(env);
@@ -168,7 +185,11 @@ export default function PlannerTopBar({
                 }
 
                 const json = await res.json();
-                if (!cancelled) setCurrentUser(json?.user ?? null);
+                if (!cancelled) {
+                    const loadedUser = json?.user ?? null;
+                    setCurrentUser(loadedUser);
+                    setUser(loadedUser);
+                }
             } catch {
                 if (!cancelled) setCurrentUser(null);
             }
@@ -271,6 +292,8 @@ export default function PlannerTopBar({
     };
 
     const envToShow = runtimeEnv;
+
+    const shouldShowMonthSwitcher = showMonthSwitcher && anchorMonth && onPrevMonth && onNextMonth && onCurrentMonth;
 
     return (
         <header className="sticky top-0 z-40 w-full border-b border-slate-200 bg-white/90 backdrop-blur dark:border-slate-800 dark:bg-slate-950/80">
@@ -402,6 +425,21 @@ export default function PlannerTopBar({
                     </div>
                 </div>
 
+                { showMonthSwitcher &&
+                    anchorMonth &&
+                    onPrevMonth &&
+                    onNextMonth &&
+                    onCurrentMonth && (
+                        <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
+                        <MonthSwitcher
+                            anchorMonth={anchorMonth}
+                            onPrevMonth={onPrevMonth}
+                            onNextMonth={onNextMonth}
+                            onCurrentMonth={onCurrentMonth}
+                        />
+                    </div>
+                )}
+
                 {/* RIGHT — force this column to take space and align to the far right */}
                 <div className="flex flex-1 basis-0 items-center justify-end gap-3">
                     <button
@@ -414,7 +452,7 @@ export default function PlannerTopBar({
                         <span className="text-base leading-none">{isDark ? "☀" : "🌙"}</span>
                     </button>
 
-                    {currentUser?.role === "ADMIN" && (
+                    {user?.role === "ADMIN" && (
                         <div className="relative" ref={adminRef}>
                             <button
                                 type="button"
@@ -504,18 +542,23 @@ export default function PlannerTopBar({
                             className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
                         >
     <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-blue-600 text-xs font-semibold text-white">
-        {(currentUser?.full_name || currentUser?.email || "U")
-            .trim()
-            .slice(0, 2)
-            .toUpperCase()}
+        {user?.profile_image_url ? (
+            <img
+                src={user.profile_image_url}
+                alt="Profile"
+                className="h-full w-full object-cover"
+                />
+        ) : (
+            getUserInitials(user?.full_name, user?.email)
+        )}
     </span>
 
                             <span className="text-left leading-tight">
         <span className="block">
-            {currentUser?.full_name || currentUser?.email || "User"}
+            {user?.full_name || user?.email || "User"}
         </span>
         <span className="block text-xs text-slate-500 dark:text-slate-400">
-    {[currentUser?.job_role, currentUser?.role].filter(Boolean).join(" · ")}
+    {[user?.job_role, user?.role].filter(Boolean).join(" · ")}
         </span>
     </span>
                         </button>
@@ -524,29 +567,46 @@ export default function PlannerTopBar({
                             <div className="absolute right-0 top-full z-50 mt-2 w-56 rounded-xl border border-slate-200 bg-white p-2 shadow-lg dark:border-slate-800 dark:bg-slate-900">
                                 <div className="rounded-lg px-3 py-2">
                                     <div className="text-sm font-medium text-slate-900 dark:text-slate-100">
-                                        {currentUser?.full_name || "Signed in"}
+                                        {user?.full_name || "Signed in"}
                                     </div>
                                     <div className="text-xs text-slate-500 dark:text-slate-400">
-                                        {currentUser?.email || ""}
+                                        {user?.email || ""}
                                     </div>
                                 </div>
 
                                 <div className="my-2 h-px bg-slate-200 dark:bg-slate-800" />
 
+{/*                                <Link
+                                    href="/planner/settings/preferences"
+                                    onClick={() => setMenuOpen(false)}
+                                    className="block w-full rounded-lg px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800"
+                                >
+                                    Preferences
+                                </Link>*/}
+
                                 <Link
-                                    href="/settings"
+                                    href="/planner/settings"
                                     onClick={() => setMenuOpen(false)}
                                     className="block w-full rounded-lg px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800"
                                 >
                                     Settings
                                 </Link>
 
-                                <button
-                                    type="button"
+                                <Link
+                                    href="/planner/settings/security"
+                                    onClick={() => setMenuOpen(false)}
                                     className="block w-full rounded-lg px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800"
                                 >
-                                    Account
-                                </button>
+                                    Change Password
+                                </Link>
+
+{/*                                <Link
+                                    href="/planner/settings/security"
+                                    onClick={() => setMenuOpen(false)}
+                                    className="block w-full rounded-lg px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800"
+                                >
+                                    Security
+                                </Link>*/}
 
                                 <div className="my-2 h-px bg-slate-200 dark:bg-slate-800" />
 

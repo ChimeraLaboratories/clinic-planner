@@ -1,6 +1,6 @@
 "use client";
 
-import type { Session } from "../types/planner";
+import type { Session } from "../../types/planner";
 
 function sumValue(sessions: any[], code: "ST" | "CL") {
     let total = 0;

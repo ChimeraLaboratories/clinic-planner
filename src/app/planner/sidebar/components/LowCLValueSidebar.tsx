@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
-import type { PlannerResponse } from "../types/planner";
+import type { PlannerResponse } from "../../types/planner";
 
 export default function LowCLValueSidebar({
                                               data,
