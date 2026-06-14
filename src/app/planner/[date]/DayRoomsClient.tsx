@@ -6,10 +6,10 @@ import { useRouter } from "next/navigation";
 import { DayRoom } from "@/app/planner/[date]/types";
 import CreateSessionModal from "@/app/planner/modals/components/CreateSessionModal";
 import { usePresence, type PresenceUser } from "@/app/planner/hooks/usePresence";
+import { useDayNavigation } from "@/app/planner/context/DayNavigationContext";
 
 type Slot = "AM" | "PM" | "FULL";
 
-// ✅ Safer: extracts YYYY-MM-DD from ANY string without timezone shifting
 function extractYmd(input: any): string | null {
     if (!input) return null;
 
@@ -36,14 +36,11 @@ function ymdLocal(d: Date) {
     return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
 }
 
-// ✅ computes a from/to range covering the month of the given YYYY-MM-DD
 function monthRangeFromYmd(dateYmd: string): { from: string; to: string } {
     const yyyy = Number(dateYmd.slice(0, 4));
-    const mm = Number(dateYmd.slice(5, 7)); // 1..12
+    const mm = Number(dateYmd.slice(5, 7));
 
     const from = `${yyyy}-${pad2(mm)}-01`;
-
-    // last day of month: day 0 of next month
     const last = new Date(yyyy, mm, 0);
     const to = ymdLocal(last);
 
@@ -67,7 +64,7 @@ export default function DayRoomsClient({
                                            clinicians,
                                        }: {
     initialRooms: DayRoom[];
-    date: string; // YYYY-MM-DD (from route param)
+    date: string;
     clinicians: {
         id: number;
         full_name?: string | null;
@@ -78,9 +75,18 @@ export default function DayRoomsClient({
         is_active?: number;
     }[];
 }) {
+    const router = useRouter();
+
+    const {
+        setSelectedDate,
+        setShowDaySwitcher,
+        setOnPrevDay,
+        setOnNextDay,
+        setOnToday,
+    } = useDayNavigation();
+
     const [rooms, setRooms] = useState<DayRoom[]>(initialRooms);
     const [deleting, setDeleting] = useState<number | null>(null);
-    const router = useRouter();
 
     const [createOpen, setCreateOpen] = useState(false);
     const [createDefaults, setCreateDefaults] = useState<{
@@ -89,30 +95,89 @@ export default function DayRoomsClient({
         slot: Slot;
     } | null>(null);
 
+    const [currentUserId, setCurrentUserId] = useState<number | null>(null);
+
+    const [addingSupervisor, setAddingSupervisor] = useState(false);
+    const [supervisorId, setSupervisorId] = useState<number | "">("");
+
+    const [supervisorInStoreForDay, setSupervisorInStoreForDay] = useState<string>("");
+    const [loadingSupervisorInStore, setLoadingSupervisorInStore] = useState(false);
+
     const editingRoomId = createOpen ? createDefaults?.room_id ?? null : null;
+
     const { users: presenceUsers } = usePresence({
         activity: editingRoomId ? "editing" : "viewing",
         activeRoomId: editingRoomId,
     });
 
-    const [currentUserId, setCurrentUserId] = useState<number | null>(null);
+    function navigateDay(offset: number) {
+        const current = new Date(`${date}T12:00:00`);
+
+        current.setDate(current.getDate() + offset);
+
+        const yyyy = current.getFullYear();
+        const mm = String(current.getMonth() + 1).padStart(2, "0");
+        const dd = String(current.getDate()).padStart(2, "0");
+
+        router.push(`/planner/${yyyy}-${mm}-${dd}`);
+    }
+
+    function goToToday() {
+        const today = new Date();
+
+        const yyyy = today.getFullYear();
+        const mm = String(today.getMonth() + 1).padStart(2, "0");
+        const dd = String(today.getDate()).padStart(2, "0");
+
+        router.push(`/planner/${yyyy}-${mm}-${dd}`);
+    }
+
+    useEffect(() => {
+        const selectedDate = new Date(`${date}T12:00:00`);
+
+        setShowDaySwitcher(true);
+        setSelectedDate(selectedDate);
+
+        setOnPrevDay(() => () => navigateDay(-1));
+        setOnNextDay(() => () => navigateDay(1));
+        setOnToday(() => goToToday);
+
+        return () => {
+            setShowDaySwitcher(false);
+            setSelectedDate(null);
+            setOnPrevDay(null);
+            setOnNextDay(null);
+            setOnToday(null);
+        };
+    }, [
+        date,
+        setSelectedDate,
+        setShowDaySwitcher,
+        setOnPrevDay,
+        setOnNextDay,
+        setOnToday,
+    ]);
 
     useEffect(() => {
         let cancelled = false;
 
-        (async () => {
+        async function loadCurrentUser() {
             try {
                 const res = await fetch("/planner/api/me", { cache: "no-store" });
                 if (!res.ok) return;
+
                 const json = await res.json();
                 const id = Number(json?.user?.id ?? null);
+
                 if (!cancelled && Number.isFinite(id) && id > 0) {
                     setCurrentUserId(id);
                 }
             } catch {
                 // ignore
             }
-        })();
+        }
+
+        loadCurrentUser();
 
         return () => {
             cancelled = true;
@@ -129,11 +194,9 @@ export default function DayRoomsClient({
             room_id: roomId,
             slot,
         });
+
         setCreateOpen(true);
     }
-
-    const [addingSupervisor, setAddingSupervisor] = useState(false);
-    const [supervisorId, setSupervisorId] = useState<number | "">("");
 
     const supervisorOptions = clinicians.filter(
         (c) =>
@@ -142,17 +205,12 @@ export default function DayRoomsClient({
             Number(c.is_supervisor) === 1
     );
 
-    // ✅ store supervisor-in-store selection for this date (API returns string)
-    const [supervisorInStoreForDay, setSupervisorInStoreForDay] = useState<string>("");
-    const [loadingSupervisorInStore, setLoadingSupervisorInStore] = useState(false);
-
     async function fetchSupervisorInStoreForDay() {
         try {
             setLoadingSupervisorInStore(true);
 
             const { from, to } = monthRangeFromYmd(date);
 
-            // ✅ your API needs from/to
             const res = await fetch(
                 `/planner/api/planner?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`,
                 { cache: "no-store" }
@@ -165,16 +223,18 @@ export default function DayRoomsClient({
             }
 
             const data = await res.json().catch(() => null);
-            const rows = Array.isArray(data?.supervisionByDate) ? data.supervisionByDate : [];
+            const rows = Array.isArray(data?.supervisionByDate)
+                ? data.supervisionByDate
+                : [];
 
             const row = rows.find((r: any) => {
                 const ymdA = extractYmd(r?.date);
                 const ymdB = extractYmd(r?.in_store_date);
                 const ymdC = extractYmd(r?.inStoreDate);
+
                 return ymdA === date || ymdB === date || ymdC === date;
             });
 
-            // ✅ API returns supervisorsInStore as string e.g. "Chintu"
             const sis = String(row?.supervisorsInStore ?? "").trim();
             setSupervisorInStoreForDay(sis);
         } finally {
@@ -182,7 +242,6 @@ export default function DayRoomsClient({
         }
     }
 
-    // ✅ load on mount + whenever date changes
     useEffect(() => {
         fetchSupervisorInStoreForDay();
         // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -214,30 +273,11 @@ export default function DayRoomsClient({
 
             setSupervisorId("");
 
-            // ✅ refresh local banner immediately (and keep your router.refresh)
             await fetchSupervisorInStoreForDay();
             router.refresh();
         } finally {
             setAddingSupervisor(false);
         }
-    }
-
-    async function deleteSession(sessionId: number) {
-        setDeleting(sessionId);
-
-        const res = await fetch(`/planner/api/sessions/${sessionId}`, {
-            method: "DELETE",
-        });
-
-        setDeleting(null);
-
-        if (!res.ok) {
-            const msg = await res.json().catch(() => null);
-            alert(msg?.error ?? "Failed to delete session.");
-            return;
-        }
-
-        router.refresh();
     }
 
     async function deleteRoomSessions(sessionIds: number[]) {
@@ -257,6 +297,7 @@ export default function DayRoomsClient({
         setDeleting(null);
 
         const failed = results.filter((x) => !x.ok);
+
         if (failed.length) {
             alert(`Failed to delete ${failed.length} session(s).`);
             return;
@@ -292,33 +333,34 @@ export default function DayRoomsClient({
 
     return (
         <>
-            <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                    <div className="text-sm text-gray-500 dark:text-slate-400">Date</div>
-                    <div className="text-lg font-semibold text-gray-900 dark:text-slate-100">{date}</div>
-
-                    {/* banner showing selected supervisor in store */}
+            {(loadingSupervisorInStore || supervisorInStoreLabel) && (
+                <div className="mb-4">
                     {loadingSupervisorInStore ? (
-                        <div className="mt-2 text-sm text-gray-400 dark:text-slate-500">
+                        <div className="text-sm text-gray-400 dark:text-slate-500">
                             Loading supervisor in store…
                         </div>
-                    ) : supervisorInStoreLabel ? (
-                        <div className="mt-2 inline-flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-900 shadow-sm dark:border-blue-900/60 dark:bg-blue-950/30 dark:text-blue-100 dark:shadow-none">
+                    ) : (
+                        <div className="inline-flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-900 shadow-sm dark:border-blue-900/60 dark:bg-blue-950/30 dark:text-blue-100 dark:shadow-none">
                             <span className="text-xs font-semibold uppercase tracking-wide text-blue-700 dark:text-blue-300">
                                 Supervisor in store
                             </span>
                             <span className="font-medium">{supervisorInStoreLabel}</span>
                         </div>
-                    ) : null}
+                    )}
                 </div>
+            )}
 
+            <div className="mb-4 flex justify-end">
                 <div className="flex items-center gap-2">
                     <select
-                        className="rounded-lg border border-gray-200 dark:border-slate-800 px-3 py-2 text-sm bg-white dark:bg-slate-900 text-gray-900 dark:text-slate-100 shadow-sm dark:shadow-none"
+                        className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100 dark:shadow-none"
                         value={supervisorId}
-                        onChange={(e) => setSupervisorId(e.target.value ? Number(e.target.value) : "")}
+                        onChange={(e) =>
+                            setSupervisorId(e.target.value ? Number(e.target.value) : "")
+                        }
                     >
                         <option value="">Supervisor in store (not testing)…</option>
+
                         {supervisorOptions.map((c) => (
                             <option key={c.id} value={c.id}>
                                 {c.full_name}
@@ -328,8 +370,12 @@ export default function DayRoomsClient({
 
                     <button
                         onClick={addSupervisorInStore}
-                        disabled={addingSupervisor || supervisorId === "" || supervisorOptions.length === 0}
-                        className="rounded-lg border border-gray-200 dark:border-slate-800 px-4 py-2 text-sm font-medium shadow-sm dark:shadow-none text-gray-900 dark:text-slate-100 hover:bg-gray-50 dark:hover:bg-slate-900 disabled:opacity-50"
+                        disabled={
+                            addingSupervisor ||
+                            supervisorId === "" ||
+                            supervisorOptions.length === 0
+                        }
+                        className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-900 shadow-sm hover:bg-gray-50 disabled:opacity-50 dark:border-slate-800 dark:text-slate-100 dark:shadow-none dark:hover:bg-slate-900"
                         title="Marks the selected supervisor as present in store for this date"
                     >
                         {addingSupervisor ? "Adding…" : "Add"}
@@ -337,7 +383,7 @@ export default function DayRoomsClient({
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 items-start">
+            <div className="grid grid-cols-1 items-start gap-6 sm:grid-cols-2 lg:grid-cols-4">
                 {rooms.map((room) => {
                     const hasSessions = room.sessions.length > 0;
 
@@ -372,20 +418,25 @@ export default function DayRoomsClient({
                             }`}
                         >
                             <div className="flex items-center justify-between whitespace-nowrap">
-                                <h3 className="font-semibold text-gray-900 dark:text-slate-100">{room.name}</h3>
+                                <h3 className="font-semibold text-gray-900 dark:text-slate-100">
+                                    {room.name}
+                                </h3>
 
                                 <div className="flex items-center gap-2">
                                     {!hasSessions ? (
                                         <button
                                             onClick={() => {
                                                 if (isLockedByOtherUser) {
-                                                    alert("This room is currently being edited by another user.");
+                                                    alert(
+                                                        "This room is currently being edited by another user."
+                                                    );
                                                     return;
                                                 }
+
                                                 openCreateForRoom(room.id);
                                             }}
                                             disabled={isLockedByOtherUser}
-                                            className="text-xs px-2 py-1 rounded border border-blue-200 dark:border-blue-900/60 hover:bg-blue-50 dark:hover:bg-blue-950/30 text-blue-600 dark:text-blue-300 disabled:opacity-50"
+                                            className="rounded border border-blue-200 px-2 py-1 text-xs text-blue-600 hover:bg-blue-50 disabled:opacity-50 dark:border-blue-900/60 dark:text-blue-300 dark:hover:bg-blue-950/30"
                                         >
                                             + Add
                                         </button>
@@ -393,13 +444,16 @@ export default function DayRoomsClient({
                                         <button
                                             onClick={() => {
                                                 if (isLockedByOtherUser) {
-                                                    alert("This room is currently being edited by another user.");
+                                                    alert(
+                                                        "This room is currently being edited by another user."
+                                                    );
                                                     return;
                                                 }
+
                                                 deleteRoomSessions(room.sessions.map((s) => s.id));
                                             }}
                                             disabled={deleting !== null || isLockedByOtherUser}
-                                            className="text-xs px-2 py-1 rounded border border-gray-200 dark:border-slate-800 hover:bg-gray-50 dark:hover:bg-slate-800 disabled:opacity-50 text-gray-900 dark:text-slate-100"
+                                            className="rounded border border-gray-200 px-2 py-1 text-xs text-gray-900 hover:bg-gray-50 disabled:opacity-50 dark:border-slate-800 dark:text-slate-100 dark:hover:bg-slate-800"
                                             title="Delete session(s) in this room"
                                         >
                                             {deleting !== null ? "Deleting…" : "Delete"}
@@ -407,7 +461,7 @@ export default function DayRoomsClient({
                                     )}
 
                                     <span
-                                        className={`inline-flex items-center justify-center text-center leading-tight text-xs font-medium px-3 py-1 rounded-full whitespace-nowrap ${
+                                        className={`inline-flex items-center justify-center whitespace-nowrap rounded-full px-3 py-1 text-center text-xs font-medium leading-tight ${
                                             isLockedByOtherUser
                                                 ? "bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-200"
                                                 : needsSupervisorWarning
@@ -449,13 +503,19 @@ export default function DayRoomsClient({
                                 {hasSessions ? (
                                     <div className="space-y-1">
                                         {clinicianNames.length > 0 ? (
-                                            clinicianNames.map((name) => <div key={name}>• {name}</div>)
+                                            clinicianNames.map((name) => (
+                                                <div key={name}>• {name}</div>
+                                            ))
                                         ) : (
-                                            <div className="text-gray-400 dark:text-slate-500">• Unassigned</div>
+                                            <div className="text-gray-400 dark:text-slate-500">
+                                                • Unassigned
+                                            </div>
                                         )}
                                     </div>
                                 ) : (
-                                    <div className="text-gray-400 dark:text-slate-500">No Clinic today</div>
+                                    <div className="text-gray-400 dark:text-slate-500">
+                                        No Clinic today
+                                    </div>
                                 )}
                             </div>
                         </div>
@@ -465,7 +525,10 @@ export default function DayRoomsClient({
 
             {createOpen && createDefaults && (
                 <CreateSessionModal
-                    rooms={rooms.map((r) => ({ id: Number(r.id), name: String(r.name) }))}
+                    rooms={rooms.map((r) => ({
+                        id: Number(r.id),
+                        name: String(r.name),
+                    }))}
                     clinicians={clinicians}
                     defaults={createDefaults}
                     onClose={() => {

@@ -1,3 +1,5 @@
+import {ChevronLeft, ChevronRight} from "lucide-react";
+
 export default function MonthSwitcher({
                                           anchorMonth,
                                           onPrevMonth,
@@ -22,7 +24,7 @@ export default function MonthSwitcher({
                 onClick={onPrevMonth}
                 className="inline-flex h-12 w-12 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 shadow-sm hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
             >
-                ‹
+                <ChevronLeft className="h-4 w-4"/>
             </button>
 
             <div className="inline-flex h-12 min-w-[128px] items-center justify-center rounded-xl border border-slate-200 bg-white px-6 text-base font-semibold text-slate-800 shadow-sm dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100">
@@ -37,7 +39,7 @@ export default function MonthSwitcher({
                 onClick={onNextMonth}
                 className="inline-flex h-12 w-12 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 shadow-sm hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
             >
-                ›
+                <ChevronRight className="h-4 w-4"/>
             </button>
 
             <button
