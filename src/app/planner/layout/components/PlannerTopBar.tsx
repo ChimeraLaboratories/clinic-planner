@@ -585,11 +585,11 @@ export default function PlannerTopBar({
                                 </Link>*/}
 
                                 <Link
-                                    href="/planner/settings/profile"
+                                    href="/planner/settings"
                                     onClick={() => setMenuOpen(false)}
                                     className="block w-full rounded-lg px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800"
                                 >
-                                    Profile
+                                    Settings
                                 </Link>
 
                                 <Link
@@ -597,8 +597,16 @@ export default function PlannerTopBar({
                                     onClick={() => setMenuOpen(false)}
                                     className="block w-full rounded-lg px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800"
                                 >
-                                    Security
+                                    Change Password
                                 </Link>
+
+{/*                                <Link
+                                    href="/planner/settings/security"
+                                    onClick={() => setMenuOpen(false)}
+                                    className="block w-full rounded-lg px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800"
+                                >
+                                    Security
+                                </Link>*/}
 
                                 <div className="my-2 h-px bg-slate-200 dark:bg-slate-800" />
 
