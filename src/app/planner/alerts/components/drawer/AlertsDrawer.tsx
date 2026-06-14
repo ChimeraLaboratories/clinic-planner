@@ -1,9 +1,9 @@
 "use client";
 
-import {PlannerAlert} from "@/app/planner/types/alert";
-import AlertsDrawerHeader from "@/app/planner/alerts/components/drawer/AlertsDrawerHeader";
-import AlertsDrawerFilters from "@/app/planner/alerts/components/drawer/AlertsDrawerFilter";
-import AlertsDrawerList from "@/app/planner/alerts/components/drawer/AlertsDrawerList";
+import type { PlannerAlert } from "@/app/planner/types/alert";
+import AlertsDrawerHeader from "./AlertsDrawerHeader";
+import AlertsDrawerFilters from "./AlertsDrawerFilters";
+import AlertsDrawerList from "./AlertsDrawerList";
 
 type AlertsDrawerProps = {
     open: boolean;
@@ -11,36 +11,23 @@ type AlertsDrawerProps = {
     alerts: PlannerAlert[];
 };
 
-export default function AlertsDrawer({
-                                         open,
-                                         onClose,
-                                         alerts,
-                                     }: AlertsDrawerProps) {
+export default function AlertsDrawer({ open, onClose, alerts }: AlertsDrawerProps) {
     if (!open) return null;
 
     return (
         <div className="fixed inset-0 z-50 flex justify-end bg-slate-950/35">
-            <aside className="flex h-full w-full max-w-[430px] flex-col border-l border-slate-200 bg-white shadow-2xl">
-                <AlertsDrawerHeader
-                    totalAlerts={alerts.length}
-                    onClose={onClose}
-                />
+            <aside className="flex h-screen w-full max-w-[430px] flex-col border-l border-slate-200 bg-white shadow-2xl">
+                <AlertsDrawerHeader totalAlerts={alerts.length} onClose={onClose} />
 
                 <AlertsDrawerFilters
                     allCount={alerts.length}
-                    warningCount={
-                        alerts.filter(
-                            (alert) =>
-                                alert.severity === "critical" ||
-                                alert.severity === "warning",
-                        ).length
-                    }
-                    infoCount={
-                        alerts.filter((alert) => alert.severity === "info").length
-                    }
+                    warningCount={alerts.filter((a) => a.severity === "critical" || a.severity === "warning").length}
+                    infoCount={alerts.filter((a) => a.severity === "info").length}
                 />
 
-                <AlertsDrawerList alerts={alerts} />
+                <div className="min-h-0 flex-1">
+                    <AlertsDrawerList alerts={alerts} />
+                </div>
             </aside>
         </div>
     );
