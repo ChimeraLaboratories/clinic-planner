@@ -9,6 +9,9 @@ import HolidayBookedView from "@/app/planner/holidays/components/HolidayBookedVi
 import { ExportButton } from "@/app/planner/export";
 import {useUserPreferences} from "@/app/planner/hooks/useUserPreferences";
 import {useMonthNavigation} from "@/app/planner/context/MonthNavigationContext";
+import AlertsSidebarCard from "@/app/planner/alerts/components/sidebar/AlertsSidebarCard";
+import AlertsDrawer from "@/app/planner/alerts/components/drawer/AlertsDrawer";
+import { mockAlerts } from "@/app/planner/alerts/data/mockAlerts";
 
 function normalizeYmd(input: any): string | null {
     if (!input) return null;
@@ -133,6 +136,7 @@ export default function PlannerShell({
 }) {
     const router = useRouter();
     const [activeTab, setActiveTab] = useState<PlannerTab>("month");
+    const [alertsDrawerOpen, setAlertsDrawerOpen] = useState(false);
     const { preferences, loading: preferencesLoading } = useUserPreferences();
 
     const {
@@ -451,13 +455,17 @@ export default function PlannerShell({
         const now = new Date();
         onSetMonth(new Date(now.getFullYear(), now.getMonth(), 1));
     }
-
+    
     return (
         <div className="w-full">
                 <div className="flex gap-6 items-start">
                     {/* LEFT SIDEBAR CARDS */}
                     <aside className="hidden lg:block w-80 shrink-0">
                         <div className="space-y-6">
+                            <AlertsSidebarCard
+                                totalAlerts={mockAlerts.length}
+                                onOpen={() => setAlertsDrawerOpen(true)}
+                            />
                             {/* NEEDS SUPERVISOR CARD */}
                             <div
                                 className={`rounded-2xl border shadow-sm dark:shadow-none p-6 transition-all ${
@@ -760,6 +768,12 @@ export default function PlannerShell({
                         </div>
                     </div>
                 </div>
+
+            <AlertsDrawer
+                open={alertsDrawerOpen}
+                onClose={() => setAlertsDrawerOpen(false)}
+                alerts={mockAlerts}
+            />
         </div>
     );
 }
