@@ -519,24 +519,11 @@ export default function PlannerShell({
                                     <div className="mt-5 space-y-3">
                                         {needsSupervisorDays.map((d) => (
                                             <button
-                                                key={d.date}
-                                                onClick={() => router.push(`/planner/${d.date}`)}
-                                                className="w-full text-left rounded-xl border border-red-200 dark:border-red-900/60 bg-white dark:bg-slate-900 px-4 py-3 hover:bg-red-50 dark:hover:bg-red-950/30 transition"
+                                                type="button"
+                                                onClick={() => setAlertsDrawerOpen(true)}
+                                                className="mt-5 inline-flex items-center rounded-xl border border-red-200 bg-white px-4 py-2 text-sm font-semibold text-red-700 transition hover:bg-red-50 dark:border-red-900/60 dark:bg-slate-900 dark:text-red-200 dark:hover:bg-red-950/30"
                                             >
-                                                <div className="flex items-center justify-between">
-                                                    <div className="min-w-0">
-                                                        <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-                                                            {d.date}
-                                                        </div>
-                                                        <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                                                            {d.preRegs}
-                                                        </div>
-                                                    </div>
-
-                                                    <div className="text-xs font-semibold text-red-700 bg-red-100 dark:text-red-200 dark:bg-red-950/40 rounded-full px-2 py-0.5">
-                                                        Attention
-                                                    </div>
-                                                </div>
+                                                View Days →
                                             </button>
                                         ))}
                                     </div>
@@ -605,38 +592,13 @@ export default function PlannerShell({
 
                                 {lowSTValueDays.length > 0 && (
                                     <div className="mt-5 space-y-3">
-                                        {lowSTValueDays.map((d) => (
-                                            <button
-                                                key={d.date}
-                                                onClick={() => router.push(`/planner/${d.date}`)}
-                                                className={`w-full text-left rounded-xl border bg-white dark:bg-slate-900 px-4 py-3 transition ${
-                                                    d.status === "critical"
-                                                        ? "border-red-200 dark:border-red-900/60 hover:bg-red-50 dark:hover:bg-red-950/30"
-                                                        : "border-orange-200 dark:border-orange-900/60 hover:bg-orange-50 dark:hover:bg-orange-950/25"
-                                                }`}
-                                            >
-                                                <div className="flex items-center justify-between">
-                                                    <div>
-                                                        <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-                                                            {d.date}
-                                                        </div>
-                                                        <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                                                            Total ST Value: {d.totalST.toFixed(2)}
-                                                        </div>
-                                                    </div>
-
-                                                    <div
-                                                        className={`text-xs font-semibold rounded-full px-2 py-0.5 ${
-                                                            d.status === "critical"
-                                                                ? "text-red-700 bg-red-100 dark:text-red-200 dark:bg-red-950/40"
-                                                                : "text-orange-800 bg-orange-100 dark:text-orange-200 dark:bg-orange-950/35"
-                                                        }`}
-                                                    >
-                                                        {d.status === "critical" ? "Attention" : "Warning"}
-                                                    </div>
-                                                </div>
-                                            </button>
-                                        ))}
+                                        <button
+                                            type="button"
+                                            onClick={() => setAlertsDrawerOpen(true)}
+                                            className="mt-5 inline-flex items-center rounded-xl border border-orange-200 bg-white px-4 py-2 text-sm font-semibold text-orange-700 transition hover:bg-orange-50 dark:border-orange-900/60 dark:bg-slate-900 dark:text-orange-200 dark:hover:bg-orange-950/25"
+                                        >
+                                            View Days →
+                                        </button>
                                     </div>
                                 )}
                             </div>
@@ -701,38 +663,13 @@ export default function PlannerShell({
 
                                 {lowCLValueDays.length > 0 && (
                                     <div className="mt-5 space-y-3">
-                                        {lowCLValueDays.map((d) => (
                                             <button
-                                                key={d.date}
-                                                onClick={() => router.push(`/planner/${d.date}`)}
-                                                className={`w-full text-left rounded-xl border bg-white dark:bg-slate-900 px-4 py-3 transition ${
-                                                    d.status === "critical"
-                                                        ? "border-red-200 dark:border-red-900/60 hover:bg-red-50 dark:hover:bg-red-950/30"
-                                                        : "border-orange-200 dark:border-orange-900/60 hover:bg-orange-50 dark:hover:bg-orange-950/25"
-                                                }`}
+                                                type="button"
+                                                onClick={() => setAlertsDrawerOpen(true)}
+                                                className="mt-5 inline-flex items-center rounded-xl border border-red-200 bg-white px-4 py-2 text-sm font-semibold text-red-700 transition hover:bg-red-50 dark:border-red-900/60 dark:bg-slate-900 dark:text-red-200 dark:hover:bg-red-950/30"
                                             >
-                                                <div className="flex items-center justify-between">
-                                                    <div>
-                                                        <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-                                                            {d.date}
-                                                        </div>
-                                                        <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                                                            Total CL Value: {d.totalCL.toFixed(2)}
-                                                        </div>
-                                                    </div>
-
-                                                    <div
-                                                        className={`text-xs font-semibold rounded-full px-2 py-0.5 ${
-                                                            d.status === "critical"
-                                                                ? "text-red-700 bg-red-100 dark:text-red-200 dark:bg-red-950/40"
-                                                                : "text-orange-800 bg-orange-100 dark:text-orange-200 dark:bg-orange-950/35"
-                                                        }`}
-                                                    >
-                                                        {d.status === "critical" ? "Attention" : "Warning"}
-                                                    </div>
-                                                </div>
+                                                View Days →
                                             </button>
-                                        ))}
                                     </div>
                                 )}
                             </div>
