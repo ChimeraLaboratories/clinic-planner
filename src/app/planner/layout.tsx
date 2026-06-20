@@ -1,6 +1,7 @@
 import PlannerTopBar from "@/app/planner/layout/components/PlannerTopBar";
 import { UserProvider } from "@/app/planner/context/UserContext";
 import {MonthNavigationProvider} from "@/app/planner/context/MonthNavigationContext";
+import {DayNavigationProvider} from "@/app/planner/context/DayNavigationContext";
 
 export default function PlannerLayout({
                                           children,
@@ -9,15 +10,17 @@ export default function PlannerLayout({
 }) {
     return (
         <UserProvider>
-            <MonthNavigationProvider>
-                <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
-                    <PlannerTopBar />
+            <DayNavigationProvider>
+                <MonthNavigationProvider>
+                    <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
+                        <PlannerTopBar />
 
-                    <main className="p-6">
-                        {children}
-                    </main>
-                </div>
-            </MonthNavigationProvider>
+                        <main className="p-6">
+                            {children}
+                        </main>
+                    </div>
+                </MonthNavigationProvider>
+            </DayNavigationProvider>
         </UserProvider>
     );
 }

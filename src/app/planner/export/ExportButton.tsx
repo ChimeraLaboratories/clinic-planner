@@ -1,6 +1,6 @@
 "use client";
 
-import {RotaExportRow} from "@/app/planner/export/types";
+import RotaExportRow from "@/app/planner/export/types";
 import {useState} from "react";
 import {exportRotaGridToExcel} from "@/app/planner/export/ExportRotaGridToExcel";
 
