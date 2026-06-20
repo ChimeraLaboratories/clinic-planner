@@ -1,3 +1,4 @@
 export { ExportButton } from "./ExportButton";
 export { exportRotaGridToExcel } from "./ExportRotaGridToExcel";
-export type { RotaExportRow, RotaExportOptions } from "./types";
+export type { RotaExportOptions } from "./types";
+export {default as RotaExportRow} from "./types"

@@ -42,3 +42,40 @@ export function getRmAvailableColour(value: number, max: number) {
 
     return ExcelColours.rmGreen;
 }
+
+type SessionType = "ST" | "CL";
+
+type ExportClinician = {
+    grade_code?: string | null;
+    is_supervisor?: boolean | number | null;
+};
+
+export function getRoomCellColour({
+                                      clinician,
+                                      sessionType,
+                                      hasPreRegOnDay,
+                                  }: {
+    clinician: ExportClinician | null;
+    sessionType: SessionType | null;
+    hasPreRegOnDay: boolean;
+}) {
+    if (!clinician || !sessionType) {
+        return ExcelColours.emptyBrown;
+    }
+
+    const isPreReg = clinician.grade_code === "Pre-Reg";
+    const isSupervisor = clinician.is_supervisor === true || clinician.is_supervisor === 1;
+
+    if (isPreReg && sessionType === "ST") return ExcelColours.stPreReg;
+    if (isPreReg && sessionType === "CL") return ExcelColours.clPreReg;
+
+    if (isSupervisor && hasPreRegOnDay && sessionType === "ST") {
+        return ExcelColours.stSupervisor;
+    }
+
+    if (isSupervisor && hasPreRegOnDay && sessionType === "CL") {
+        return ExcelColours.clSupervisor;
+    }
+
+    return ExcelColours.emptyBrown;
+}
