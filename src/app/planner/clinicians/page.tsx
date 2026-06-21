@@ -2,17 +2,7 @@ import Link from "next/link";
 import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import CliniciansTableClient from "./CliniciansTableClient";
-
-type Clinician = {
-    id: number;
-    full_name: string;
-    display_name: string;
-    role_code: number;
-    grade_code: number;
-    GOC_number: string | null;
-    is_supervisor: number;
-    is_active: number;
-};
+import type { Clinician } from "./types";
 
 export default async function CliniciansPage() {
     const h = await headers();
@@ -26,19 +16,12 @@ export default async function CliniciansPage() {
     let clinicians: Clinician[] = [];
 
     try {
-        const res = await fetch(
-            `${protocol}://${host}/planner/api/clinicians?includeInactive=1`,
-            {
-                headers: {
-                    cookie,
-                },
-                cache: "no-store",
-            }
-        );
+        const res = await fetch(`${protocol}://${host}/planner/api/clinicians?includeInactive=1`, {
+            headers: { cookie },
+            cache: "no-store",
+        });
 
-        if (!res.ok) {
-            throw new Error(`Clinicians API failed: ${res.status}`);
-        }
+        if (!res.ok) throw new Error(`Clinicians API failed: ${res.status}`);
 
         clinicians = await res.json();
     } catch (err) {
@@ -46,36 +29,45 @@ export default async function CliniciansPage() {
     }
 
     return (
-        <div className="min-h-screen bg-slate-50 p-8 text-slate-900 dark:bg-slate-950 dark:text-slate-50">
-            <div className="max-w-6xl mx-auto space-y-6">
-                <div className="flex items-center justify-between">
-                    <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-50">
+        <div className="space-y-8">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                <div>
+                    <p className="text-sm font-medium text-blue-600 dark:text-blue-300">
+                        Practice setup
+                    </p>
+                    <h1 className="mt-1 text-3xl font-bold tracking-tight text-slate-950 dark:text-white">
                         Clinician Management
                     </h1>
-
-                    <div className="flex items-center gap-3">
-                        <Link
-                            href="/planner"
-                            className="text-sm px-3 py-2 rounded border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
-                        >
-                            ← Back to Planner
-                        </Link>
-
-                        <Link
-                            href="/planner/clinicians/new"
-                            className="rounded bg-slate-900 px-3 py-2 text-white hover:bg-slate-800 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white"
-                        >
-                            + Add clinician
-                        </Link>
-                    </div>
+                    <p className="mt-2 max-w-2xl text-sm text-slate-500 dark:text-slate-400">
+                        Manage clinicians, grades, supervision status and clinic access.
+                    </p>
                 </div>
 
-                <CliniciansTableClient clinicians={clinicians} />
+                <div className="flex flex-wrap gap-3">
+                    <Link
+                        href="/planner"
+                        className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-200 dark:hover:bg-slate-900"
+                    >
+                        ← Back to Planner
+                    </Link>
 
-                <div className="text-xs text-slate-500 dark:text-slate-400">
-                    Tip: deactivate clinicians instead of deleting so historic sessions stay linked.
+                    <Link
+                        href="/planner/holidays/new"
+                        className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-200 dark:hover:bg-slate-900"
+                    >
+                        Add Holiday
+                    </Link>
+
+                    <Link
+                        href="/planner/clinicians/new"
+                        className="rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-700"
+                    >
+                        + Add Clinician
+                    </Link>
                 </div>
             </div>
+
+            <CliniciansTableClient clinicians={clinicians} />
         </div>
     );
 }
