@@ -1,6 +1,6 @@
-import DayRulesClient from "./DayRulesClient";
-import Link from "next/link";
+import { notFound } from "next/navigation";
 import { db } from "@/lib/db";
+import DayRulesClient from "./DayRulesClient";
 
 export default async function ClinicianDayRulesPage({
                                                         params,
@@ -8,46 +8,22 @@ export default async function ClinicianDayRulesPage({
     params: Promise<{ id: string }>;
 }) {
     const { id } = await params;
-
     const clinicianId = Number(id);
-    if (!Number.isFinite(clinicianId)) {
-        return (
-            <div className="p-6">
-                <div className="rounded-lg border border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-950 p-4 text-gray-900 dark:text-slate-100">
-                    Invalid clinician id.
-                </div>
-            </div>
-        );
-    }
+
+    if (!Number.isFinite(clinicianId)) return notFound();
 
     const [rows]: any = await db.query(
-        "SELECT full_name FROM clinicians WHERE id = ? LIMIT 1",
+        `
+    SELECT id, full_name, display_name, role_code, grade_code, is_supervisor, is_active
+    FROM clinicians
+    WHERE id = ?
+    LIMIT 1
+    `,
         [clinicianId]
     );
-    const clinicianName = rows?.[0]?.full_name ?? null;
 
-    return (
-        <div className="min-h-screen bg-gray-50 dark:bg-slate-950 p-6 space-y-4">
-            <div className="flex items-start justify-between">
-                <div>
-                    <div className="text-sm text-gray-500 dark:text-slate-400">Clinician</div>
-                    <h1 className="text-2xl font-bold text-gray-900 dark:text-slate-100">
-                        Day Rules{clinicianName ? ` - ${clinicianName}` : ""}
-                    </h1>
-                    <div className="text-sm text-gray-600 dark:text-slate-300">
-                        Clinician ID: {clinicianId}
-                    </div>
-                </div>
+    const clinician = rows?.[0];
+    if (!clinician) return notFound();
 
-                <Link
-                    href="/planner/clinicians"
-                    className="rounded-lg border border-gray-200 dark:border-slate-800 px-4 py-2 text-sm font-medium hover:bg-gray-50 dark:hover:bg-slate-900 transition shadow-sm text-gray-900 dark:text-slate-100"
-                >
-                    ← Back to Clinician Management
-                </Link>
-            </div>
-
-            <DayRulesClient clinicianId={clinicianId} />
-        </div>
-    );
+    return <DayRulesClient clinician={clinician} />;
 }

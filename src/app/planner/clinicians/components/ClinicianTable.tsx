@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import type { Clinician } from "../types";
 import ClinicianActionsMenu from "./ClinicianActionsMenu";
+import {getAvatarColour} from "@/lib/avatarColours";
 
 const roleLabel = (roleCode: number) => (roleCode === 1 ? "OO" : roleCode === 2 ? "CLO" : String(roleCode));
 const gradeLabel = (gradeCode: number) => (gradeCode === 1 ? "Registered" : gradeCode === 2 ? "Pre-Reg" : String(gradeCode));
@@ -14,23 +15,6 @@ function initials(name: string) {
         .join("")
         .slice(0, 2)
         .toUpperCase();
-}
-
-function getAvatarColour(name: string) {
-    const colours = [
-        "bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-200",
-        "bg-purple-50 text-purple-700 dark:bg-purple-950/40 dark:text-purple-200",
-        "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-200",
-        "bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-200",
-        "bg-pink-50 text-pink-700 dark:bg-pink-950/40 dark:text-pink-200",
-        "bg-cyan-50 text-cyan-700 dark:bg-cyan-950/40 dark:text-cyan-200",
-        "bg-indigo-50 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-200",
-        "bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-200",
-    ];
-
-    const hash = name.split("").reduce((acc, char) => acc + char.charCodeAt(0),0);
-
-    return colours[hash % colours.length];
 }
 
 export default function ClinicianTable({ clinicians }: { clinicians: Clinician[] }) {
@@ -61,7 +45,7 @@ export default function ClinicianTable({ clinicians }: { clinicians: Clinician[]
                         >
                             <td className="px-5 py-4">
                                 <div className="flex items-center gap-3">
-                                    <div className={`flex h-11 w-11 items-center justify-center rounded-full text-sm font-bold ${getAvatarColour(clinician.full_name)}`}>
+                                    <div className={`flex h-11 w-11 items-center justify-center rounded-full text-sm font-bold ${getAvatarColour(clinician.id)}`}>
                                         {initials(clinician.full_name)}
                                     </div>
                                     <div>
