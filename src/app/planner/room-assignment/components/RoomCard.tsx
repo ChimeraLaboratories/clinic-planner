@@ -39,7 +39,7 @@ export default function RoomCard({
 
             <div
                 onDragOver={(e) => e.preventDefault()}
-                onDrop={() => onDropOptometrist(room.id)}
+                onDrop={() => onDropOptometrist(String(room.id))}
                 className="min-h-[180px] p-4"
             >
                 {optometrists.length === 0 ? (
@@ -53,7 +53,7 @@ export default function RoomCard({
                             <OptometristCard
                                 key={optometrist.id}
                                 optometrist={optometrist}
-                                onDragStart={() => onDragStart(optometrist.id)}
+                                onDragStart={() => onDragStart(String(optometrist.id))}
                             />
                         ))}
                     </div>
