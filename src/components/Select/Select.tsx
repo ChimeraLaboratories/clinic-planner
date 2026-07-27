@@ -1,7 +1,12 @@
 "use client";
 
 import * as Popover from "@radix-ui/react-popover";
-import {Check, ChevronDown, RefreshCw} from "lucide-react";
+import {
+    AlertTriangle,
+    Check,
+    ChevronDown,
+    RefreshCw,
+} from "lucide-react";
 import {
     useEffect,
     useMemo,
@@ -22,6 +27,8 @@ type SelectProps = {
     onValueChange: (value: string) => void;
     disabled?: boolean;
     loading?: boolean;
+    error?: boolean;
+    errorIcon?: boolean;
 };
 
 export default function Select({
@@ -31,6 +38,8 @@ export default function Select({
                                    onValueChange,
                                    disabled = false,
                                    loading = false,
+                                   error = false,
+                                   errorIcon = false,
                                }: SelectProps) {
     const [open, setOpen] = useState(false);
 
@@ -67,7 +76,10 @@ export default function Select({
         <Popover.Root
             open={open}
             onOpenChange={(nextOpen) => {
-                if (disabled || loading) return;
+                if (disabled || loading) {
+                    return;
+                }
+
                 setOpen(nextOpen);
             }}
         >
@@ -75,48 +87,90 @@ export default function Select({
                 <button
                     type="button"
                     disabled={disabled || loading}
+                    aria-invalid={error}
                     className={[
                         "flex min-h-11 w-full items-center justify-between gap-3",
-                        "rounded-lg border border-slate-300 bg-white px-3 py-2",
+                        "rounded-lg border bg-white px-3 py-2",
                         "text-left text-sm text-slate-900 shadow-sm",
                         "outline-none transition-all duration-150",
-                        "hover:border-slate-400 hover:shadow-sm",
-                        "focus-visible:border-emerald-700",
-                        "focus-visible:ring-2 focus-visible:ring-emerald-100",
                         "disabled:cursor-not-allowed",
+
+                        error
+                            ? [
+                                "border-red-400",
+                                "hover:border-red-500",
+                                "focus-visible:border-red-600",
+                                "focus-visible:ring-2",
+                                "focus-visible:ring-red-100",
+                                "dark:border-red-500",
+                                "dark:hover:border-red-400",
+                                "dark:focus-visible:border-red-400",
+                                "dark:focus-visible:ring-red-950",
+                            ].join(" ")
+                            : [
+                                "border-slate-300",
+                                "hover:border-slate-400",
+                                "hover:shadow-sm",
+                                "focus-visible:border-emerald-700",
+                                "focus-visible:ring-2",
+                                "focus-visible:ring-emerald-100",
+                                "dark:border-slate-700",
+                                "dark:hover:border-slate-600",
+                                "dark:focus-visible:border-emerald-500",
+                                "dark:focus-visible:ring-emerald-950",
+                            ].join(" "),
+
                         loading
                             ? "bg-slate-100 text-slate-500"
                             : "",
+
                         disabled && !loading
                             ? "bg-slate-100 text-slate-500 opacity-70"
                             : "",
-                        "dark:border-slate-700 dark:bg-slate-900",
-                        "dark:text-slate-100",
-                        "dark:hover:border-slate-600",
-                        "dark:focus-visible:border-emerald-500",
-                        "dark:focus-visible:ring-emerald-950",
+
+                        "dark:bg-slate-900 dark:text-slate-100",
                     ].join(" ")}
                 >
-<span className="min-w-0 flex-1 truncate">
-    {selectedOption?.label ?? placeholder}
-</span>
+                    <span className="min-w-0 flex-1 truncate">
+                        {selectedOption?.label ?? placeholder}
+                    </span>
 
-                    {loading ? (
-                        <RefreshCw
-                            className="clinician-loader h-4 w-4 shrink-0 text-slate-500 dark:text-slate-400"
-                            strokeWidth={3}
-                        />
-                    ) : (
+                    <span className="flex shrink-0 items-center gap-2">
+                        {loading && (
+                            <RefreshCw
+                                className="
+                                    clinician-loader
+                                    h-4 w-4
+                                    text-slate-500
+                                    dark:text-slate-400
+                                "
+                                strokeWidth={3}
+                                aria-hidden="true"
+                            />
+                        )}
+
+                        {!loading && error && errorIcon && (
+                            <AlertTriangle
+                                className="
+                                    h-5 w-5
+                                    text-red-600
+                                    dark:text-red-400
+                                "
+                                strokeWidth={2.5}
+                                aria-hidden="true"
+                            />
+                        )}
+
                         <ChevronDown
                             className={[
-                                "h-4 w-4 shrink-0 text-slate-600",
+                                "h-4 w-4 text-slate-600",
                                 "transition-transform",
                                 open ? "rotate-180" : "",
                                 "dark:text-slate-300",
                             ].join(" ")}
                             aria-hidden="true"
                         />
-                    )}
+                    </span>
                 </button>
             </Popover.Trigger>
 
@@ -129,8 +183,10 @@ export default function Select({
                     sideOffset={4}
                     collisionPadding={12}
                     className={[
-                        "z-[100] min-w-[var(--radix-popover-trigger-width)]",
-                        "overflow-hidden rounded-lg border border-slate-300 bg-white",
+                        "z-[100]",
+                        "min-w-[var(--radix-popover-trigger-width)]",
+                        "overflow-hidden rounded-lg",
+                        "border border-slate-300 bg-white",
                         "shadow-xl",
                         "dark:border-slate-700 dark:bg-slate-900",
                     ].join(" ")}
@@ -154,15 +210,19 @@ export default function Select({
                                         "text-slate-900 transition-colors duration-100",
                                         "hover:bg-slate-100",
                                         "focus:bg-slate-100 focus:outline-none",
+
                                         selected
                                             ? "bg-emerald-50 text-emerald-900"
                                             : "",
+
                                         option.disabled
                                             ? "cursor-not-allowed opacity-45"
                                             : "",
+
                                         "dark:text-slate-100",
                                         "dark:hover:bg-slate-800",
                                         "dark:focus:bg-slate-800",
+
                                         selected
                                             ? "dark:bg-emerald-950/50 dark:text-emerald-100"
                                             : "",
@@ -174,7 +234,11 @@ export default function Select({
 
                                     {selected && (
                                         <Check
-                                            className="h-4 w-4 shrink-0 text-emerald-700 dark:text-emerald-400"
+                                            className="
+                                                h-4 w-4 shrink-0
+                                                text-emerald-700
+                                                dark:text-emerald-400
+                                            "
                                             aria-hidden="true"
                                         />
                                     )}

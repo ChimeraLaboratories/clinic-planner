@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import ErrorModal from "@/app/planner/modals/components/ErrorModal";
 import { matchesPattern } from "../../utils/date";
 import {Select} from "@/components/Select";
+import ValidationAlert from "@/components/Select/ValidationAlert";
 
 type Slot = "AM" | "PM" | "FULL";
 type SessionType = "ST" | "CL" | "OTHER";
@@ -88,7 +89,8 @@ export default function CreateSessionModal({
         setClinicianValidationStatus("checking");
         setClinicianValidationError(null);
 
-        console.log("Checking clinician:", selectedClinicianId);
+        const startedAt = Date.now();
+        const minimumLoadingTime = 400;
 
         try {
             const response = await fetch(
@@ -111,6 +113,15 @@ export default function CreateSessionModal({
 
             const result = await response.json();
 
+            const elapsed = Date.now() - startedAt;
+            const remainingDelay = minimumLoadingTime - elapsed;
+
+            if (remainingDelay > 0) {
+                await new Promise((resolve) =>
+                setTimeout(resolve, remainingDelay),
+                );
+            }
+
             if (!response.ok || result.valid !== true) {
                 const validationError: ClinicianValidationError = {
                     code: result?.error?.code ?? "UNKNOWN",
@@ -122,9 +133,6 @@ export default function CreateSessionModal({
 
                 setClinicianValidationError(validationError);
                 setClinicianValidationStatus("rejected");
-
-                setErrorMessage(validationError.message);
-                setErrorOpen(true);
 
                 // Remove rejected clinician from the selection field
                 setClinicianId(null);
@@ -144,9 +152,6 @@ export default function CreateSessionModal({
 
             setClinicianValidationError(validationError);
             setClinicianValidationStatus("rejected");
-
-            setErrorMessage(validationError.message);
-            setErrorOpen(true);
 
             setClinicianId(null);
         }
@@ -293,6 +298,8 @@ export default function CreateSessionModal({
                                         }))}
                                         placeholder="Select clinician…"
                                         loading={clinicianValidationStatus === "checking"}
+                                        error={clinicianValidationStatus === "rejected"}
+                                        errorIcon={clinicianValidationStatus === "rejected"}
                                         onValueChange={(value) => {
                                             const nextId = value ? Number(value) : null;
 
@@ -317,6 +324,16 @@ export default function CreateSessionModal({
                                             }
                                         }}
                                     />
+
+                                {clinicianValidationError && (
+                                    <ValidationAlert
+                                        message={clinicianValidationError.message}
+                                        onDismiss={() => {
+                                            setClinicianValidationError(null);
+                                            setClinicianValidationStatus("idle");
+                                        }}
+                                    />
+                                )}
 
                                 <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">
                                     {isOvertime ? (
