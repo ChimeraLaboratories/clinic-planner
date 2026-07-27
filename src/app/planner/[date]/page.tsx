@@ -5,26 +5,37 @@ import Link from "next/link";
 import DayRoomsClient from "@/app/planner/[date]/DayRoomsClient";
 import type { DayRoom } from "@/app/planner/[date]/types";
 import DayExpectedSidebar from "@/app/planner/sidebar/components/DayExpectedSidebar";
-import {formatUserDate} from "@/app/planner/utils/userFormat";
+import { formatUserDate } from "@/app/planner/utils/userFormat";
 
 type DayApiResponse = {
     rooms: DayRoom[];
+
     stats: {
         totalSessions: number;
         roomsUsed: number;
         clinicians: number;
     };
+
     holidays?: any[];
 };
 
-type PlannerTotalsLikeResponse = {
-    stats?: {
-        totalStValue?: number;
-        totalClValue?: number;
+type PlannerSession = {
+    id?: number;
+    room_id?: number | string | null;
+    clinician_id?: number | string | null;
+    session_type?: string | null;
+    type?: string | null;
+    clinic_code?: string | null;
+    status?: string | null;
+};
+
+type PlannerApiResponse = {
+    sessions?: PlannerSession[];
+    dayRules?: any[];
+    data?: {
+        sessions?: PlannerSession[];
+        dayRules?: any[];
     };
-    totalStValue?: number;
-    totalClValue?: number;
-    data?: any;
 };
 
 type ClinicianApi = {
@@ -48,85 +59,176 @@ type SidebarClinician = {
     is_active?: number;
 };
 
-function normalizeTotals(raw: any) {
-    const root = raw?.data ?? raw ?? {};
-    const stats = root?.stats ?? {};
+type ClinicTotals = {
+    totalStClinicians: number;
+    totalClClinicians: number;
+};
 
-    const explicitSt = stats.totalStValue ?? root.totalStValue;
-    const explicitCl = stats.totalClValue ?? root.totalClValue;
-
-    if (explicitSt != null || explicitCl != null) {
-        return {
-            totalStValue: Number(explicitSt ?? 0),
-            totalClValue: Number(explicitCl ?? 0),
-        };
-    }
-
-    const sessions: any[] = Array.isArray(root.sessions) ? root.sessions : [];
-
-    let totalStValue = 0;
-    let totalClValue = 0;
-
-    for (const s of sessions) {
-        if (String(s?.status ?? "").trim().toUpperCase() === "CANCELLED") continue;
-
-        const t = String(s?.session_type ?? s?.type ?? s?.clinic_code ?? "")
-            .trim()
-            .toUpperCase();
-
-        const rawVal = s?.value ?? s?.session_value ?? s?.clinic_value ?? 0;
-        const v = typeof rawVal === "number" ? rawVal : parseFloat(String(rawVal));
-
-        if (!Number.isFinite(v)) continue;
-
-        if (t.startsWith("ST")) totalStValue += v;
-        else if (t.startsWith("CL")) totalClValue += v;
-    }
-
-    return { totalStValue, totalClValue };
-}
-
-function getBaseUrl(host: string, forwardedProto: string | null) {
-    if (forwardedProto === "http" || forwardedProto === "https") {
+function getBaseUrl(
+    host: string,
+    forwardedProto: string | null
+) {
+    if (
+        forwardedProto === "http" ||
+        forwardedProto === "https"
+    ) {
         return `${forwardedProto}://${host}`;
     }
 
-    return process.env.NODE_ENV === "development" ? `http://${host}` : `https://${host}`;
+    return process.env.NODE_ENV === "development"
+        ? `http://${host}`
+        : `https://${host}`;
 }
 
-function normalizeClinicians(input: ClinicianApi[]): SidebarClinician[] {
-    return (input ?? []).map((c) => ({
-        id: Number(c.id),
-        full_name: c.full_name ?? null,
+function normalizeClinicians(
+    input: ClinicianApi[]
+): SidebarClinician[] {
+    return (input ?? []).map((clinician) => ({
+        id: Number(clinician.id),
+
+        full_name:
+            clinician.full_name ?? null,
+
         display_name:
-            String(c.display_name ?? "").trim() ||
-            String(c.full_name ?? "").trim() ||
-            `Clinician ${c.id}`,
-        role_code: Number(c.role_code ?? 0),
-        grade_code: Number(c.grade_code ?? 0),
-        is_supervisor: Number(c.is_supervisor ?? 0),
-        is_active: Number(c.is_active ?? 1),
+            String(
+                clinician.display_name ?? ""
+            ).trim() ||
+            String(
+                clinician.full_name ?? ""
+            ).trim() ||
+            `Clinician ${clinician.id}`,
+
+        role_code: Number(
+            clinician.role_code ?? 0
+        ),
+
+        grade_code: Number(
+            clinician.grade_code ?? 0
+        ),
+
+        is_supervisor: Number(
+            clinician.is_supervisor ?? 0
+        ),
+
+        is_active: Number(
+            clinician.is_active ?? 1
+        ),
     }));
+}
+
+/**
+ * Counts assigned clinicians based on the session's clinic type.
+ *
+ * The room name is deliberately not used because an ST clinician
+ * may be assigned to a room such as GF.
+ *
+ * The assignment key combines the clinic type, room and clinician.
+ * This prevents AM and PM sessions for the same clinician in the
+ * same room from being counted twice.
+ */
+function countAssignedClinicians(
+    sessions: PlannerSession[]
+): ClinicTotals {
+    const stAssignments = new Set<string>();
+    const clAssignments = new Set<string>();
+
+    for (const session of sessions ?? []) {
+        const status = String(
+            session.status ?? ""
+        )
+            .trim()
+            .toUpperCase();
+
+        if (status === "CANCELLED") {
+            continue;
+        }
+
+        const clinicianId = Number(
+            session.clinician_id
+        );
+
+        const roomId = Number(
+            session.room_id
+        );
+
+        if (
+            !Number.isFinite(clinicianId) ||
+            clinicianId <= 0
+        ) {
+            continue;
+        }
+
+        const clinicType = String(
+            session.session_type ??
+            session.type ??
+            session.clinic_code ??
+            ""
+        )
+            .trim()
+            .toUpperCase();
+
+        /*
+         * A room ID should normally exist, but the session ID
+         * provides a safe fallback so a valid assignment is not lost.
+         */
+        const assignmentLocation =
+            Number.isFinite(roomId) && roomId > 0
+                ? `room-${roomId}`
+                : `session-${session.id ?? "unknown"}`;
+
+        const assignmentKey =
+            `${clinicType}:${assignmentLocation}:${clinicianId}`;
+
+        if (clinicType.startsWith("ST")) {
+            stAssignments.add(assignmentKey);
+        }
+
+        if (clinicType.startsWith("CL")) {
+            clAssignments.add(assignmentKey);
+        }
+    }
+
+    return {
+        totalStClinicians:
+        stAssignments.size,
+
+        totalClClinicians:
+        clAssignments.size,
+    };
 }
 
 export default async function PlannerDayPage({
                                                  params,
                                                  searchParams,
                                              }: {
-    params: Promise<{ date: string }>;
-    searchParams?: Promise<{ m?: string }>;
+    params: Promise<{
+        date: string;
+    }>;
+
+    searchParams?: Promise<{
+        m?: string;
+    }>;
 }) {
     const { date } = await params;
-    const sp = (await searchParams) ?? {};
-    const monthParam = sp?.m;
+
+    const resolvedSearchParams =
+        (await searchParams) ?? {};
+
+    const monthParam =
+        resolvedSearchParams.m;
 
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
         notFound();
     }
 
-    const h = await headers();
-    const host = h.get("host");
-    const cookieHeader = h.get("cookie") ?? "";
+    const requestHeaders =
+        await headers();
+
+    const host =
+        requestHeaders.get("host");
+
+    const cookieHeader =
+        requestHeaders.get("cookie") ?? "";
 
     if (!host) {
         return (
@@ -138,11 +240,19 @@ export default async function PlannerDayPage({
         );
     }
 
-    const baseUrl = getBaseUrl(host, h.get("x-forwarded-proto"));
+    const baseUrl = getBaseUrl(
+        host,
+        requestHeaders.get(
+            "x-forwarded-proto"
+        )
+    );
 
-    async function authedFetch(url: string) {
+    async function authedFetch(
+        url: string
+    ) {
         return fetch(url, {
             cache: "no-store",
+
             headers: {
                 cookie: cookieHeader,
             },
@@ -151,70 +261,154 @@ export default async function PlannerDayPage({
 
     let dayData: DayApiResponse = {
         rooms: [],
+
         stats: {
             totalSessions: 0,
             roomsUsed: 0,
             clinicians: 0,
         },
+
         holidays: [],
     };
 
-    let totals = { totalStValue: 0, totalClValue: 0 };
+    let plannerSessions:
+        PlannerSession[] = [];
+
     let dayRules: any[] = [];
-    let clinicianList: SidebarClinician[] = [];
+
+    let clinicianList:
+        SidebarClinician[] = [];
+
     let dayLoadError = "";
 
+    /*
+     * Load the room cards and day statistics.
+     */
     try {
-        const dayRes = await authedFetch(`${baseUrl}/planner/api/day?date=${date}`);
+        const dayResponse =
+            await authedFetch(
+                `${baseUrl}/planner/api/day?date=${encodeURIComponent(date)}`
+            );
 
-        if (!dayRes.ok) {
-            throw new Error(`Day API failed with status ${dayRes.status}`);
+        if (!dayResponse.ok) {
+            throw new Error(
+                `Day API failed with status ${dayResponse.status}`
+            );
         }
 
-        dayData = await dayRes.json();
+        dayData =
+            await dayResponse.json();
     } catch (error) {
-        console.error("[PlannerDayPage] failed to load day data:", error);
-        dayLoadError = "Unable to load day data right now.";
-    }
-
-    try {
-        const totalsRes = await authedFetch(
-            `${baseUrl}/planner/api/planner?from=${date}&to=${date}`
+        console.error(
+            "[PlannerDayPage] failed to load day data:",
+            error
         );
 
-        if (totalsRes.ok) {
-            const rawTotals: PlannerTotalsLikeResponse = await totalsRes.json();
-            totals = normalizeTotals(rawTotals);
-
-            const root = (rawTotals as any)?.data ?? rawTotals ?? {};
-            dayRules = Array.isArray(root?.dayRules) ? root.dayRules : [];
-        } else {
-            console.error(
-                `[PlannerDayPage] planner totals API failed with status ${totalsRes.status}`
-            );
-        }
-    } catch (error) {
-        console.error("[PlannerDayPage] failed to load totals/day rules:", error);
+        dayLoadError =
+            "Unable to load day data right now.";
     }
 
+    /*
+     * Load the actual sessions for the selected day.
+     *
+     * These sessions are used to count ST and CL clinician
+     * assignments by session type rather than clinician value.
+     *
+     * The day rules from this response are also required by
+     * DayExpectedSidebar.
+     */
     try {
-        const cRes = await authedFetch(`${baseUrl}/planner/api/clinicians`);
+        const plannerResponse =
+            await authedFetch(
+                `${baseUrl}/planner/api/planner?from=${encodeURIComponent(date)}&to=${encodeURIComponent(date)}`
+            );
 
-        if (cRes.ok) {
-            const rawClinicians: ClinicianApi[] = await cRes.json();
-            clinicianList = normalizeClinicians(rawClinicians);
+        if (plannerResponse.ok) {
+            const response:
+                PlannerApiResponse =
+                await plannerResponse.json();
+
+            const root =
+                response.data ??
+                response;
+
+            plannerSessions =
+                Array.isArray(root.sessions)
+                    ? root.sessions
+                    : [];
+
+            dayRules =
+                Array.isArray(root.dayRules)
+                    ? root.dayRules
+                    : [];
         } else {
             console.error(
-                `[PlannerDayPage] clinicians API failed with status ${cRes.status}`
+                `[PlannerDayPage] planner API failed with status ${plannerResponse.status}`
             );
         }
     } catch (error) {
-        console.error("[PlannerDayPage] failed to load clinicians:", error);
+        console.error(
+            "[PlannerDayPage] failed to load sessions and day rules:",
+            error
+        );
     }
 
-    const displayDate = new Date(`${date}T00:00:00`);
-    const dayName = displayDate.toLocaleDateString("en-GB", { weekday: "long" });
-    const backHref = monthParam ? `/planner?m=${monthParam}` : "/planner";
+    /*
+     * Load clinicians for the room modal and expected-clinicians
+     * sidebar.
+     */
+    try {
+        const cliniciansResponse =
+            await authedFetch(
+                `${baseUrl}/planner/api/clinicians`
+            );
+
+        if (cliniciansResponse.ok) {
+            const clinicians:
+                ClinicianApi[] =
+                await cliniciansResponse.json();
+
+            clinicianList =
+                normalizeClinicians(
+                    clinicians
+                );
+        } else {
+            console.error(
+                `[PlannerDayPage] clinicians API failed with status ${cliniciansResponse.status}`
+            );
+        }
+    } catch (error) {
+        console.error(
+            "[PlannerDayPage] failed to load clinicians:",
+            error
+        );
+    }
+
+    /*
+     * These are assignment counts, not ST/CL capacity values.
+     */
+    const {
+        totalStClinicians,
+        totalClClinicians,
+    } = countAssignedClinicians(
+        plannerSessions
+    );
+
+    const displayDate =
+        new Date(`${date}T00:00:00`);
+
+    const dayName =
+        displayDate.toLocaleDateString(
+            "en-GB",
+            {
+                weekday: "long",
+            }
+        );
+
+    const backHref =
+        monthParam
+            ? `/planner?m=${monthParam}`
+            : "/planner";
 
     return (
         <div className="min-h-screen bg-gray-50 p-8 dark:bg-slate-950">
@@ -222,10 +416,15 @@ export default async function PlannerDayPage({
                 <div className="sticky top-8 h-fit w-[320px] flex-shrink-0">
                     <DayExpectedSidebar
                         dateISO={`${date}T00:00:00`}
-                        clinicians={clinicianList}
+                        clinicians={
+                            clinicianList
+                        }
                         dayRules={dayRules}
                         rooms={dayData.rooms}
-                        holidays={dayData.holidays ?? []}
+                        holidays={
+                            dayData.holidays ??
+                            []
+                        }
                     />
                 </div>
 
@@ -235,8 +434,11 @@ export default async function PlannerDayPage({
                             <h1 className="text-3xl font-bold text-gray-900 dark:text-slate-100">
                                 {dayName}
                             </h1>
+
                             <p className="text-gray-500 dark:text-slate-400">
-                                {formatUserDate(displayDate)}
+                                {formatUserDate(
+                                    displayDate
+                                )}
                             </p>
                         </div>
 
@@ -259,8 +461,12 @@ export default async function PlannerDayPage({
                             <div className="text-base font-medium tracking-tight text-gray-700 dark:text-slate-200">
                                 Rooms Used
                             </div>
+
                             <div className="text-3xl font-bold text-gray-900 dark:text-slate-100">
-                                {dayData.stats.roomsUsed}
+                                {
+                                    dayData.stats
+                                        .roomsUsed
+                                }
                             </div>
                         </div>
 
@@ -270,8 +476,11 @@ export default async function PlannerDayPage({
                                     <div className="text-base font-medium tracking-tight text-gray-700 dark:text-slate-200">
                                         Total ST
                                     </div>
+
                                     <div className="text-3xl font-bold text-gray-900 dark:text-slate-100">
-                                        {totals.totalStValue.toFixed(2)}
+                                        {
+                                            totalStClinicians
+                                        }
                                     </div>
                                 </div>
 
@@ -279,8 +488,11 @@ export default async function PlannerDayPage({
                                     <div className="text-base font-medium tracking-tight text-gray-700 dark:text-slate-200">
                                         Total CL
                                     </div>
+
                                     <div className="text-3xl font-bold text-gray-900 dark:text-slate-100">
-                                        {totals.totalClValue.toFixed(2)}
+                                        {
+                                            totalClClinicians
+                                        }
                                     </div>
                                 </div>
                             </div>
@@ -290,8 +502,15 @@ export default async function PlannerDayPage({
                             <div className="text-base font-medium tracking-tight text-gray-700 dark:text-slate-200">
                                 Available Rooms
                             </div>
+
                             <div className="text-3xl font-bold text-gray-900 dark:text-slate-100">
-                                {Math.max(0, dayData.rooms.length - dayData.stats.roomsUsed)}
+                                {Math.max(
+                                    0,
+                                    dayData.rooms
+                                        .length -
+                                    dayData.stats
+                                        .roomsUsed
+                                )}
                             </div>
                         </div>
                     </div>
@@ -300,10 +519,15 @@ export default async function PlannerDayPage({
                         <h2 className="mb-4 text-xl font-semibold text-slate-900 dark:text-slate-100">
                             Room Overview
                         </h2>
+
                         <DayRoomsClient
-                            initialRooms={dayData.rooms}
+                            initialRooms={
+                                dayData.rooms
+                            }
                             date={date}
-                            clinicians={clinicianList}
+                            clinicians={
+                                clinicianList
+                            }
                         />
                     </section>
                 </div>
