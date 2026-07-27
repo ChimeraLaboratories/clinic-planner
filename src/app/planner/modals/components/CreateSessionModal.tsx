@@ -3,10 +3,21 @@
 import { useMemo, useState } from "react";
 import ErrorModal from "@/app/planner/modals/components/ErrorModal";
 import { matchesPattern } from "../../utils/date";
+import {Select} from "@/components/Select";
 
 type Slot = "AM" | "PM" | "FULL";
 type SessionType = "ST" | "CL" | "OTHER";
 type Status = "DRAFT" | "PUBLISHED" | "CANCELLED";
+type ClinicianValidationStatus = "idle" | "checking" | "accepted" | "rejected";
+type ClinicianValidationError = {
+    code:
+        "HOLIDAY"
+        | "ALREADY_ASSIGNED"
+        | "DAY_OFF"
+        | "UNKNOWN";
+    title: string;
+    message: string;
+};
 
 // role_code: 1 = OO, 2 = CLO
 type Clinician = {
@@ -67,6 +78,79 @@ export default function CreateSessionModal({
     const [notes, setNotes] = useState("");
     const [saving, setSaving] = useState(false);
     const [isOvertime, setIsOvertime] = useState(false);
+
+    //New Clinican Validation States
+    const [clinicianValidationStatus, setClinicianValidationStatus] = useState<ClinicianValidationStatus>("idle");
+    const [clinicianValidationError, setClinicianValidationError] = useState<ClinicianValidationError | null>(null);
+
+    // Clinician Validation Function
+    async function validateSelectedClinician(selectedClinicianId: number,) {
+        setClinicianValidationStatus("checking");
+        setClinicianValidationError(null);
+
+        console.log("Checking clinician:", selectedClinicianId);
+
+        try {
+            const response = await fetch(
+                "/planner/api/sessions/validate-clinician",
+                {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({
+                        clinician_id: selectedClinicianId,
+                        session_date,
+                        room_id,
+                        slot,
+                        session_type,
+                        is_overtime: isOvertime ? 1 : 0,
+                    }),
+                },
+            );
+
+            const result = await response.json();
+
+            if (!response.ok || result.valid !== true) {
+                const validationError: ClinicianValidationError = {
+                    code: result?.error?.code ?? "UNKNOWN",
+                    title: result?.error?.title ??
+                        "Clinician cannot be assigned",
+                    message: result?.error?.message ??
+                        "This clinician cannot be assigned to this session.",
+                };
+
+                setClinicianValidationError(validationError);
+                setClinicianValidationStatus("rejected");
+
+                setErrorMessage(validationError.message);
+                setErrorOpen(true);
+
+                // Remove rejected clinician from the selection field
+                setClinicianId(null);
+
+                return;
+            }
+
+            setClinicianValidationStatus("accepted");
+        } catch (error) {
+            console.error("[CLINICIAN_VALIDATION_FAILED]", error,);
+
+            const validationError: ClinicianValidationError = {
+                code: "UNKNOWN",
+                title: "Validation failed",
+                message: "The clinician could not be checked, please try again.",
+            };
+
+            setClinicianValidationError(validationError);
+            setClinicianValidationStatus("rejected");
+
+            setErrorMessage(validationError.message);
+            setErrorOpen(true);
+
+            setClinicianId(null);
+        }
+    }
 
     const selectedClinician = useMemo(() => {
         if (clinician_id == null) return null;
@@ -201,32 +285,38 @@ export default function CreateSessionModal({
                         <div className="grid gap-4">
                             <label className="text-sm font-medium text-slate-700 dark:text-slate-200">
                                 Clinician <span className="text-red-600 dark:text-red-400">*</span>
-                                <select
-                                    className="mt-2 w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-3 text-slate-900 dark:text-slate-100 shadow-sm outline-none transition focus:border-slate-400 dark:focus:border-slate-600 focus:ring-4 focus:ring-slate-100 dark:focus:ring-slate-800"
-                                    value={clinician_id ?? ""}
-                                    onChange={(e) => {
-                                        const nextId = e.target.value ? Number(e.target.value) : null;
-                                        setClinicianId(nextId);
+                                    <Select
+                                        value={clinician_id?.toString() ?? ""}
+                                        options={eligibleClinicians.map((c: any) => ({
+                                            value: c.id.toString(),
+                                            label: clinicianLabel(c),
+                                        }))}
+                                        placeholder="Select clinician…"
+                                        loading={clinicianValidationStatus === "checking"}
+                                        onValueChange={(value) => {
+                                            const nextId = value ? Number(value) : null;
 
-                                        if (nextId == null) return;
+                                            setClinicianId(nextId);
 
-                                        const selected = clinicians.find((c) => c.id === nextId);
+                                            if (nextId != null) {
+                                                validateSelectedClinician(nextId);
+                                            }
 
-                                        // 2 = CLO -> CL, 1 = OO -> ST
-                                        if (selected?.role_code === 2) setSessionType("CL");
-                                        else if (selected?.role_code === 1) setSessionType("ST");
-                                    }}
-                                >
-                                    <option value="" disabled>
-                                        Select clinician…
-                                    </option>
+                                            if (nextId == null) {
+                                                return;
+                                            }
 
-                                    {eligibleClinicians.map((c: any) => (
-                                        <option key={c.id} value={c.id}>
-                                            {clinicianLabel(c)}
-                                        </option>
-                                    ))}
-                                </select>
+                                            const selected = clinicians.find(
+                                                (c) => c.id === nextId,
+                                            );
+
+                                            if (selected?.role_code === 2) {
+                                                setSessionType("CL");
+                                            } else if (selected?.role_code === 1) {
+                                                setSessionType("ST");
+                                            }
+                                        }}
+                                    />
 
                                 <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">
                                     {isOvertime ? (
@@ -311,9 +401,16 @@ export default function CreateSessionModal({
 
             <ErrorModal
                 open={errorOpen}
-                title="Cannot create session"
+                title={clinicianValidationError?.title ?? "Cannot save session"}
                 message={errorMessage}
-                onClose={() => setErrorOpen(false)}
+                onClose={() => {
+                    setErrorOpen(false);
+
+                    if (clinicianValidationStatus === "rejected") {
+                        setClinicianValidationStatus("idle")
+                        setClinicianValidationError(null);
+                    }
+                }}
             />
         </>
     );
