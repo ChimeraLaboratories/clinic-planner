@@ -51,7 +51,6 @@ function clinicianLabel(c: any) {
 }
 
 export default function CreateSessionModal({
-                                               rooms,
                                                clinicians,
                                                dayRules,
                                                defaults,
@@ -245,7 +244,7 @@ export default function CreateSessionModal({
             } catch {}
 
             if (!res.ok) {
-                throw new Error(json?.error ?? `HTTP ${res.status}`);
+                new Error(json?.error ?? `HTTP ${res.status}`);
             }
 
             onCreated?.();

@@ -291,7 +291,7 @@ export default async function PlannerDayPage({
             );
 
         if (!dayResponse.ok) {
-            throw new Error(
+            new Error(
                 `Day API failed with status ${dayResponse.status}`
             );
         }
