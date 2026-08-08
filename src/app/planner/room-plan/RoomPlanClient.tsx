@@ -442,14 +442,12 @@ export default function RoomPlanClient() {
                                                             "CL"
                                                         ) {
                                                             return (
-                                                                clinician.roleCode ===
-                                                                2
+                                                                clinician
                                                             );
                                                         }
 
                                                         return (
-                                                            clinician.roleCode ===
-                                                            1
+                                                            clinician
                                                         );
                                                     },
                                                 );
