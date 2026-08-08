@@ -200,6 +200,58 @@ async function getRoomMap() {
     return map;
 }
 
+async function getWeeklyRoomPlanForDate(
+    dateYmd: string,
+): Promise<Map<number, number>> {
+    /*
+     * clinician_room_day_assignment uses:
+     *
+     * 1 = Monday
+     * 2 = Tuesday
+     * 3 = Wednesday
+     * 4 = Thursday
+     * 5 = Friday
+     * 6 = Saturday
+     * 7 = Sunday
+     *
+     * JavaScript Date.getDay() instead uses:
+     * 0 = Sunday ... 6 = Saturday
+     */
+    const jsWeekday = toDateOnly(dateYmd).getDay();
+
+    const weekday =
+        jsWeekday === 0
+            ? 7
+            : jsWeekday;
+
+    const [rows] = await db.query(
+        `
+            SELECT
+                clinician_id,
+                room_id
+            FROM clinician_room_day_assignment
+            WHERE weekday = ?
+              AND is_active = 1
+        `,
+        [weekday],
+    );
+
+    const map = new Map<number, number>();
+
+    for (const row of rows as AnyRow[]) {
+        const clinicianId = Number(row.clinician_id);
+        const roomId = Number(row.room_id);
+
+        if (!clinicianId || !roomId) {
+            continue;
+        }
+
+        map.set(clinicianId, roomId);
+    }
+
+    return map;
+}
+
 async function getExistingSessions(dateYmd: string) {
     const [rows] = await db.query(
         `
@@ -469,6 +521,7 @@ export async function previewAutoScheduleDay(options: {
 
     const pattern = getPatternForDate(dateYmd);
     const roomMap = await getRoomMap();
+    const weeklyRoomPlan = await getWeeklyRoomPlanForDate(dateYmd);
     const { rows: ruleRows, debugRows } = await getRuleRowsForDate(dateYmd);
     const existingSessions = await getExistingSessions(dateYmd);
 
@@ -693,6 +746,36 @@ export async function previewAutoScheduleDay(options: {
             return true;
         });
 
+        /*
+ * Prefer the clinician's weekly room plan before using
+ * the normal AUTO room selection.
+ */
+        const plannedRoomId =
+            weeklyRoomPlan.get(row.clinician_id);
+
+        if (plannedRoomId) {
+            candidateKeys.sort((a, b) => {
+                const aRoomId = Number(a.split(":")[0]);
+                const bRoomId = Number(b.split(":")[0]);
+
+                const aIsPlanned =
+                    aRoomId === plannedRoomId;
+
+                const bIsPlanned =
+                    bRoomId === plannedRoomId;
+
+                if (aIsPlanned && !bIsPlanned) {
+                    return -1;
+                }
+
+                if (!aIsPlanned && bIsPlanned) {
+                    return 1;
+                }
+
+                return 0;
+            });
+        }
+
         if (candidateKeys.length === 0) {
             warnings.push(
                 `${dateYmd}: ${row.display_name || row.full_name || `Clinician ${row.clinician_id}`} is AUTO but no free ${sessionType} ${slot} room was available`
@@ -710,9 +793,44 @@ export async function previewAutoScheduleDay(options: {
         }
 
         const chosenKey = candidateKeys.sort((a, b) => {
-            const aUsed = roomSlotUsed.get(a) ?? 0;
-            const bUsed = roomSlotUsed.get(b) ?? 0;
-            if (aUsed !== bUsed) return aUsed - bUsed;
+            const aRoomId = Number(a.split(":")[0]);
+            const bRoomId = Number(b.split(":")[0]);
+
+            const plannedRoomId =
+                weeklyRoomPlan.get(row.clinician_id);
+
+            /*
+             * Weekly room plan takes priority.
+             */
+            if (plannedRoomId) {
+                const aIsPlanned =
+                    aRoomId === plannedRoomId;
+
+                const bIsPlanned =
+                    bRoomId === plannedRoomId;
+
+                if (aIsPlanned && !bIsPlanned) {
+                    return -1;
+                }
+
+                if (!aIsPlanned && bIsPlanned) {
+                    return 1;
+                }
+            }
+
+            /*
+             * Existing AUTO behaviour remains as the fallback.
+             */
+            const aUsed =
+                roomSlotUsed.get(a) ?? 0;
+
+            const bUsed =
+                roomSlotUsed.get(b) ?? 0;
+
+            if (aUsed !== bUsed) {
+                return aUsed - bUsed;
+            }
+
             return a.localeCompare(b);
         })[0];
 
